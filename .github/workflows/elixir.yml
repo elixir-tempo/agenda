@@ -1,0 +1,121 @@
+name: Elixir CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  MIX_ENV: test
+  LOCALIZE_DEFAULT_LOCALE: en
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: "Elixir ${{ matrix.elixir }} / OTP ${{ matrix.otp }}${{ matrix.lint && ' (lint)' || '' }}"
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # OTP 27 is the floor, inherited from `ex_tempo` — its tokenizer's
+        # optimiser-off `@compile` flags expose an OTP-26 code-generation bug.
+        include:
+          # Elixir 1.17 — the declared floor in mix.exs
+          - elixir: "1.17-otp-27"
+            otp: "27"
+
+          - elixir: "1.18-otp-27"
+            otp: "27"
+
+          - elixir: "1.19-otp-28"
+            otp: "28"
+
+          - elixir: "1.20.2-otp-28"
+            otp: "28"
+          - elixir: "1.20.2-otp-29"
+            otp: "29"
+            lint: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: ${{ matrix.elixir }}
+          otp-version: ${{ matrix.otp }}
+
+      - name: Restore dependency cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            deps
+            _build
+          key: mix-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            mix-${{ matrix.elixir }}-${{ matrix.otp }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      # `astro` arrives transitively via `ex_tempo`. It downloads the ~32 MB
+      # JPL ephemeris from NASA on first application start and fails to boot
+      # without it, which would abort the whole test suite. Cache it and
+      # pre-fetch with retries so a flaky NASA connection can't fail CI.
+      - name: Cache Astro ephemeris
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/astro
+          key: astro-ephemeris-de440s
+
+      - name: Pre-fetch Astro ephemeris
+        run: |
+          mkdir -p ~/.cache/astro
+          if [ ! -f ~/.cache/astro/de440s.bsp ]; then
+            curl -fSL --retry 5 --retry-all-errors --retry-delay 5 \
+              -o ~/.cache/astro/de440s.bsp \
+              https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de440s.bsp
+          fi
+
+      - name: Check formatting
+        if: matrix.lint
+        run: mix format --check-formatted
+
+      - name: Run Credo
+        if: matrix.lint
+        run: mix credo --strict
+
+      - name: Docs (no warnings)
+        if: matrix.lint
+        env:
+          MIX_ENV: release
+        # `--warnings-as-errors` fails on ex_doc's own documentation
+        # warnings (broken refs, bad `@doc` links) without tripping on
+        # the dependency compile warnings a fresh release build emits.
+        run: mix docs --warnings-as-errors
+
+      - name: Compile (warnings as errors)
+        run: mix compile --warnings-as-errors
+
+      - name: Run tests
+        run: mix test
+
+      - name: Restore PLT cache
+        if: matrix.lint
+        uses: actions/cache@v5
+        with:
+          path: _build/dev/dialyxir_*
+          key: plt-${{ matrix.elixir }}-${{ matrix.otp }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            plt-${{ matrix.elixir }}-${{ matrix.otp }}-
+
+      - name: Run dialyzer
+        if: matrix.lint
+        env:
+          MIX_ENV: dev
+        run: mix dialyzer
