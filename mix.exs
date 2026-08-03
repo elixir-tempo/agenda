@@ -95,10 +95,7 @@ defmodule Timetable.MixProject do
 
   defp deps do
     [
-      # Path dep while the metadata-provenance and n-ary set operations
-      # land in Tempo. Must become `{:ex_tempo, "~> 1.1"}` before this
-      # library is published.
-      {:ex_tempo, path: "../tempo"},
+      {:ex_tempo, "~> 1.1"},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
