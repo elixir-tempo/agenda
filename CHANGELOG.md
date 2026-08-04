@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+* Requires `ex_tempo ~> 1.2`. Beyond the new `Tempo.compare/3` sorter callback, 1.1.1 fixed two defects that reach this library directly: intervals built from a duration could not be rendered or inspected, and `Tempo.IntervalSet.new/2` raised rather than returning `{:error, reason}` when handed a member that was not an interval.
+
 ### Added
 
 * `Timetable.Resource` honours `concurrency` — previously the field was accepted, documented, and enforced nowhere, so a twenty-locker bank went fully unavailable after one booking. A window is now unavailable only where overlapping claims reach the resource's concurrency.
