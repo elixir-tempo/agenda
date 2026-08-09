@@ -76,11 +76,115 @@ Then three worked problems, each end to end with executed output:
 
 * [ElixirConf 2027](https://hexdocs.pm/timetable/case-study-conference.html) — two days, keynotes, and parallel tracks. Where planning becomes searching, and where the search stops.
 
+## When not everything fits
+
+Three things separate a scheduler you can ship from one that only works on the happy path, and all three are about failure.
+
+**Place what you can.** By default an unplaceable session fails the whole programme, which is right when the programme is a unit and wrong when it is a wish list. `unplaced: :allow` leaves out as few sessions as the search can manage — and says so, under a tag that cannot be mistaken for success:
+
+```elixir
+case Timetable.arrange(programme, rooms, unplaced: :allow) do
+  {:ok, arrangements} -> publish(arrangements)
+  {:partial, layout}  -> review(layout.placed, layout.unplaced)
+  {:error, reason}    -> abandon(reason)
+end
+```
+
+**Hold the announced sessions still.** A published programme gets edited, and the keynote must not move. `:pinned` fixes chosen placements and searches around them, with every constraint still applying to the pins:
+
+```elixir
+Timetable.arrange(programme, rooms, pinned: already_announced)
+```
+
+**Say which sessions are actually in tension.** "No arrangement found" is a dead end. `conflict/3` returns a *minimal* set — remove any one member and the rest fit:
+
+```elixir
+Timetable.conflict(programme, rooms)
+#=> {:ok, ["Keynote", "Workshop", "Panel"]}
+```
+
+> *"Any two of these three fit. Choose which one moves."*
+
+It works on a single session too, naming the demands that are impossible *together* — including the ones a person induced rather than the session asking for them:
+
+```elixir
+Timetable.conflict(session, rooms)
+#=> {:ok, [needs: {:room, :video_conferencing}, requires: {"Alice", :step_free_access}]}
+```
+
+## Holding a room while someone finds their card
+
+A booking page needs to take a room *tentatively*. A hold occupies the resource exactly as a booking does — which is why it lives in the ledger rather than in a persistence layer: availability is derived on every call, so a hold nobody can see is a hold nobody subtracts.
+
+```elixir
+{:ok, ledger} = Timetable.hold(ledger, arrangement, until: "2026-06-15T10:15:00")
+{:ok, ledger} = Timetable.confirm(ledger, "Review")
+```
+
+**Nothing expires on its own.** `expire/2` takes the moment as an argument rather than reading a clock:
+
+```elixir
+{:ok, ledger} = Timetable.expire(ledger, now)
+```
+
+That is deliberate. `busy/2` is called inside `plan/3` and `arrange/3`; if it consulted the system clock, arranging the same programme twice would give different answers as holds lapsed underneath it. Refusing to guess the time is the same discipline as refusing to guess an unmeasured journey.
+
+The rest of the claim lifecycle — completed, cancelled, no-show — is deliberately *not* here. A hold changes what is available; a no-show does not. That line is what separates the engine's business from the adapter's.
+
+## Preferring one workable layout over another
+
+Every constraint above is hard. A preference is soft: it never makes a layout invalid, only worse.
+
+```elixir
+{:ok, programme} = Timetable.prefer(programme, :room_changes, weight: 10)
+{:ok, programme} = Timetable.prefer(programme, :room_spread, weight: 3)
+
+Timetable.explain_score(arrangements, programme)
+#=> ["room_changes: 0 × 10 = 0", "room_spread: 0 × 3 = 0"]
+```
+
+Preferences count *violations*, so zero is ideal — a number that means something on its own, where a reward total only means something next to another reward total.
+
+Optimisation is **lexicographic and two-pass**, and that is the whole design. The first pass ignores preferences and *proves* how many sessions can be placed. The second takes that number as a hard ceiling and looks only for a better-scoring layout placing exactly as many. So a preference can never cost you a session, `minimal?` still means proven, and the new `score_proven?` says whether the scoring pass finished or ran out of its own budget.
+
+What is not promised is soft *optimality*. Proving a weighted optimum needs a bound on remaining cost that this search has no cheap way to compute — and a programme that genuinely needs one wants a solver, which is the next section.
+
+## Handing it to a solver
+
+Past a few dozen sessions the exact search runs out of road. The answer has always been "use a solver, then write the result back through `allocate/2`" — and with the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that sentence is executable:
+
+```elixir
+{:ok, arrangements} = Timetable.Fixpoint.solve(programme, rooms)
+```
+
+Nothing about the model changes. Each session already has a finite list of candidate placements that satisfy its requirements, so the solver's variable is *which candidate* — eligibility, induced requirements, availability and the place tree all stay on this side of the boundary, where they are explained. The solver never learns what a room is. Conflicts come from `Timetable.Arranger.conflict?/4`, the same predicate the built-in search uses, so the two cannot disagree about what a clash is.
+
+It answers the all-or-nothing question only, for exclusive resources. Concurrency above one is refused rather than mis-solved: capacity is not a pairwise property, and fixpoint has no cumulative constraint to express it.
+
+## Open hours from a calendar
+
+Availability usually already exists somewhere. `from_ical/1` reads [RFC 7953](https://www.rfc-editor.org/rfc/rfc7953.html) `VAVAILABILITY` — what a CalDAV server hands you when asked when someone is free:
+
+```elixir
+{:ok, hours} = Timetable.from_ical(vavailability)
+{:ok, clinic} = Timetable.open(Timetable.resource("Clinic"), hours)
+```
+
+`PRIORITY` across overlapping components and each `AVAILABLE` recurrence resolve against the window you actually ask about, not at import time. `VEVENT`s in the same document are ignored — those are time *taken*, and belong in `free/2`'s `:busy`.
+
+Requires the optional `ical` dependency.
+
 ## Status
 
-**Early development.** Phase 1 — the model and matching, with no time involved — is implemented: resources, attributes, the place tree, travel time, requirements, the predicate vocabulary, induced requirements, and explanations.
+**Early development, but no longer only a model.** Implemented: resources, attributes, the place tree and derived travel, requirements and the predicate vocabulary, induced requirements, explanations, availability, single-session planning, the allocation ledger, holds, recurring series, tracks, whole-programme arrangement, partial arrangement, pinning, soft constraints, minimal conflict sets, RFC 7953 import, and the fixpoint solver bridge.
 
-Availability and planning, the allocation ledger, tracks and programmes follow in later phases. The full design is in [the plan](https://github.com/elixir-tempo/timetable/blob/main/plans/tempo-timetable.md).
+Still open: the rest of the claim lifecycle — completed, cancelled, no-show — which belongs with the persistence adapter, since none of those states changes what is available. The full design is in [the plan](https://github.com/elixir-tempo/timetable/blob/main/plans/tempo-timetable.md).
+
+### Optional dependencies
+
+* [`ical`](https://hex.pm/packages/ical) for RFC 7953 `VAVAILABILITY` import.
+
+* [`fixpoint`](https://hex.pm/packages/fixpoint) for the solver bridge. It describes itself as a proof of concept, so treat that path accordingly.
 
 ## Installation
 

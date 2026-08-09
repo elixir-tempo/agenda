@@ -363,4 +363,43 @@ defmodule Timetable.ArrangerTest do
       assert {:ok, _} = Arranger.arrange(programme, [context.hall], candidates: 40)
     end
   end
+
+  describe "arrange/3 — a track's reachability is any availability pattern" do
+    test "a duration written as a string is read, not crashed on", context do
+      # `Track.reachable/2` accepts anything `Timetable.open/2` does,
+      # so the arranger must parse it rather than assume a struct.
+      track =
+        Timetable.track("T", of: [talk("First"), talk("Second")])
+        |> Track.reachable(within: "PT10M")
+
+      assert {:ok, arrangements} = Arranger.arrange(conf([track]), [context.hall])
+      assert length(arrangements) == 2
+    end
+
+    test "a string and a sigil agree", context do
+      as_string = Track.reachable(Timetable.track("T", of: [talk("A")]), within: "PT10M")
+      as_sigil = Track.reachable(Timetable.track("T", of: [talk("A")]), within: ~o"PT10M")
+
+      assert Arranger.arrange(conf([as_string]), [context.hall]) ==
+               Arranger.arrange(conf([as_sigil]), [context.hall])
+    end
+
+    test "something that is not a duration is an error, not a crash", context do
+      track =
+        Timetable.track("T", of: [talk("First"), talk("Second")])
+        |> Track.reachable(within: "not a duration")
+
+      assert {:error, reason} = Arranger.arrange(conf([track]), [context.hall])
+      assert Timetable.explain(reason) =~ "which is not a duration"
+    end
+
+    test "an interval is not a duration either", context do
+      track =
+        Timetable.track("T", of: [talk("First")])
+        |> Track.reachable(within: "2026-09-15/2026-09-16")
+
+      assert {:error, reason} = Arranger.arrange(conf([track]), [context.hall])
+      assert Timetable.explain(reason) =~ "which is not a duration"
+    end
+  end
 end

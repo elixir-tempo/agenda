@@ -34,6 +34,7 @@ defmodule Timetable.Planner do
   alias Tempo.IntervalSet
   alias Timetable.Arrangement
   alias Timetable.Availability
+  alias Timetable.Conflict
   alias Timetable.Infeasible
   alias Timetable.Place
   alias Timetable.Requirement
@@ -95,6 +96,115 @@ defmodule Timetable.Planner do
       |> arrangements(candidates, roster_free, window, duration, options)
       |> ranked(session, options)
     end
+  end
+
+  @doc """
+  The smallest set of demands that rules out every way of holding
+  `session`.
+
+  Where `plan/3`'s failure says *that* nothing fits, this says *which
+  demands together* make it so — the requirement-level counterpart of
+  `Timetable.Arranger.conflict/3`. Two attributes that are each
+  satisfiable alone but impossible together are the common case, and
+  neither `Timetable.explain/2` nor a list of near misses will show it.
+
+  Both kinds of demand are searched, which matters because the second
+  is invisible at the call site:
+
+  * `{:needs, role, attribute}` — an attribute the session asked for,
+    as in `Timetable.Session.needs(session, :room, seats: at_least(8))`.
+
+  * `{:requires, resource, attribute}` — an attribute a rostered
+    resource *induces*, as in a person whose `requires:` tightens
+    whatever room they are booked into.
+
+  ### Arguments
+
+  * `session` is a `t:Timetable.Session.t/0`.
+
+  * `pool` is the list of `t:Timetable.Resource.t/0` to choose from.
+
+  ### Options
+
+  Takes the same options as `plan/3`.
+
+  ### Returns
+
+  * `:none` when the session can be held and there is nothing to
+    explain; or
+
+  * `{:ok, demands}` — a minimal set of demands that cannot all be met.
+    An empty list means no demand is to blame: the session fails on
+    time alone, with every attribute demand dropped.
+
+  ### Examples
+
+      iex> import Timetable.Predicate
+      iex> small = Timetable.resource("Snug", seats: 4, video_conferencing: true)
+      iex> {:ok, small} = Timetable.open(small, "2026-06-15T09:00:00/2026-06-15T12:00:00")
+      iex> big = Timetable.resource("Barn", seats: 40, video_conferencing: false)
+      iex> {:ok, big} = Timetable.open(big, "2026-06-15T09:00:00/2026-06-15T12:00:00")
+      iex> session =
+      ...>   Timetable.session("Review", lasting: "PT1H", between: "2026-06-15/2026-06-16")
+      ...>   |> Timetable.Session.needs(:room, seats: at_least(8), video_conferencing: true)
+      iex> Timetable.Planner.conflict(session, [small, big])
+      {:ok, [needs: {:room, :seats}, needs: {:room, :video_conferencing}]}
+
+  """
+  @spec conflict(Session.t(), [Resource.t()], keyword()) ::
+          {:ok, [{:needs | :requires, {atom() | String.t(), atom()}}]} | :none
+  def conflict(%Session{} = session, pool, options \\ []) when is_list(pool) do
+    Conflict.minimal(demands(session), fn kept ->
+      match?({:ok, _arrangements}, plan(relaxed(session, kept), pool, options))
+    end)
+  end
+
+  defp demands(%Session{} = session) do
+    asked =
+      for requirement <- session.requirements,
+          {attribute, _predicate} <- requirement.attributes,
+          do: {:needs, {requirement.name, attribute}}
+
+    induced =
+      for requirement <- session.requirements,
+          resource <- requirement.roster,
+          {attribute, _value} <- resource.requires,
+          do: {:requires, {resource.name, attribute}}
+
+    asked ++ Enum.uniq(induced)
+  end
+
+  # The session as it would be if only `kept` were demanded of it.
+  # Induced demands are dropped at their source — the rostered
+  # resource's own `requires` — because that is where the induction
+  # happens, and suppressing it anywhere later would leave `plan/3`
+  # folding it straight back in.
+  defp relaxed(%Session{} = session, kept) do
+    keeping = MapSet.new(kept)
+
+    requirements =
+      Enum.map(session.requirements, fn requirement ->
+        %{
+          requirement
+          | attributes:
+              Map.filter(requirement.attributes, fn {attribute, _predicate} ->
+                MapSet.member?(keeping, {:needs, {requirement.name, attribute}})
+              end),
+            roster: Enum.map(requirement.roster, &without_induced(&1, keeping))
+        }
+      end)
+
+    %{session | requirements: requirements}
+  end
+
+  defp without_induced(%Resource{} = resource, keeping) do
+    %{
+      resource
+      | requires:
+          Map.filter(resource.requires, fn {attribute, _value} ->
+            MapSet.member?(keeping, {:requires, {resource.name, attribute}})
+          end)
+    }
   end
 
   # --- stage 1: eligibility --------------------------------------

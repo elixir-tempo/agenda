@@ -17,16 +17,25 @@ defmodule Timetable.Allocation do
 
   alias Timetable.Arrangement
 
-  @typedoc "One resource held by one session for one interval."
+  @typedoc """
+  One resource held by one session for one interval.
+
+  `held_until` marks a **tentative** claim — a hold, not a booking. It
+  occupies the resource exactly as a firm allocation does, which is why
+  it lives here rather than in a persistence layer: availability is
+  derived on every call, so a hold nobody can see is a hold nobody
+  subtracts. `nil` means the claim is firm.
+  """
   @type t :: %__MODULE__{
           session: String.t(),
           role: atom(),
           resource: String.t(),
           interval: Tempo.Interval.t(),
-          series: String.t() | nil
+          series: String.t() | nil,
+          held_until: Tempo.t() | nil
         }
 
-  defstruct [:session, :role, :resource, :interval, :series]
+  defstruct [:session, :role, :resource, :interval, :series, :held_until]
 
   @doc """
   The allocations an arrangement implies — one per resource, across

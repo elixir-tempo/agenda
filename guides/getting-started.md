@@ -181,8 +181,60 @@ Three worked case studies, each end to end, with every value in them executed ra
 
 * **[ElixirConf 2027](case-study-conference.md)** — two days, keynotes, parallel tracks. Where planning becomes searching, and where the search stops. Read this one if you are laying out many sessions at once rather than booking them one at a time.
 
+## Open hours you already have
+
+Availability usually exists somewhere before it exists in your code. `from_ical/1` reads an RFC 7953 `VAVAILABILITY` — what a CalDAV server returns when asked when someone is free — into a pattern `open/2` accepts:
+
+```elixir
+{:ok, hours} = Timetable.from_ical(vavailability)
+{:ok, clinic} = Timetable.open(Timetable.resource("Clinic"), hours)
+```
+
+It stays unmaterialised until you ask about a window, so a recurring `AVAILABLE` and `PRIORITY` across overlapping components resolve against the dates you actually query. `VEVENT`s in the same document are ignored — those are time *taken*, and belong in `free/2`'s `:busy`. Needs the optional `ical` dependency.
+
+## Holding something before you book it
+
+A booking page needs to take a room tentatively while somebody decides. A hold occupies the resource exactly as a booking does:
+
+```elixir
+{:ok, ledger} = Timetable.hold(ledger, arrangement, until: "2027-03-01T09:05:00")
+{:ok, ledger} = Timetable.confirm(ledger, "Quarterly review")
+```
+
+Nothing expires on its own — `Timetable.expire(ledger, now)` takes the moment as an argument rather than reading a clock, so planning the same session twice always gives the same answer. That matters more than the convenience it costs: `busy/2` runs inside `plan/3` and `arrange/3`, and a ledger that shifts underneath them is one you cannot test.
+
+## Preferring one workable answer to another
+
+Everything above is hard — a layout is valid or it is not. Several are usually valid, and a preference chooses among them without ever making one invalid:
+
+```elixir
+{:ok, programme} = Timetable.prefer(programme, :room_changes, weight: 10)
+```
+
+`:room_changes` and `:room_spread` are built in; your own is a name and a function. Preferences count violations, so zero is ideal. Crucially **a preference can never cost you a session** — the number placed is settled and proven first, and only then is a better-scoring layout preferred among those placing just as many.
+
+## When the answer is "no"
+
+Three separate questions hide inside a failed schedule, and each has its own verb:
+
+* **"Book what fits."** `arrange/3` with `unplaced: :allow` leaves out as few sessions as it can and returns `{:partial, layout}` — never `{:ok, …}`, so an incomplete programme cannot be mistaken for a finished one.
+
+* **"Do not move what is announced."** `:pinned` fixes chosen placements and searches around them, with every constraint still applying to the pins.
+
+* **"Which of these is actually fighting?"** `conflict/3` returns a *minimal* set — remove any one member and the rest fit. It works on a programme (which sessions cannot co-exist) and on a single session (which demands are impossible together, including those a rostered person induced).
+
+The conference case study works all three end to end.
+
 ## Knowing when to stop
 
 `plan/3` enumerates the ways one session could be held. `arrange/3` searches for a consistent layout across many. Both are exact, and both are bounded by caps that *report* when they are hit rather than returning a partial answer as though it were complete.
 
 A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Timetable.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
+
+With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that hand-off is already written:
+
+```elixir
+{:ok, arrangements} = Timetable.Fixpoint.solve(programme, rooms)
+```
+
+The solver is only asked to *choose*. Eligibility, induced requirements, availability and the place tree all stay here, where they are explained — the model handed over is which of each session's candidate placements to take, and the answer comes back as ordinary arrangements the ledger accepts. It covers the all-or-nothing question for exclusive resources; partial layouts, preferences and concurrency above one stay with `arrange/3`.

@@ -10,6 +10,20 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+* `Timetable.Arranger.arrange/3` takes `unplaced: :allow`, which leaves out the fewest sessions it can rather than failing the whole programme, and returns a `Timetable.Layout` under a `{:partial, layout}` tag. Each unplaced session carries its own reason, and `{:ok, arrangements}` still means every session was placed.
+
+* `Timetable.Arranger.arrange/3` takes `:pinned`, a list of arrangements whose placements are fixed while everything else is searched around them. `Timetable.Ledger.arrangements/3` rebuilds what is already booked into pinnable arrangements, and `Timetable.Ledger.busy/2`'s `:except` now accepts a list of session names.
+
+* Holds. `Timetable.hold/3` claims resources tentatively until a moment, `confirm/2` makes the claim firm, and `expire/2` drops what has lapsed. A hold consumes availability exactly as a booking does, which is why it lives in the ledger; nothing expires on its own, because `expire/2` takes the moment as an argument rather than reading a clock and so the ledger stays a value that answers the same question twice.
+
+* Soft constraints. `Timetable.prefer/3` adds a weighted `Timetable.Preference` to a programme — `:room_changes`, `:room_spread`, or one of your own — and `arrange/3` prefers a lower-scoring layout among those it could already return. Optimisation is lexicographic and two-pass, so a preference can never cost a placement: `minimal?` still means proven, and the new `score_proven?` says whether the scoring pass finished. `Timetable.explain_score/3` breaks the total down per preference.
+
+* `Timetable.Fixpoint.solve/3` hands a whole programme to the [fixpoint](https://hex.pm/packages/fixpoint) CP solver and takes the answer back as ordinary arrangements the ledger accepts. Each session becomes one variable over its candidate placements and each pair an `Element2D` conflict lookup, so eligibility, availability and the place tree stay on this side of the boundary where they are explained. Conflicts come from the new `Timetable.Arranger.conflict?/4`, which the built-in search uses too, so the two cannot disagree. Exclusive resources only, and all-or-nothing: concurrency above one is refused rather than mis-solved, because capacity is not a pairwise property and fixpoint has no cumulative constraint.
+
+* `Timetable.from_ical/1` reads a resource's open hours from an RFC 7953 `VAVAILABILITY` — what a CalDAV server hands you when asked when someone is available. The result is a pattern for `open/2`, held unmaterialised until a query window is known, so `PRIORITY` and each `AVAILABLE` recurrence resolve against the window actually being asked about.
+
+* `Timetable.Conflict.minimal/3` implements QuickXplain, finding the smallest set of constraints that still cannot hold together. `Timetable.conflict/3` applies it to a programme (which sessions cannot all be held) or a session (which demands are impossible together, including those induced by a rostered resource).
+
 * `Timetable.Resource` honours `concurrency` — previously the field was accepted, documented, and enforced nowhere, so a twenty-locker bank went fully unavailable after one booking. A window is now unavailable only where overlapping claims reach the resource's concurrency.
 
 * `buffer_before` and `buffer_after` on a resource — turnaround that is genuinely unavailable rather than something the caller must remember to leave free. A 30-minute claim with a 15-minute after-buffer blocks 45 minutes.
@@ -22,11 +36,17 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Performance
 
+* `Timetable.Arranger.arrange/3` searches by branch and bound rather than by iterative deepening on the number of sessions left out. Deepening found nothing at all until it reached the correct round, so a badly overbooked programme exhausted `:nodes` and returned an error where it could have returned most of a conference — twelve sessions competing for six slots now answers in 194 ms where it previously gave up. The search is also anytime, so hitting the cap returns the best layout found, flagged `minimal?: false`.
+
+* A relaxation bound — the largest set of non-overlapping candidate placements each resource could hold, times its concurrency — lets the search stop as soon as a layout matches it, rather than exhaustively proving the point. Being further overbooked is now cheaper, not dearer: twenty sessions into six slots is faster than eight into six.
+
 * `Timetable.Arranger.arrange/3` breaks symmetry between interchangeable sessions — same track, length, window, and requirements — by fixing a canonical chronological order among them. Proving a tight programme infeasible previously cost a factorial in the number of look-alike sessions: nine one-hour talks into eight hours took over 100 seconds and now takes 9 ms; seven into six went from 373 ms to 2 ms. No arrangement is lost, because interchangeable sessions can always be relabelled into the canonical order.
 
 * `Timetable.Availability.free/2` collapses everything claiming a resource into one interval set before subtracting, rather than folding one sweep per claim. A resource with 800 prior bookings no longer pays 800 passes over its own open hours.
 
 ### Fixed
+
+* A track whose `reachable/2` duration was written as a string rather than a Tempo value no longer crashes the search with a `FunctionClauseError` several frames deep. The pattern is resolved once when arranging begins, and one that is not a duration is an ordinary error tuple.
 
 * Named resources are now recorded in the arrangement they were matched for. Previously a `roster/3` requirement was honoured when planning but never appeared in `allocations`, so the ledger did not know a named person or site was in use and would happily double-book them.
 

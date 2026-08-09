@@ -135,6 +135,47 @@ length(restored)
 
 Eight again. Nothing had to be un-marked, because nothing was marked — busy time is derived from the ledger every time it is asked for.
 
+## Holding a room while someone decides
+
+A booking page shows eight slots. Somebody clicks the nine o'clock one and goes to find a colleague. That room is not booked, but it must not be offered to anyone else for the next few minutes — and a hold is exactly that:
+
+```elixir
+{:ok, ledger} = Timetable.hold(Timetable.ledger(), hd(options), until: "2027-03-01T09:05:00")
+
+{:ok, remaining} = Timetable.plan(review, rooms, busy: Timetable.busy(ledger))
+length(remaining)
+#=> 7
+```
+
+Seven — the same as if it had been booked outright. That is the point: a hold occupies the resource exactly as an allocation does, which is why it lives in the ledger rather than in a table beside it. Availability is derived from the ledger on every call, so a hold the ledger cannot see is a hold nobody subtracts, and two people book the same room.
+
+It is still visible *as* a hold, not as a booking — and it holds everything the arrangement claimed, not only the room:
+
+```elixir
+Timetable.holds(ledger) |> Enum.map(& &1.resource)
+#=> ["Priya", "Tom", "Boardroom"]
+```
+
+Priya and Tom are held too, which is what stops a second meeting being offered a slot they cannot attend. A hold is per-allocation, exactly as a booking is.
+
+When the colleague is found, confirm it:
+
+```elixir
+{:ok, ledger} = Timetable.confirm(ledger, "Quarterly review")
+Timetable.holds(ledger)
+#=> []
+```
+
+**Nothing expires on its own.** There is no timer and no background sweep; time advances only when you say so:
+
+```elixir
+{:ok, ledger} = Timetable.expire(ledger, "2027-03-01T09:10:00")
+```
+
+That looks like extra work and is worth the trouble. `busy/2` is called inside `plan/3` and `arrange/3`. If it read the system clock, planning the same meeting twice would give different answers as holds lapsed underneath you, and the ledger would stop being a value you can reason about or test. Passing the moment in is the same discipline as `travel_time/3` returning `{:error, :unknown}` rather than guessing an unmeasured journey.
+
+A hold good *until* five past is gone at five past, not after it. And the rest of the lifecycle — completed, cancelled, no-show — is deliberately absent: a hold changes what is available, and none of those do. Those belong to whatever persists your bookings.
+
 ## Moving a meeting without losing the room
 
 The operation every hand-rolled system gets wrong. The naive implementation releases everything and re-acquires it, which hands the room to a competing booking in the gap and churns records that never moved. Ask instead what actually changed:

@@ -125,6 +125,124 @@ Timetable.explain(reason)
 
 Not "no solution found" — the session that failed, and every room with the reason it did not qualify. That is the difference between a programme committee arguing and a programme committee booking a bigger venue.
 
+## When the programme does not fit
+
+A committee accepts more talks than the venue holds. That is not a bug in the schedule, it is the ordinary state of a call for papers, and failing the whole programme over it is useless. `unplaced: :allow` asks for the **fewest** sessions left out instead:
+
+```elixir
+lightning_slot = ~o"2027-05-13T14:00:00/2027-05-13T16:00:00"
+
+crowded =
+  Enum.reduce(1..8, programme, fn n, acc ->
+    Timetable.Programme.add_session(acc, talk.("Lightning #{n}", lightning_slot))
+  end)
+
+{:partial, layout} = Timetable.arrange(crowded, [hall, room_a, room_b], unplaced: :allow)
+
+length(layout.placed)
+#=> 12
+Timetable.Layout.unplaced_sessions(layout)
+#=> ["Lightning 7", "Lightning 8"]
+```
+
+Three rooms across a two-hour slot hold six lightning talks; eight were offered, so two are left out and the other six join the six-session programme.
+
+The result is **never** `{:ok, …}` when something was dropped — the tag is `{:partial, layout}`, so a caller who has not thought about incompleteness cannot mistake one for a finished programme. Each entry in `layout.unplaced` is an ordinary infeasible result, so it still says why:
+
+```elixir
+Timetable.explain(layout)
+#=> "ElixirConf 2027: 12 of 14 sessions placed. Lightning 7 cannot be held: cannot be
+#=>  placed without clashing with something already placed Lightning 8 cannot be held:
+#=>  cannot be placed without clashing with something already placed"
+```
+
+"Fewest" is meant literally, and `layout.minimal?` says whether it was proved:
+
+```elixir
+layout.minimal?
+#=> true
+```
+
+The search is branch-and-bound. It keeps the best complete layout found so far and cuts any branch that already leaves out as many, so a greedy near-miss is never passed off as the best available. Two consequences are worth knowing:
+
+* **It answers early and improves.** The first descent already yields a usable layout, so hitting the `:nodes` cap returns the best found rather than an error. That is what `minimal?: false` means — a good answer whose optimality was not proved. Raise `:nodes` and ask again.
+
+* **Being more overbooked is not more expensive.** A relaxation bound — how many placements the rooms could possibly hold, ignoring every other constraint — lets the search stop the moment it matches it, instead of exhaustively proving the point. Twenty lightning talks into six slots is *faster* than eight, because the bound is reached sooner.
+
+## Holding the announced sessions still
+
+Once the programme is published, re-running it must not move the keynote somebody already booked a flight for. `:pinned` fixes chosen placements and searches around them:
+
+```elixir
+{:ok, arrangements} = Timetable.arrange(programme, [hall, room_a, room_b])
+announced = Enum.filter(arrangements, &String.contains?(&1.session, "keynote"))
+
+{:ok, revised} = Timetable.arrange(programme, [hall, room_a, room_b], pinned: announced)
+length(revised)
+#=> 6
+```
+
+A pin is not a hint. Every constraint still applies to it — a pinned session occupies its room, clashes with its track, and counts against reachability — and a pin that cannot be honoured is an error naming it, not something quietly dropped. Pinning what is already booked is a one-liner via `Timetable.arrangements/3`, which rebuilds ledger allocations into pinnable arrangements.
+
+## Which sessions are actually fighting
+
+When a programme genuinely cannot be laid out, `arrange/3` names *a* session that failed. That is often not the one to move. `conflict/3` returns a **minimal** set — remove any single member and the rest fit:
+
+```elixir
+tight =
+  Timetable.programme("Overbooked", across: ~o"2027-05-13/2027-05-14")
+  |> Timetable.Programme.add_session(keynote.("Keynote A", day1_morning))
+  |> Timetable.Programme.add_session(keynote.("Keynote B", day1_morning))
+
+Timetable.conflict(tight, [hall, room_a, room_b])
+#=> {:ok, ["Keynote A", "Keynote B"]}
+```
+
+> *"Both keynotes need the only 500-seat room in the same 90 minutes. One of them has to move."*
+
+This is QuickXplain, and it costs a number of trial arrangements logarithmic in the size of the programme rather than one per session — so run it **on failure**, not on every call. Pinned sessions form the background and are never named, because they are not free to move.
+
+## Preferring one layout over another
+
+Everything so far is hard: a layout is valid or it is not. But several layouts are usually valid, and `arrange/3` has been picking among them arbitrarily. A delegate following the Core track would rather not be marched between floors every hour, and that is a *preference* — it never makes a layout invalid, only worse.
+
+```elixir
+{:ok, programme} = Timetable.prefer(programme, :room_changes, weight: 10)
+
+{:ok, arrangements} = Timetable.arrange(programme, [hall, room_a, room_b])
+Timetable.explain_score(arrangements, programme)
+#=> ["room_changes: 0 × 10 = 0"]
+```
+
+Zero because both Core talks now sit in the same room. Preferences count *violations*, so the ideal layout scores zero — a number that means something on its own, where a reward total only means something next to another reward total.
+
+`:room_spread` is the other built-in, and it discourages piling everything into one room while another stands empty. Your own is a name and a function:
+
+```elixir
+Timetable.prefer(programme, {:no_late_keynotes, &count_late_keynotes/2}, weight: 5)
+```
+
+**A preference can never cost you a session.** Optimisation is lexicographic and runs in two passes: the first ignores preferences entirely and proves how many sessions can be placed, the second takes that number as a hard ceiling and looks only for a better-scoring layout placing exactly as many. So `minimal?` still means what it meant, and a separate `score_proven?` says whether the scoring pass finished:
+
+```elixir
+layout.minimal?       #=> true   — provably the fewest left out
+layout.score_proven?  #=> true   — and the scoring pass finished too
+```
+
+The two are independent, and usually the first is proven while the second is merely good — the count is cheap to prove and the score is not. Declaring a preference does cost time: the search can no longer stop at the first layout that places everything, since a later one may score better. It gets its own `:score_nodes` budget so it can never spend the one that proves the count.
+
+## When even that is not enough
+
+Past a few dozen sessions this search runs out of road, and the guide has said so from the start: use a real solver and write its output back through `allocate/2`. With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency, that is one call:
+
+```elixir
+{:ok, arrangements} = Timetable.Fixpoint.solve(programme, [hall, room_a, room_b])
+```
+
+The programme does not change shape to suit the solver. Each session already has a finite list of candidate placements that satisfy its requirements, so the variable handed over is *which candidate* — and eligibility, induced requirements, availability and the place tree all stay here, where they are explained. The solver never learns what a room is. Conflicts come from the same predicate `arrange/3` uses, so the two cannot disagree about what a clash is.
+
+Two limits. It answers the all-or-nothing question only — `unplaced: :allow`, `minimal?` and preferences all stay with `arrange/3`. And it models exclusive resources only: capacity above one is not a pairwise property, so a pool containing a resource with `concurrency > 1` is refused rather than quietly mis-solved.
+
 ## Scale, honestly
 
 The search is depth-first with backtracking, ordered most-constrained-first, and bounded by two explicit caps:
@@ -154,3 +272,7 @@ A conference of a few dozen sessions across a handful of rooms is comfortable. A
 * **Not overlapping is intrinsic to a track.** Only reachability is optional.
 
 * **Read the caps.** If a programme fails, check whether it was genuinely infeasible or merely hit `:nodes`.
+
+* **Failure has three shapes, not one.** `unplaced: :allow` for "book what fits", `:pinned` for "do not move what is announced", and `conflict/3` for "which of these is actually fighting".
+
+* **Hard constraints decide validity, preferences decide taste.** And a preference can never cost a placement, because the count is settled before the score is considered.

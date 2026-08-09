@@ -41,10 +41,18 @@ defmodule Timetable.Availability do
   @type span :: Tempo.t() | Tempo.Interval.t() | Tempo.Duration.t() | IntervalSet.t()
 
   @typedoc """
-  Anything that can be read as a span: a Tempo value, or a string in
-  ISO 8601 (preferred) or RFC 5545 `RRULE` form.
+  Availability imported from an RFC 7953 `VAVAILABILITY`, held
+  unmaterialised until a query window is known — exactly as a
+  recurrence is.
   """
-  @type pattern :: span() | String.t()
+  @type imported :: {:vavailability, term()}
+
+  @typedoc """
+  Anything that can be read as a span: a Tempo value, a string in
+  ISO 8601 (preferred) or RFC 5545 `RRULE` form, or the result of
+  `from_ical/1`.
+  """
+  @type pattern :: span() | String.t() | imported()
 
   @doc """
   Set when `resource` is open.
@@ -111,7 +119,8 @@ defmodule Timetable.Availability do
       3
 
   """
-  @spec normalise(term()) :: {:ok, span()} | {:error, :unreadable_pattern}
+  @spec normalise(term()) :: {:ok, span() | imported()} | {:error, :unreadable_pattern}
+  def normalise({:vavailability, _calendar} = imported), do: {:ok, imported}
   def normalise(%IntervalSet{} = value), do: {:ok, value}
   def normalise(%Interval{} = value), do: {:ok, value}
   def normalise(%Duration{} = value), do: {:ok, value}
@@ -119,20 +128,78 @@ defmodule Timetable.Availability do
 
   def normalise(pattern) when is_binary(pattern) do
     with {:error, _iso} <- Tempo.from_iso8601(pattern),
-         {:error, _rrule} <- rrule(pattern) do
+         {:error, _rrule} <- RRule.parse(pattern, []) do
       {:error, :unreadable_pattern}
     end
   end
 
   def normalise(_pattern), do: {:error, :unreadable_pattern}
 
-  # `Tempo.RRule.parse/2` raises rather than returning an error tuple on
-  # some malformed input, and a library function must not crash on a
-  # value that merely turned out not to be an RRULE.
-  defp rrule(pattern) do
-    RRule.parse(pattern, [])
+  @doc """
+  Read a resource's open hours from an RFC 7953 `VAVAILABILITY`.
+
+  This is how a calendar system states availability, and it is what a
+  CalDAV server will hand you. The result is a pattern for `open/2`,
+  held unmaterialised until a query window is known — a
+  `VAVAILABILITY` whose `AVAILABLE` subcomponents recur has no extent
+  of its own, exactly as an ISO 8601 recurrence has none.
+
+  `VEVENT`s in the same document are ignored. They are what is
+  *taken*, not what is *offered*, and belong in `free/2`'s `:busy`
+  rather than in a resource's open hours.
+
+  Requires the optional `ical` dependency.
+
+  ### Arguments
+
+  * `ics` is iCalendar data as a string.
+
+  ### Returns
+
+  * `{:ok, pattern}` to hand to `open/2`; or
+
+  * `{:error, reason}` when the data cannot be read, or when `ical`
+    is not available.
+
+  ### Examples
+
+      iex> ics = \"\"\"
+      ...> BEGIN:VCALENDAR
+      ...> VERSION:2.0
+      ...> BEGIN:VAVAILABILITY
+      ...> UID:clinic
+      ...> DTSTAMP:20260601T000000Z
+      ...> BEGIN:AVAILABLE
+      ...> UID:weekday-clinic
+      ...> DTSTAMP:20260601T000000Z
+      ...> DTSTART:20260601T090000Z
+      ...> DTEND:20260601T170000Z
+      ...> RRULE:FREQ=DAILY;COUNT=5
+      ...> END:AVAILABLE
+      ...> END:VAVAILABILITY
+      ...> END:VCALENDAR
+      ...> \"\"\"
+      iex> {:ok, hours} = Timetable.Availability.from_ical(ics)
+      iex> {:ok, clinic} = Timetable.open(Timetable.resource("Clinic"), hours)
+      iex> {:ok, free} = Timetable.free(clinic, within: "2026-06-01/2026-06-08")
+      iex> Tempo.IntervalSet.count(free)
+      5
+
+  """
+  @spec from_ical(String.t()) :: {:ok, imported()} | {:error, :ical_not_available | String.t()}
+  def from_ical(ics) when is_binary(ics) do
+    if Code.ensure_loaded?(Tempo.ICal) do
+      # `apply/3` rather than a direct call: `ical` is an optional
+      # dependency, so `ICal` may not exist at compile time and a
+      # direct call would warn in every project that does not import
+      # calendar data.
+      # credo:disable-for-next-line Credo.Check.Refactor.Apply
+      {:ok, {:vavailability, apply(ICal, :from_ics, [ics])}}
+    else
+      {:error, :ical_not_available}
+    end
   rescue
-    _error -> {:error, :not_an_rrule}
+    error -> {:error, Exception.message(error)}
   end
 
   @doc """
@@ -224,6 +291,17 @@ defmodule Timetable.Availability do
   # twenty-first person wants one.
   defp saturated(busy, concurrency) do
     IntervalSet.overlapping(busy, at_least: concurrency)
+  end
+
+  # An imported `VAVAILABILITY` states availability directly, so
+  # materialising it *is* asking what it offers over the window —
+  # `Tempo.ICal.available/2` already clips to that window, resolves
+  # PRIORITY across overlapping components, and expands each
+  # `AVAILABLE` recurrence.
+  defp within({:vavailability, calendar}, window) do
+    # See `from_ical/1` for why this is `apply/3`.
+    # credo:disable-for-next-line Credo.Check.Refactor.Apply
+    apply(Tempo.ICal, :available, [calendar, [within: window]])
   end
 
   # Materialise the open pattern against the window, then clip to it.

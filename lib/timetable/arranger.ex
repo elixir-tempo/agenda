@@ -21,6 +21,56 @@ defmodule Timetable.Arranger do
     them must be at least the journey between their rooms — derived
     from the place tree, not configured.
 
+  ### Placing what fits, when not everything does
+
+  By default one unplaceable session fails the programme, which is the
+  right answer when the programme is a unit. When it is a wish list,
+  `unplaced: :allow` asks instead for the **fewest** sessions left out:
+
+      {:partial, layout} = arrange(programme, pool, unplaced: :allow)
+
+  The result is a `t:Timetable.Layout.t/0` under a `:partial` tag,
+  never `{:ok, …}` — a partial programme presented as finished is worse
+  than an admitted failure, but a partial programme *labelled* as
+  partial is better than no answer at all.
+
+  That search is branch-and-bound, which makes it **anytime**: the
+  first complete layout is found immediately and later ones only
+  improve on it, so exhausting the node cap returns the best layout so
+  far rather than nothing. `Timetable.Layout`'s `minimal?` says which
+  you have. A relaxation bound — what the resources could hold at
+  best — lets the search stop as soon as it matches, so a badly
+  overbooked programme is cheaper to answer than a marginal one.
+
+  ### Preferring one workable layout over another
+
+  Every constraint above is hard. A `Timetable.Preference` is soft: it
+  never makes a layout invalid, only worse. Declaring one changes what
+  `arrange/3` returns among the answers that were always allowed.
+
+      {:ok, programme} = Timetable.prefer(programme, :room_changes, weight: 10)
+
+  Optimisation is **lexicographic and two-pass**. The first pass
+  ignores preferences and proves how many sessions can be placed. The
+  second takes that number as a hard ceiling and looks only for a
+  better-scoring layout that places exactly as many — so a preference
+  can never cost a placement, and `Timetable.Layout`'s `minimal?`
+  means what it always meant.
+
+  What is *not* promised is soft optimality: the scoring pass has its
+  own `:score_nodes` budget and stops when it runs out, which
+  `score_proven?` reports. Proving a weighted optimum needs a bound on
+  remaining cost that this search has no cheap way to compute, and a
+  programme that genuinely needs one wants a solver.
+
+  ### Holding placements still
+
+  A published programme gets edited, and the edit must not move the
+  keynote that has already been announced. `:pinned` fixes chosen
+  placements and searches around them; every constraint still applies
+  to a pin, so the sessions that move must work with the ones that
+  cannot.
+
   ### Scale, and where this stops
 
   The search is depth-first with backtracking, ordered most-constrained
@@ -32,24 +82,41 @@ defmodule Timetable.Arranger do
   either way.
 
   When the cap is reached the result says so rather than returning a
-  partial layout as though it were complete: a partial programme
-  presented as finished is worse than an admitted failure.
+  partial layout as though it were complete.
 
   """
 
   import Tempo.Sigils
 
   alias Tempo.Compare
+  alias Tempo.Duration
   alias Tempo.Interval
   alias Timetable.Arrangement
+  alias Timetable.Availability
+  alias Timetable.Conflict
   alias Timetable.Infeasible
+  alias Timetable.Layout
   alias Timetable.Planner
+  alias Timetable.Preference
   alias Timetable.Programme
   alias Timetable.Resource
+  alias Timetable.Session
   alias Timetable.Track
 
   @default_nodes 10_000
   @default_candidates 40
+
+  # The scoring pass is capped far lower than the counting pass. It is
+  # looking for a nicer answer, not a correct one, and every node it
+  # spends is latency a caller pays for cosmetics. Raise it with
+  # `:score_nodes` when the layout matters more than the wait.
+  @default_score_nodes 2_000
+
+  @typedoc "The outcome of arranging a programme."
+  @type result ::
+          {:ok, [Arrangement.t()]}
+          | {:partial, Layout.t()}
+          | {:error, Infeasible.t()}
 
   @doc """
   Find a placement for every session in `programme`.
@@ -63,23 +130,42 @@ defmodule Timetable.Arranger do
   ### Options
 
   * `:busy` is a map of resource name to what already claims it, as
-    `Timetable.Ledger.busy/2` returns. The default is `%{}`.
+    `Timetable.Ledger.busy/2` returns. The default is `%{}`. It must
+    not include the claims of `:pinned` sessions — those are added for
+    you, so pass `Timetable.Ledger.busy/2` the pinned session names as
+    `:except`.
+
+  * `:pinned` is a list of `t:Timetable.Arrangement.t/0` whose
+    placements are fixed. Those sessions are not searched for, every
+    constraint still applies to them, and they are returned alongside
+    the sessions that were placed. The default is `[]`.
+
+  * `:unplaced` decides what happens when a session cannot be held —
+    `:error` (the default) fails the whole programme, `:allow` leaves
+    out as few sessions as the search can manage and returns
+    `{:partial, layout}`.
 
   * `:candidates` caps how many placements are considered per session.
     The default is `40`.
 
-  * `:nodes` caps how many search steps are taken before giving up.
-    The default is `10_000`.
+  * `:nodes` caps how many search steps are taken across the whole
+    call, including every round of the `unplaced: :allow` search. The
+    default is `10_000`.
 
   * `:travel` is passed to `Timetable.travel_time/3` for the
     reachability check — use it to supply per-pair overrides.
 
   ### Returns
 
-  * `{:ok, arrangements}` — one per session, mutually consistent; or
+  * `{:ok, arrangements}` — one per session, mutually consistent, in
+    programme order; or
+
+  * `{:partial, t:Timetable.Layout.t/0}` under `unplaced: :allow`, when
+    some sessions could not be held; or
 
   * `{:error, t:Timetable.Infeasible.t/0}` naming the session that
-    could not be placed, or reporting that the cap was hit.
+    could not be placed, reporting a bad pin, or reporting that the cap
+    was hit.
 
   ### Examples
 
@@ -94,37 +180,249 @@ defmodule Timetable.Arranger do
       ...>   |> Timetable.Programme.add_track(
       ...>        Timetable.track("Elixir", of: [talk.("Keynote"), talk.("Deep dive")]))
       iex> {:ok, arrangements} = Timetable.Arranger.arrange(programme, [room])
-      iex> length(arrangements)
-      2
+      iex> Enum.map(arrangements, & &1.session)
+      ["Keynote", "Deep dive"]
 
   """
-  @spec arrange(Programme.t(), [Resource.t()], keyword()) ::
-          {:ok, [Arrangement.t()]} | {:error, Infeasible.t()}
+  @spec arrange(Programme.t(), [Resource.t()], keyword()) :: result()
   def arrange(%Programme{} = programme, pool, options \\ []) when is_list(pool) do
-    with {:ok, candidates} <- candidates_per_session(programme, pool, options) do
+    with {:ok, programme} <- with_readable_tracks(programme),
+         {:ok, pinned} <- pins(programme, options) do
+      options = Keyword.put(options, :busy, busy_including(pinned, options))
+      {candidates, unplaceable} = candidates_per_session(programme, pool, pinned, options)
+
       candidates
       |> Enum.sort_by(fn {_session, _symmetry, placements} -> length(placements) end)
-      |> search(programme, [], budget(options), options)
-      |> to_result(programme)
+      |> resolve(programme, pinned, unplaceable, options)
     end
   end
 
-  defp budget(options), do: Keyword.get(options, :nodes, @default_nodes)
+  @doc """
+  The smallest set of sessions in `programme` that cannot all be held.
+
+  This is the diagnostic to reach for when `arrange/3` fails. A failure
+  names *a* session that could not be placed; this names the group that
+  is actually in tension, so that the answer is "any two of these three
+  fit — choose which one moves" rather than "no arrangement found".
+
+  It works by arranging smaller and smaller parts of the programme, so
+  it costs a number of arrangements logarithmic in the programme's
+  size. Run it on failure, not on every call.
+
+  Pinned sessions form the background: they are never named as part of
+  a conflict, because they are not free to move. If the pins alone
+  cannot be arranged the result is `{:ok, []}`, which says exactly
+  that.
+
+  ### Arguments
+
+  * `programme` is a `t:Timetable.Programme.t/0`.
+
+  * `pool` is the list of `t:Timetable.Resource.t/0` to choose from.
+
+  ### Options
+
+  Takes the same options as `arrange/3`. `:unplaced` is ignored — a
+  conflict is only meaningful against the all-or-nothing question.
+
+  ### Returns
+
+  * `:none` when the whole programme can be arranged and there is
+    nothing to explain; or
+
+  * `{:ok, session_names}` — a minimal set of sessions that cannot all
+    be held. Removing any one of them leaves a set that can.
+
+  ### Examples
+
+      iex> room = Timetable.resource("Hall", seats: 100)
+      iex> {:ok, room} = Timetable.open(room, "2026-09-15T09:00:00/2026-09-15T10:00:00")
+      iex> talk = fn name ->
+      ...>   Timetable.session(name, lasting: "PT1H", between: "2026-09-15/2026-09-16")
+      ...>   |> Timetable.Session.needs(:room, seats: 100)
+      ...> end
+      iex> programme =
+      ...>   Timetable.programme("Conf")
+      ...>   |> Timetable.Programme.add_session(talk.("Keynote"))
+      ...>   |> Timetable.Programme.add_session(talk.("Deep dive"))
+      iex> Timetable.Arranger.conflict(programme, [room])
+      {:ok, ["Keynote", "Deep dive"]}
+
+  """
+  @spec conflict(Programme.t(), [Resource.t()], keyword()) :: {:ok, [String.t()]} | :none
+  def conflict(%Programme{} = programme, pool, options \\ []) when is_list(pool) do
+    options = Keyword.put(options, :unplaced, :error)
+    fixed = options |> Keyword.get(:pinned, []) |> Enum.map(& &1.session)
+    free = programme |> Programme.all_sessions() |> Enum.map(& &1.name) |> Kernel.--(fixed)
+
+    Conflict.minimal(free, fixed, fn names ->
+      match?({:ok, _placed}, arrange(Programme.restrict_to(programme, names), pool, options))
+    end)
+  end
+
+  # --- reachability durations -------------------------------------
+
+  # `Timetable.Track.reachable/2` takes any availability pattern, so a
+  # track can carry `"PT5M"` as readily as `~o"PT5M"`. The search
+  # compares it by shifting a point, which needs the parsed duration —
+  # so it is resolved once here, and an unreadable one is an error
+  # tuple rather than a crash six frames into the search.
+  @doc """
+  Resolve a programme's track reachability durations once.
+
+  `Timetable.Track.reachable/2` accepts a duration written as a string,
+  and the search compares durations thousands of times, so the pattern
+  is read once here rather than re-parsed per comparison. `arrange/3`
+  does this for itself; another solver building on
+  `conflict?/4` must do it too, or a string will reach the comparison
+  as a `FunctionClauseError` several frames down.
+
+  ### Arguments
+
+  * `programme` is a `t:Timetable.Programme.t/0`.
+
+  ### Returns
+
+  * `{:ok, programme}` with every track's reach resolved; or
+
+  * `{:error, t:Timetable.Infeasible.t/0}` when one is not a duration.
+
+  ### Examples
+
+      iex> {:ok, programme} = Timetable.Arranger.readable(Timetable.programme("Conf"))
+      iex> programme.tracks
+      []
+
+  """
+  @spec readable(Programme.t()) :: {:ok, Programme.t()} | {:error, Infeasible.t()}
+  def readable(%Programme{} = programme), do: with_readable_tracks(programme)
+
+  defp with_readable_tracks(%Programme{} = programme) do
+    programme.tracks
+    |> Enum.reduce_while({:ok, []}, fn track, {:ok, acc} ->
+      case readable_reach(track) do
+        {:ok, track} -> {:cont, {:ok, acc ++ [track]}}
+        {:error, reason} -> {:halt, {:error, Infeasible.new(programme.name, [reason])}}
+      end
+    end)
+    |> case do
+      {:ok, tracks} -> {:ok, %{programme | tracks: tracks}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp readable_reach(%Track{reachable_within: nil} = track), do: {:ok, track}
+
+  defp readable_reach(%Track{reachable_within: within} = track) do
+    case Availability.normalise(within) do
+      {:ok, %Duration{} = duration} ->
+        {:ok, %{track | reachable_within: duration}}
+
+      _not_a_duration ->
+        {:error,
+         "the #{track.name} track is reachable within #{inspect(within)}, which is not a duration"}
+    end
+  end
+
+  # --- pins --------------------------------------------------------
+
+  # A pin is only useful if it is honoured, so a pin that cannot be is
+  # an error rather than something quietly dropped. Three ways it can
+  # be wrong: it names a session the programme does not have, it is one
+  # of two pins for the same session, or it clashes with another pin.
+  defp pins(programme, options) do
+    pinned = Keyword.get(options, :pinned, [])
+    known = programme |> Programme.all_sessions() |> MapSet.new(& &1.name)
+
+    with :ok <- all_known(pinned, known, programme),
+         :ok <- one_per_session(pinned, programme) do
+      pins_agree(pinned, programme, options)
+    end
+  end
+
+  defp all_known(pinned, known, programme) do
+    case Enum.reject(pinned, &MapSet.member?(known, &1.session)) do
+      [] ->
+        :ok
+
+      strangers ->
+        {:error,
+         Infeasible.new(
+           programme.name,
+           Enum.map(strangers, &"#{&1.session} is pinned but is not in the programme")
+         )}
+    end
+  end
+
+  defp one_per_session(pinned, programme) do
+    pinned
+    |> Enum.frequencies_by(& &1.session)
+    |> Enum.filter(fn {_session, count} -> count > 1 end)
+    |> case do
+      [] ->
+        :ok
+
+      repeated ->
+        {:error,
+         Infeasible.new(
+           programme.name,
+           Enum.map(repeated, fn {session, count} ->
+             "#{session} is pinned #{count} times — a session can hold only one placement"
+           end)
+         )}
+    end
+  end
+
+  # Pins are checked against each other with the same rules the search
+  # applies, so an impossible set is reported before any work is done.
+  defp pins_agree(pinned, programme, options) do
+    Enum.reduce_while(pinned, {:ok, []}, fn pin, {:ok, settled} ->
+      if compatible?(pin, settled, programme, options) do
+        {:cont, {:ok, [{pin, exempt(pin)} | settled]}}
+      else
+        {:halt,
+         {:error,
+          Infeasible.new(programme.name, [
+            "#{pin.session} is pinned to a placement that clashes with another pin"
+          ])}}
+      end
+    end)
+    |> case do
+      {:ok, settled} -> {:ok, settled |> Enum.reverse() |> Enum.map(&elem(&1, 0))}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # A pinned placement occupies its resources for everyone else, so it
+  # belongs in `:busy` before candidates are generated. Without this the
+  # `:candidates` cap could fill with placements that all clash with a
+  # pin, and a perfectly placeable session would look impossible.
+  defp busy_including(pinned, options) do
+    Enum.reduce(pinned, Keyword.get(options, :busy, %{}), fn arrangement, busy ->
+      arrangement
+      |> Arrangement.resources()
+      |> Enum.reduce(busy, fn resource, acc ->
+        Map.update(acc, resource.name, [arrangement.interval], &(&1 ++ [arrangement.interval]))
+      end)
+    end)
+  end
 
   # --- candidate placements, one session at a time ----------------
 
-  defp candidates_per_session(programme, pool, options) do
+  defp candidates_per_session(programme, pool, pinned, options) do
     limit = Keyword.get(options, :candidates, @default_candidates)
+    fixed = MapSet.new(pinned, & &1.session)
 
     programme
     |> Programme.all_sessions()
-    |> Enum.reduce_while({:ok, []}, fn session, {:ok, acc} ->
+    |> Enum.reject(&MapSet.member?(fixed, &1.name))
+    |> Enum.reduce({[], []}, fn session, {candidates, unplaceable} ->
       case placements_for(session, programme, pool, options, limit) do
         {:ok, placements} ->
-          {:cont, {:ok, acc ++ [{session, symmetry_of(session, programme), placements}]}}
+          {candidates ++ [{session, symmetry_of(session, programme), placements}], unplaceable}
 
         {:error, reason} ->
-          {:halt, {:error, reason}}
+          {candidates, unplaceable ++ [reason]}
       end
     end)
   end
@@ -139,6 +437,11 @@ defmodule Timetable.Arranger do
 
     {track && track.name, session.duration, session.window, session.requirements}
   end
+
+  # A pinned placement is interchangeable with nothing: its time is
+  # fixed, so it cannot be relabelled and must sit outside every
+  # symmetry rule.
+  defp exempt(%Arrangement{session: session}), do: {:pinned, session}
 
   defp placements_for(session, programme, pool, options, limit) do
     session = bounded_by(session, programme)
@@ -157,48 +460,307 @@ defmodule Timetable.Arranger do
 
   defp bounded_by(session, _programme), do: session
 
-  # --- depth-first search with backtracking -----------------------
+  # --- how many sessions may be left out --------------------------
 
-  # `placed` holds `{arrangement, symmetry}` pairs — the symmetry key
-  # is search bookkeeping and never reaches the caller.
-  defp search([], _programme, placed, budget, _options),
-    do: {:found, placed |> Enum.reverse() |> Enum.map(&elem(&1, 0)), budget}
+  defp resolve(candidates, programme, pinned, unplaceable, options) do
+    allow? = allow_unplaced?(options)
 
-  defp search(_remaining, _programme, _placed, budget, _options) when budget <= 0,
-    do: {:exhausted, :nodes}
-
-  defp search([{session, symmetry, candidates} | rest], programme, placed, budget, options) do
-    try_candidates(candidates, session, symmetry, rest, programme, placed, budget, options)
-  end
-
-  defp try_candidates([], session, _symmetry, _rest, _programme, _placed, _budget, _options),
-    do: {:stuck, session}
-
-  defp try_candidates(
-         [candidate | others],
-         session,
-         symmetry,
-         rest,
-         programme,
-         placed,
-         budget,
-         options
-       ) do
-    if worth_trying?(candidate, symmetry, programme, placed, options) do
-      case search(rest, programme, [{candidate, symmetry} | placed], budget - 1, options) do
-        {:found, _arrangements, _left} = found ->
-          found
-
-        {:exhausted, _why} = exhausted ->
-          exhausted
-
-        {:stuck, _deeper} ->
-          try_candidates(others, session, symmetry, rest, programme, placed, budget - 1, options)
-      end
+    if not allow? and unplaceable != [] do
+      {:error, hd(unplaceable)}
     else
-      try_candidates(others, session, symmetry, rest, programme, placed, budget - 1, options)
+      candidates
+      |> optimise(programme, pinned, allow?, options, [])
+      |> refine(candidates, programme, pinned, allow?, options)
+      |> to_result(programme, unplaceable)
     end
   end
+
+  # Only two values are meaningful, and a third is a typo worth hearing
+  # about rather than silently reading as the default.
+  defp allow_unplaced?(options) do
+    case Keyword.get(options, :unplaced, :error) do
+      :error -> false
+      :allow -> true
+    end
+  end
+
+  # Branch and bound over the number of sessions left out.
+  #
+  # One search, carrying the best complete layout found so far. Any
+  # branch already leaving out as many as that best is cut, because it
+  # cannot beat it. Two properties follow, and both matter:
+  #
+  # * **No round is ever re-explored.** Iterative deepening — search
+  #   for "all placed", then "all but one", then "all but two" — redoes
+  #   every earlier round's work on each pass.
+  #
+  # * **It is *anytime*.** The first descent to a leaf already yields a
+  #   usable layout, which later descents only improve. Deepening finds
+  #   nothing at all until it reaches the correct round, so exhausting
+  #   the node cap on a badly overbooked programme returned an error
+  #   where it could have returned most of a conference.
+  #
+  # The relaxation bound closes it off: once the best layout places as
+  # many sessions as the resources could possibly hold, it is optimal
+  # and the search stops rather than proving the point exhaustively.
+  defp optimise(candidates, programme, pinned, allow?, options, preferences, ceiling \\ nil) do
+    context = %{programme: programme, options: options}
+    widest = if allow?, do: length(candidates), else: 0
+
+    explore(candidates, context, Enum.map(pinned, &{&1, exempt(&1)}), [], %{
+      best: nil,
+      stuck: nil,
+      budget: budget(options, preferences),
+      exhausted?: false,
+      ceiling: ceiling || widest,
+      floor: if(allow?, do: fewest_possible_unplaced(candidates), else: 0),
+      preferences: preferences,
+      count_proven?: nil,
+      scoring: %{programme: programme, pool: Keyword.get(options, :pool, [])}
+    })
+  end
+
+  # Lexicographic optimisation, done in two passes rather than one.
+  #
+  # The first pass ignores preferences entirely, so it keeps every
+  # property it had before them: `>=` pruning, the early exit at the
+  # capacity bound, and a *proven* minimum number of sessions left out.
+  #
+  # The second pass takes that number as a hard ceiling and looks only
+  # for a better-scoring layout that places exactly as many. It cannot
+  # cost a placement, because a branch that leaves out one more is cut
+  # before it is explored.
+  #
+  # Doing this in a single pass was tried and was badly wrong. Soft
+  # constraints force `>` pruning — a tie on count is precisely where a
+  # better score lives — and that plus the loss of the early exit made
+  # every programme burn its whole node budget: a four-session layout
+  # went from 5ms to 1951ms, and larger ones stopped being able to
+  # prove minimality at all. Separating the passes gives the soft
+  # search its own budget, so it can never spend the guarantee.
+  defp refine(state, candidates, programme, pinned, allow?, options)
+
+  defp refine(state, _candidates, %Programme{preferences: []}, _pinned, _allow?, _options),
+    do: state
+
+  defp refine(%{best: nil} = state, _candidates, _programme, _pinned, _allow?, _options),
+    do: state
+
+  defp refine(
+         %{best: {count, _score, _placed, _skipped}} = proven,
+         candidates,
+         programme,
+         pinned,
+         allow?,
+         options
+       ) do
+    scored =
+      optimise(candidates, programme, pinned, allow?, options, programme.preferences, count)
+
+    # Minimality was settled by the first pass and cannot be unsettled
+    # by the second, whose exhaustion says only that a better *score*
+    # may exist.
+    case scored.best do
+      nil -> proven
+      _found -> %{scored | floor: proven.floor, count_proven?: minimal?(proven)}
+    end
+  end
+
+  # The scoring pass gets its own budget so that looking for a prettier
+  # layout can never eat the budget that proves how many fit.
+  defp budget(options, []), do: Keyword.get(options, :nodes, @default_nodes)
+
+  defp budget(options, [_first | _rest]) do
+    Keyword.get(options, :score_nodes, @default_score_nodes)
+  end
+
+  # --- the relaxation bound ---------------------------------------
+
+  # The fewest sessions that must be left out, ignoring every
+  # constraint except that a resource cannot hold more overlapping
+  # placements than its concurrency.
+  #
+  # For one resource, the largest set of pairwise-disjoint candidate
+  # intervals is exact by a greedy earliest-end scan; a set whose
+  # overlap never exceeds `c` splits into `c` such sets, so
+  # `disjoint × concurrency` bounds what it can hold. Summing across
+  # resources overcounts a session needing two of them at once, which
+  # keeps the total an upper bound rather than breaking it.
+  #
+  # The bound is computed from the same candidate lists the search
+  # uses, so it bounds the space actually being searched — which is
+  # what makes "optimal" mean the same thing to both.
+  defp fewest_possible_unplaced(candidates) do
+    capacity =
+      candidates
+      |> Enum.flat_map(fn {_session, _symmetry, placements} ->
+        for placement <- placements, resource <- Arrangement.resources(placement) do
+          {resource.name, resource.concurrency, placement.interval}
+        end
+      end)
+      |> Enum.group_by(&elem(&1, 0))
+      |> Enum.map(fn {_name, held} -> holdable(held) end)
+      |> Enum.sum()
+
+    max(length(candidates) - capacity, 0)
+  end
+
+  defp holdable([{_name, concurrency, _interval} | _rest] = held) do
+    held
+    |> Enum.map(&elem(&1, 2))
+    |> Enum.sort(&(Compare.compare_endpoints(&1.to, &2.to) != :later))
+    |> Enum.reduce({0, nil}, fn interval, {count, busy_until} ->
+      if busy_until && Compare.compare_endpoints(interval.from, busy_until) == :earlier do
+        {count, busy_until}
+      else
+        {count + 1, interval.to}
+      end
+    end)
+    |> elem(0)
+    |> Kernel.*(concurrency)
+  end
+
+  # --- depth-first search with backtracking -----------------------
+
+  # `placed` holds `{arrangement, symmetry}` pairs and `skipped` holds
+  # `{session, symmetry}` pairs — the symmetry keys are search
+  # bookkeeping and never reach the caller.
+  defp explore(remaining, context, placed, skipped, state) do
+    cond do
+      settled?(state) -> state
+      state.budget <= 0 -> %{state | exhausted?: true}
+      remaining == [] -> record(state, placed, skipped)
+      hopeless?(skipped, state) -> state
+      true -> descend(remaining, context, placed, skipped, state)
+    end
+  end
+
+  defp descend([{session, symmetry, candidates} | rest], context, placed, skipped, state) do
+    state
+    |> place_each(candidates, symmetry, rest, context, placed, skipped)
+    |> leave_out(session, symmetry, rest, context, placed, skipped)
+  end
+
+  defp place_each(state, [], _symmetry, _rest, _context, _placed, _skipped), do: state
+
+  defp place_each(state, [candidate | others], symmetry, rest, context, placed, skipped) do
+    cond do
+      settled?(state) ->
+        state
+
+      state.budget <= 0 ->
+        %{state | exhausted?: true}
+
+      true ->
+        state
+        |> spend()
+        |> try_placing(candidate, symmetry, rest, context, placed, skipped)
+        |> place_each(others, symmetry, rest, context, placed, skipped)
+    end
+  end
+
+  # Forward checking — filtering every remaining session's candidates
+  # against each new placement, and reordering by how few survive —
+  # was implemented here and reverted. It is textbook for constraint
+  # problems, and it made this one 16 to 20 times slower.
+  #
+  # Two reasons, both particular to this search. `compatible?/4` is
+  # not a table lookup but a scan over everything already placed, so
+  # look-ahead costs `remaining × candidates × placed` at *every*
+  # node, where checking a candidate when its own session comes up
+  # pays that once. And there is little left for it to find: the
+  # symmetry rules below already collapse the interchangeable
+  # sessions that generate the redundant branches forward checking
+  # exists to prune. It also cost more than it saved in answers —
+  # two programmes that had been solved to proven optimality came
+  # back merely good, the budget spent on look-ahead instead.
+  #
+  # Worth revisiting only if `compatible?/4` becomes cheap enough to
+  # memoise per candidate pair.
+  defp try_placing(state, candidate, symmetry, rest, context, placed, skipped) do
+    if worth_trying?(candidate, symmetry, context, placed, skipped) do
+      explore(rest, context, [{candidate, symmetry} | placed], skipped, state)
+    else
+      state
+    end
+  end
+
+  # Leaving a session out is explored as a branch in its own right,
+  # not merely as a fallback once its placements fail: placing a
+  # session can foreclose two others, so the best layout sometimes
+  # gives up one to keep more.
+  defp leave_out(state, session, symmetry, rest, context, placed, skipped) do
+    cond do
+      length(skipped) >= state.ceiling -> note_stuck(state, session)
+      settled?(state) -> state
+      state.budget <= 0 -> %{state | exhausted?: true}
+      true -> skip_it(state, session, symmetry, rest, context, placed, skipped)
+    end
+  end
+
+  defp skip_it(state, session, symmetry, rest, context, placed, skipped) do
+    explore(rest, context, placed, [{session, symmetry} | skipped], spend(state))
+  end
+
+  defp spend(state), do: %{state | budget: state.budget - 1}
+
+  # No layout can leave out fewer than the resources force, so one that
+  # matches the bound is optimal and there is nothing left to prove —
+  # unless preferences are declared, in which case another layout
+  # placing just as many may still score better, and stopping here
+  # would return the first workable answer rather than a good one.
+  defp settled?(%{best: nil}), do: false
+
+  # Penalties are never negative, so a score of zero is the best any
+  # layout can do and the scoring pass has nothing left to look for.
+  defp settled?(%{preferences: [_first | _rest], best: {_count, 0, _placed, _skipped}}), do: true
+
+  defp settled?(%{preferences: [_first | _rest]}), do: false
+  defp settled?(%{best: {count, _score, _placed, _skipped}, floor: floor}), do: count <= floor
+
+  # Without preferences a branch that ties the best count cannot
+  # improve on it, so `>=` cuts it. With preferences a tie is exactly
+  # where a better score lives, so only a strictly worse count is cut.
+  # That is what makes soft constraints cost something: the search can
+  # no longer dismiss the layouts it would otherwise never look at.
+  defp hopeless?(_skipped, %{best: nil}), do: false
+
+  defp hopeless?(skipped, %{best: {count, _score, _placed, _skipped}} = state) do
+    if state.preferences == [] do
+      length(skipped) >= count
+    else
+      length(skipped) > count
+    end
+  end
+
+  # Lexicographic: fewer sessions left out always wins, and the score
+  # only separates layouts that leave out the same number.
+  defp record(state, placed, skipped) do
+    count = length(skipped)
+    arrangements = placed |> Enum.reverse() |> Enum.map(&elem(&1, 0))
+    score = Preference.score(state.preferences, arrangements, state.scoring)
+
+    if better_than_best?(state.best, count, score) do
+      %{
+        state
+        | best: {count, score, arrangements, skipped |> Enum.reverse() |> Enum.map(&elem(&1, 0))}
+      }
+    else
+      state
+    end
+  end
+
+  defp better_than_best?(nil, _count, _score), do: true
+
+  defp better_than_best?({best_count, best_score, _placed, _skipped}, count, score) do
+    count < best_count or (count == best_count and score < best_score)
+  end
+
+  # The first session whose placements all failed with no room to drop
+  # it. Only reached when `:unplaced` is `:error`, and only used to name
+  # the session in the failure.
+  defp note_stuck(%{stuck: nil} = state, session), do: %{state | stuck: session}
+  defp note_stuck(state, _session), do: state
 
   # Symmetry breaking, and the reason the search is tractable at all.
   #
@@ -206,13 +768,23 @@ defmodule Timetable.Arranger do
   # requirements, same track — produce identical subproblems under any
   # permutation. Without a canonical order the search explores all of
   # them, so proving a tight programme infeasible costs a factorial in
-  # the number of look-alike sessions. Requiring each to start no
-  # earlier than its predecessor in the same group collapses those
-  # permutations to one, and loses no solution: any arrangement can be
-  # relabelled into this order because the sessions are identical.
-  defp worth_trying?(candidate, symmetry, programme, placed, options) do
-    in_symmetry_order?(candidate, symmetry, placed) and
-      compatible?(candidate, placed, programme, options)
+  # the number of look-alike sessions.
+  #
+  # Two rules collapse those permutations to one representative, and
+  # neither loses a solution because the sessions are identical and any
+  # arrangement can be relabelled into canonical form. Each must start
+  # no earlier than the last placed member of its group, and once one
+  # member has been left out no later member may be placed — so the
+  # sessions a group gives up are always its last, not an arbitrary
+  # subset of it.
+  defp worth_trying?(candidate, symmetry, context, placed, skipped) do
+    not left_out_already?(symmetry, skipped) and
+      in_symmetry_order?(candidate, symmetry, placed) and
+      compatible?(candidate, placed, context.programme, context.options)
+  end
+
+  defp left_out_already?(symmetry, skipped) do
+    Enum.any?(skipped, fn {_session, key} -> key == symmetry end)
   end
 
   # The most recently placed session of the same shape is the head of
@@ -228,9 +800,30 @@ defmodule Timetable.Arranger do
     end
   end
 
-  defp to_result({:found, arrangements, _budget}, _programme), do: {:ok, arrangements}
+  # --- shaping the outcome ----------------------------------------
 
-  defp to_result({:exhausted, :nodes}, programme) do
+  defp to_result(%{best: {_count, score, arrangements, skipped}} = state, programme, unplaceable) do
+    placed = in_programme_order(arrangements, programme)
+
+    case unplaceable ++ Enum.map(skipped, &clashed/1) do
+      [] ->
+        {:ok, placed}
+
+      left_out ->
+        {:partial,
+         %{
+           Layout.new(programme.name, placed, left_out, minimal?(state))
+           | score: score,
+             score_proven?: not state.exhausted?
+         }}
+    end
+  end
+
+  # Running out of budget outranks getting stuck. A session whose
+  # placements all failed may have failed only because the search never
+  # got far enough to try the arrangement that would have fitted it, so
+  # claiming it is impossible would be claiming more than was proved.
+  defp to_result(%{best: nil, exhausted?: true}, programme, _unplaceable) do
     {:error,
      Infeasible.new(programme.name, [
        "the search reached its node limit before placing every session — " <>
@@ -238,11 +831,101 @@ defmodule Timetable.Arranger do
      ])}
   end
 
-  defp to_result({:stuck, session}, programme) do
+  # The programme is the subject when the whole thing fails, because
+  # the whole thing is what the caller asked for. Inside a layout the
+  # session is the subject instead — there, the programme succeeded and
+  # this one session is what did not.
+  defp to_result(%{best: nil, stuck: %Session{} = session}, programme, _unplaceable) do
+    {:error, Infeasible.new(programme.name, [unplaceable_because(session.name)])}
+  end
+
+  # No layout, nothing named, no exhaustion flag — the budget ran out
+  # somewhere that did not record it. Reporting the cap is the honest
+  # reading, and a clause here is cheaper than a FunctionClauseError.
+  defp to_result(%{best: nil}, programme, _unplaceable) do
     {:error,
      Infeasible.new(programme.name, [
-       "#{session.name} cannot be placed without clashing with something already placed"
+       "the search reached its node limit before placing every session — " <>
+         "raise :nodes, or narrow the programme"
      ])}
+  end
+
+  # A layout is provably the fewest left out when the search finished
+  # on its own terms, or when it matched the relaxation bound before
+  # the budget ran out. When a scoring pass has run, the answer is the
+  # one the counting pass reached — the scoring pass never changes how
+  # many were placed, so its budget cannot cost the guarantee.
+  defp minimal?(%{count_proven?: proven}) when is_boolean(proven), do: proven
+
+  defp minimal?(%{best: {count, _score, _placed, _skipped}, floor: floor, exhausted?: exhausted?}) do
+    not exhausted? or count <= floor
+  end
+
+  defp clashed(session) do
+    Infeasible.new(session.name, [
+      "cannot be placed without clashing with something already placed"
+    ])
+  end
+
+  defp unplaceable_because(name) do
+    "#{name} cannot be placed without clashing with something already placed"
+  end
+
+  defp in_programme_order(arrangements, programme) do
+    order =
+      programme
+      |> Programme.all_sessions()
+      |> Enum.with_index()
+      |> Map.new(fn {session, index} -> {session.name, index} end)
+
+    Enum.sort_by(arrangements, &Map.get(order, &1.session, 0))
+  end
+
+  @doc """
+  `true` when two placements cannot both stand.
+
+  Two placements conflict when they share a resource at overlapping
+  times, when they belong to the same track and overlap, or when a
+  delegate could not walk between them in the gap. This is the whole
+  of what `arrange/3` enforces between any *pair*, exposed so that
+  another solver can be handed the same question and give an answer
+  this library agrees with.
+
+  Capacity beyond one is not a pairwise property — three placements
+  can each be fine with the other two and still exceed a concurrency
+  of two — so a caller relying on this to build a model must handle
+  `concurrency > 1` itself.
+
+  ### Arguments
+
+  * `a` and `b` are each a `t:Timetable.Arrangement.t/0`.
+
+  * `programme` is the `t:Timetable.Programme.t/0` they belong to,
+    consulted for their tracks.
+
+  ### Options
+
+  * `:travel` is passed to `Timetable.travel_time/3`.
+
+  ### Returns
+
+  * `true` when the two cannot both stand.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> room = Timetable.resource("Hall")
+      iex> a = %Timetable.Arrangement{session: "A", allocations: %{room: [room]},
+      ...>       interval: ~o"2026-09-15T09:00:00/2026-09-15T10:00:00"}
+      iex> b = %Timetable.Arrangement{session: "B", allocations: %{room: [room]},
+      ...>       interval: ~o"2026-09-15T09:30:00/2026-09-15T10:30:00"}
+      iex> Timetable.Arranger.conflict?(a, b, Timetable.programme("Conf"))
+      true
+
+  """
+  @spec conflict?(Arrangement.t(), Arrangement.t(), Programme.t(), keyword()) :: boolean()
+  def conflict?(%Arrangement{} = a, %Arrangement{} = b, %Programme{} = programme, options \\ []) do
+    not compatible?(a, [{b, nil}], programme, options)
   end
 
   # --- the three constraints --------------------------------------

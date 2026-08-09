@@ -17,6 +17,7 @@ defmodule Timetable.Programme do
   """
 
   alias Timetable.Availability
+  alias Timetable.Preference
   alias Timetable.Session
   alias Timetable.Track
 
@@ -25,10 +26,11 @@ defmodule Timetable.Programme do
           name: String.t(),
           window: Availability.pattern() | nil,
           tracks: [Track.t()],
-          sessions: [Session.t()]
+          sessions: [Session.t()],
+          preferences: [Preference.t()]
         }
 
-  defstruct name: nil, window: nil, tracks: [], sessions: []
+  defstruct name: nil, window: nil, tracks: [], sessions: [], preferences: []
 
   @doc """
   Build a programme.
@@ -132,6 +134,55 @@ defmodule Timetable.Programme do
   end
 
   @doc """
+  Add a soft constraint.
+
+  A preference never makes a layout invalid, only worse.
+  `Timetable.Arranger.arrange/3` places as many sessions as it can
+  first — that part is proven — and prefers a lower score only among
+  the layouts it reaches. See `Timetable.Preference` for what is and
+  is not promised.
+
+  Declaring even one preference changes how the search runs: it can no
+  longer stop at the first layout that places everything it can, since
+  a later one may score better. A programme with no preferences is
+  unaffected.
+
+  ### Arguments
+
+  * `programme` is a `t:t/0`.
+
+  * `preference` is a built-in name — `:room_changes` or
+    `:room_spread` — or a `{name, function}` pair of your own.
+
+  ### Options
+
+  * `:weight` is how much each violation costs. The default is `1`.
+
+  ### Returns
+
+  * `{:ok, programme}`; or
+
+  * `{:error, reason}` when the preference is not recognised.
+
+  ### Examples
+
+      iex> programme = Timetable.programme("Conf")
+      iex> {:ok, programme} = Timetable.Programme.prefer(programme, :room_changes, weight: 10)
+      iex> Enum.map(programme.preferences, & &1.name)
+      [:room_changes]
+
+      iex> Timetable.Programme.prefer(Timetable.programme("Conf"), :teleportation)
+      {:error, {:unknown_preference, :teleportation}}
+
+  """
+  @spec prefer(t(), atom() | {atom(), function()}, keyword()) :: {:ok, t()} | {:error, term()}
+  def prefer(%__MODULE__{} = programme, preference, options \\ []) do
+    with {:ok, built} <- Preference.new(preference, options) do
+      {:ok, %{programme | preferences: programme.preferences ++ [built]}}
+    end
+  end
+
+  @doc """
   Every session in the programme, tracked or not.
 
   ### Arguments
@@ -156,6 +207,62 @@ defmodule Timetable.Programme do
   @spec all_sessions(t()) :: [Session.t()]
   def all_sessions(%__MODULE__{} = programme) do
     programme.sessions ++ Enum.flat_map(programme.tracks, & &1.sessions)
+  end
+
+  @doc """
+  The same programme cut down to the named sessions.
+
+  Tracks keep only the sessions named, and a track left with none is
+  dropped rather than kept empty — an empty track constrains nothing
+  and would only be noise in the result.
+
+  This exists for `Timetable.Arranger.conflict/3`, which asks whether
+  smaller and smaller parts of a programme can be arranged in order to
+  find the part that cannot.
+
+  ### Arguments
+
+  * `programme` is a `t:t/0`.
+
+  * `names` is the list of session names to keep.
+
+  ### Returns
+
+  * the programme, holding only those sessions.
+
+  ### Examples
+
+      iex> track = Timetable.track("Elixir", of: [Timetable.session("Keynote")])
+      iex> Timetable.programme("Conf")
+      ...> |> Timetable.Programme.add_session(Timetable.session("Registration"))
+      ...> |> Timetable.Programme.add_track(track)
+      ...> |> Timetable.Programme.restrict_to(["Registration"])
+      ...> |> Timetable.Programme.all_sessions()
+      ...> |> Enum.map(& &1.name)
+      ["Registration"]
+
+      iex> track = Timetable.track("Elixir", of: [Timetable.session("Keynote")])
+      iex> Timetable.programme("Conf")
+      ...> |> Timetable.Programme.add_track(track)
+      ...> |> Timetable.Programme.restrict_to([])
+      ...> |> Map.get(:tracks)
+      []
+
+  """
+  @spec restrict_to(t(), [String.t()]) :: t()
+  def restrict_to(%__MODULE__{} = programme, names) when is_list(names) do
+    keeping = MapSet.new(names)
+
+    kept = fn sessions -> Enum.filter(sessions, &MapSet.member?(keeping, &1.name)) end
+
+    %{
+      programme
+      | sessions: kept.(programme.sessions),
+        tracks:
+          programme.tracks
+          |> Enum.map(&%{&1 | sessions: kept.(&1.sessions)})
+          |> Enum.reject(&(&1.sessions == []))
+    }
   end
 
   @doc """

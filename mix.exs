@@ -95,7 +95,13 @@ defmodule Timetable.MixProject do
 
   defp deps do
     [
-      {:ex_tempo, "~> 1.2"},
+      # TODO revert both to hex releases once RFC 7953 VAVAILABILITY
+      # support has shipped in `ical` and `ex_tempo`.
+      {:ex_tempo, path: "../tempo"},
+      {:ical, path: "../ical", optional: true},
+      # A proof-of-concept CP solver. Optional, and `Timetable.Fixpoint`
+      # is only compiled when it is present.
+      {:fixpoint, "~> 0.22", optional: true},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
