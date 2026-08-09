@@ -244,6 +244,10 @@ This is a **search over enumerated candidates**, not a general constraint optimi
 
 The line is worth stating plainly rather than letting it be discovered in production. Where the two meet is that an external optimiser's output is written back through the same allocation API, so the ledger stays authoritative either way.
 
+**Since written, that hand-off is implemented rather than merely described.** `Timetable.Fixpoint.solve/3` hands a programme to a CP solver and takes ordinary arrangements back. It does not move the line — it makes crossing it a function call. The model handed over is *which candidate placement* per session, so eligibility, induced requirements, availability and the place tree stay on this side where they are explained, and the solver never learns what a room is.
+
+Two further qualifications the original text did not anticipate. Soft constraints were added, but only lexicographically: the count is proven first and the score improved second, so this is still not a general optimiser and does not pretend to prove a weighted optimum. And the fixpoint bridge models exclusive resources only, because capacity above one is not a pairwise property and that solver has no cumulative constraint.
+
 ## Persistent state — the ledger, and why freeing is not a workflow
 
 The requirement is that a resource is released when the session holding it changes or is cancelled. The design decision that makes this trivial rather than error-prone: **an allocation is keyed by the session that holds it, and free time is derived, never stored.**
@@ -349,6 +353,16 @@ Two frictions are real and should be stated rather than discovered:
 
 * **`Tempo.Network` is not used.** The plan expected pinned tracks to delegate to the STP solver. In practice every track shape — pinned or varying-room — is handled by the same backtracking search, because the search must run anyway for resource exclusion and reachability, and routing a subset of cases through a second solver would add a seam for no gain. The STP remains the right tool if precedence constraints between sessions are ever added (*"the panel must follow the keynote"*), which this phase does not model.
 
+**Phase 4d — calendar interchange.** Not in the original plan. `from_ical/1` reads RFC 7953 `VAVAILABILITY` into open hours. The parsing sits upstream — `VAVAILABILITY` support was contributed to the `ical` library and the interval work to `Tempo.ICal` — because the missing piece was *format*, not *domain*, which is the same test that sent `IntervalSet.overlapping/2` and `Duration.negate/1` upstream. RFC 8984 JSCalendar landed the same way, as a standalone `jscalendar` package with a `Tempo.JSCalendar` bridge. **Done.**
+
+**Phase 4a — answering when it does not fit.** Not in the original plan, and added once the search was exercised in anger. `unplaced: :allow` returns a `Layout` under a `{:partial, …}` tag with the fewest sessions left out; `:pinned` fixes chosen placements and searches around them; `Conflict.minimal/3` (QuickXplain) names the smallest set of sessions or requirements that cannot hold together. **Done.**
+
+The search itself was rewritten twice in the process, both times because measurement contradicted the design. Iterative deepening on the number left out was replaced by branch and bound, because deepening finds *nothing* until it reaches the correct round and so returned an error where it could have returned most of a conference. A relaxation bound — the largest set of non-overlapping candidates each resource could hold — then let it stop as soon as a layout matches, which made being *further* overbooked cheaper rather than dearer.
+
+**Phase 4b — holds.** `hold/3`, `confirm/2`, `expire/2`. **Done**, and contrary to the capability review, which had deferred this to the adapter. Availability is derived from the ledger on every call, so a hold the ledger cannot see is a hold nobody subtracts. `expire/2` takes the moment as an argument rather than the library reading a clock — see the review's post-mortem.
+
+**Phase 4c — soft constraints and the solver hand-off.** `Preference` with `:room_changes`, `:room_spread` and custom counters, optimised lexicographically in two passes so a preference can never cost a placement. `Timetable.Fixpoint.solve/3` makes the "bring your own solver" line below executable against [fixpoint](https://hex.pm/packages/fixpoint). **Done.**
+
 **Phase 5 — adapter.** `Matcher`, `Selector`/`Strategy`, `CostFn` over the place tree, then the attribute-and-place projection behaviour. Whether this lands as a separate `ash_scheduling_timetable` package or as an optional dependency contributed into `ash_scheduling` is Alembic's call and worth asking before building — the technical content is identical either way.
 
 ## Risks
@@ -373,6 +387,6 @@ Phase 0 meets Tempo's six gates on the mise-current toolchain and is the only ph
 
 * **Packaging of the adapter** — separate package, or contributed upstream into `ash_scheduling` as an optional dependency? Worth asking Alembic before Phase 5.
 
-* **The default travel table** — what per-depth defaults, and in what unit? A same-place default of zero and a different-root default of "unknown, must be configured" may be safer than guessing minutes.
+* ~~**The default travel table**~~ — **settled.** Zero for the same place, five and ten minutes for one and two levels apart, twenty for anything deeper, and `{:error, :unknown}` for unrelated roots. The safer half of the original suggestion won: unrelated places are never guessed at, and any specific pair can be overridden with `:between`.
 
-* **Whether resource availability belongs here at all**, or whether a resource should simply carry a Tempo value the caller supplies. The lighter option is attractive; the argument for `open/2` is that recurring open hours are the single most common thing every caller would otherwise rebuild.
+* ~~**Whether resource availability belongs here at all**~~ — **settled, and the argument for keeping it got stronger.** `open/2` takes a Tempo value, an ISO 8601 string, an RFC 5545 `RRULE`, or — via `from_ical/1` — an RFC 7953 `VAVAILABILITY` document, which is what a CalDAV server returns when asked when someone is free. Had a resource merely carried a caller-supplied value, every consumer would have rebuilt that import. The import stays unmaterialised until a query window is known, so `PRIORITY` and each recurrence resolve against the dates actually asked about.

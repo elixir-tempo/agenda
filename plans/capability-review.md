@@ -8,11 +8,11 @@ Every "yes" below was executed, not assumed. Two were assumed on the first pass 
 
 ## Status
 
-**Reviewed 2026-08-03. Revised after the gap-closing work of the same day.** Four of the five items the first pass raised are now closed; the fifth (holds and an injectable clock) is deliberately deferred to the adapter. The tables below record the current state; the closing notes record what changed and why.
+**Reviewed 2026-08-03. Revised after the gap-closing work of the same day, and again on 2026-08-10 when holds landed.** All five items the first pass raised are now closed. The fifth — holds and the clock they need — had been deferred to the adapter; that deferral turned out to be wrong, and the closing notes record why. The tables below are the current state.
 
 ## Verdict
 
-Of the capabilities AshScheduling enumerates, `timetable` now covers the availability engine, matching, orchestration-as-values, and recurrence. What remains open is the claim lifecycle — specifically `:held` and the clock it needs — which is entangled with how claims are persisted and belongs with the adapter rather than ahead of it.
+Of the capabilities AshScheduling enumerates, `timetable` covers the availability engine, matching, orchestration-as-values, recurrence, and holds. What remains open is the *rest* of the claim lifecycle — completed, cancelled, no-show — which genuinely does belong with persistence, because none of those states changes what is available.
 
 ## The engine (their Phase 2)
 
@@ -30,7 +30,7 @@ Of the capabilities AshScheduling enumerates, `timetable` now covers the availab
 | `min_duration` filtering | **Yes** — `lasting_at_least/2`. |
 | `explain: true` on unavailable windows | **Partial.** We explain *eligibility* richly ("seats is 4 — needs at least 8") but cannot say *why a particular window* is unavailable. |
 | `transition_fn` for context-dependent gaps | **Yes, and richer** — `travel_time/3` derives the gap from the place tree with per-pair overrides, rather than a callback the consumer must supply. |
-| `now` / injectable clock | **No.** Nothing in the library reads a clock; it only matters once holds exist. |
+| `now` / injectable clock | **Yes, by not having one.** Nothing here reads a clock. `expire/2` takes the moment as an argument, which is stronger than injecting one: there is no clock to stub, and `busy/2` stays a pure projection. |
 | Sweep-line, O(n log n) | **Yes**, inherited from Tempo's set operations. |
 | Commutativity — evaluation order does not change results | **Yes, verified.** Three orderings of the same busy set give identical output. |
 | Monotonicity — adding a block-out never increases availability | **Yes, verified.** |
@@ -47,8 +47,8 @@ Of the capabilities AshScheduling enumerates, `timetable` now covers the availab
 | Idempotency key | **Partial.** `allocate/2` is idempotent by construction (a session's allocations are replaced wholesale), so retrying is safe. There is no key to deduplicate two *different* calls meaning the same thing. |
 | Recurring series with a shared id, cancel-from-date | **Yes** — `every/3` expands a session over a recurrence; `release_series/3` cancels the run, or the rest of it with `:from`. |
 | Conflict prevention under concurrency | **Correctly out of scope.** A pure library cannot arbitrate races; the ledger carries what an exclusion constraint or advisory lock needs. |
-| Claim lifecycle: held → confirmed → completed / cancelled / no-show | **No** — deferred to the adapter. See the open item below. |
-| Hold expiry excluded from conflict checks | **No** — follows from having no holds. |
+| Claim lifecycle: held → confirmed → completed / cancelled / no-show | **Held and confirmed, yes** — `hold/3` and `confirm/2`. The remaining states are correctly the adapter's; see the closing note. |
+| Hold expiry excluded from conflict checks | **Yes** — `expire/2` drops what has lapsed, and until it is called a hold occupies its resource exactly as a booking does. |
 | Constraint schedules: bookable only during a constraining schedule's hours | **Yes** — `only_during/2`. |
 | Grouped OR constraints (any of three venues open) | **Yes** — `during_any/2`. |
 | Constraint cycle detection | **Not applicable** — no constraint graph to make cyclic. |
@@ -98,11 +98,19 @@ Each verb accepts either a set or the `{:ok, set}` from the previous step, and a
 
 ## Still open
 
-**Claim lifecycle, and the clock it needs.** Most of the status graph — confirmed, completed, cancelled, no-show — is persistence's business and rightly outside a pure library. `:held` is not: a hold *consumes availability until it expires*, so the engine has to know about it, and that requires an injectable clock the library currently has no notion of.
-
-This is deliberately deferred rather than merely unfinished. How a hold is represented depends on how claims are persisted, which is the adapter's decision; building it first would mean guessing at that shape. Everything a hold needs is already in place — allocations carry their interval, and `free/2` derives availability on every call — so adding one is additive when the adapter settles the representation.
+**The rest of the claim lifecycle.** Completed, cancelled and no-show are persistence's business and stay outside a pure library. The line is not "which states are interesting" but **which states change what is available**: a hold does, and none of those do.
 
 **Two smaller partials** noted above and not closed: `explain: true` cannot yet say why a *particular window* is unavailable (only why a resource is ineligible), and cycles are expressible through Tempo's recurrence and working-day arithmetic without a named surface.
+
+## The one item this review got wrong
+
+Holds were deferred here on the grounds that "how a hold is represented depends on how claims are persisted, which is the adapter's decision". That reasoning does not survive contact with how this library works.
+
+Availability is *derived* from the ledger on every call. A hold the ledger cannot see is a hold nobody subtracts — so two callers are offered the same room, which is the exact failure a hold exists to prevent. The representation question was real but small; the consequence of deferring it was not.
+
+The clock was the part worth thinking about, and the answer was not the injectable clock this review assumed. `Ledger.expire/2` takes the moment as an argument and drops what has lapsed, so `busy/2` needs no clock at all and stays a pure projection. That is stronger than injection: there is nothing to stub, arranging the same programme twice gives the same answer, and the discipline matches `travel_time/3` returning `{:error, :unknown}` rather than guessing an unmeasured journey.
+
+Worth recording because the reasoning generalises. "This depends on a decision downstream" is a good reason to defer a *representation* and a bad reason to defer a *capability the engine must have to be correct*.
 
 ## Where we are ahead
 
@@ -114,7 +122,11 @@ Worth recording, because it shapes what an adapter should delegate rather than r
 
 * **Places as a tree.** ADR-002 lists geography as a non-goal that must stay possible, supported via the `context` map. We derive travel from containment, which is the thing they left open.
 
-* **Whole-programme arrangement.** Their `Optimizer` behaviour is unimplemented and explicitly delegated to the consumer ("consumer brings CP-SAT, OR-Tools"). `arrange/3` fills it for the small-to-medium case, with caps that report truncation.
+* **Whole-programme arrangement.** Their `Optimizer` behaviour is unimplemented and explicitly delegated to the consumer ("consumer brings CP-SAT, OR-Tools"). `arrange/3` fills it for the small-to-medium case, with caps that report truncation — and `Timetable.Fixpoint.solve/3` makes the hand-off itself executable when the consumer does bring a solver.
+
+* **Exactness, which a metaheuristic cannot offer.** Timefold and OptaPlanner return a good answer with no optimality guarantee, ever. `arrange/3` is exact branch-and-bound with a relaxation bound, so `minimal?` means *no layout leaves out fewer* — a claim a local search cannot make at any scale. The trade is that it holds for dozens of sessions, not thousands.
+
+* **Soft constraints that cannot cost a placement.** `Timetable.Preference` optimises lexicographically in two passes: the count is proven first, then a better score is sought only among layouts placing exactly as many. Weighted scoring is ordinary; the guarantee that turning it on cannot lose you a session is not.
 
 * **Calendar correctness beyond Gregorian.** Inherited from Tempo: non-Gregorian calendars, uncertain dates, and ISO 8601-2 semantics that a hand-rolled engine would not attempt.
 
@@ -126,4 +138,6 @@ That is the pattern worth recording. When a domain library finds itself hand-rol
 
 ## Recommendation
 
-All five items the first pass raised are resolved or deliberately deferred. The next substantive work is the adapter, which is also where holds should be designed — their representation depends on how claims are persisted, and that is the adapter's decision to make rather than one to guess at now.
+All five items the first pass raised are resolved. The engine now covers everything AshScheduling's implementation requirements state a scheduling *engine* needs; what is left on their list is persistence, races and the status graph, none of which a pure library should hold.
+
+The next substantive work is therefore the adapter itself, and it starts from a better place than this review expected: holds exist, so the adapter persists a lifecycle rather than inventing one.
