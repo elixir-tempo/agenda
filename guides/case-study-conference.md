@@ -17,9 +17,9 @@ Three constraints hold a programme together:
 ## The venue
 
 ```elixir
-venue       = Timetable.place("Convention Centre")
-main_level  = Timetable.place("Plenary Level", within: venue)
-break_level = Timetable.place("Breakout Level", within: venue)
+venue       = Agenda.place("Convention Centre")
+main_level  = Agenda.place("Plenary Level", within: venue)
+break_level = Agenda.place("Breakout Level", within: venue)
 
 conf_days =
   Tempo.IntervalSet.new!([
@@ -27,9 +27,9 @@ conf_days =
     ~o"2027-05-14T09:00:00/2027-05-14T17:00:00"
   ])
 
-{:ok, hall}   = Timetable.resource("Main Hall", within: main_level, seats: 800) |> Timetable.open(conf_days)
-{:ok, room_a} = Timetable.resource("Room A", within: break_level, seats: 200) |> Timetable.open(conf_days)
-{:ok, room_b} = Timetable.resource("Room B", within: break_level, seats: 200) |> Timetable.open(conf_days)
+{:ok, hall}   = Agenda.resource("Main Hall", within: main_level, seats: 800) |> Agenda.open(conf_days)
+{:ok, room_a} = Agenda.resource("Room A", within: break_level, seats: 200) |> Agenda.open(conf_days)
+{:ok, room_b} = Agenda.resource("Room B", within: break_level, seats: 200) |> Agenda.open(conf_days)
 ```
 
 Open hours are a Tempo value, so "nine to five on two specific days" is just a two-member interval set. It could equally be an ISO 8601 recurrence or an RFC 5545 `RRULE` — `open/2` takes all three, and ISO 8601 is the preferred spelling because it is what Tempo stores and renders back.
@@ -38,13 +38,13 @@ Open hours are a Tempo value, so "nine to five on two specific days" is just a t
 
 ```elixir
 keynote = fn name, window ->
-  Timetable.session(name, lasting: ~o"PT1H", between: window)
-  |> Timetable.Session.needs(:room, seats: at_least(500))
+  Agenda.session(name, lasting: ~o"PT1H", between: window)
+  |> Agenda.Session.needs(:room, seats: at_least(500))
 end
 
 talk = fn name, window ->
-  Timetable.session(name, lasting: ~o"PT1H", between: window)
-  |> Timetable.Session.needs(:room, seats: at_least(150))
+  Agenda.session(name, lasting: ~o"PT1H", between: window)
+  |> Agenda.Session.needs(:room, seats: at_least(150))
 end
 ```
 
@@ -63,12 +63,12 @@ This is worth stating plainly because the alternative — a genuine "nothing els
 
 ```elixir
 core =
-  Timetable.track("Core", of: [talk.("OTP internals", day1_rest), talk.("Ecto at scale", day2_rest)])
-  |> Timetable.Track.reachable(within: ~o"PT15M")
+  Agenda.track("Core", of: [talk.("OTP internals", day1_rest), talk.("Ecto at scale", day2_rest)])
+  |> Agenda.Track.reachable(within: ~o"PT15M")
 
 web =
-  Timetable.track("Web", of: [talk.("LiveView patterns", day1_rest), talk.("Phoenix 2.0", day2_rest)])
-  |> Timetable.Track.reachable(within: ~o"PT15M")
+  Agenda.track("Web", of: [talk.("LiveView patterns", day1_rest), talk.("Phoenix 2.0", day2_rest)])
+  |> Agenda.Track.reachable(within: ~o"PT15M")
 ```
 
 > *"No two Core talks may overlap, and a delegate following Core must be able to walk between consecutive ones inside fifteen minutes."*
@@ -81,13 +81,13 @@ The word is deliberately **track** and not "stream". Elixir's `Stream` owns that
 
 ```elixir
 programme =
-  Timetable.programme("ElixirConf 2027", across: ~o"2027-05-13/2027-05-15")
-  |> Timetable.Programme.add_session(keynote.("Day 1 keynote", day1_morning))
-  |> Timetable.Programme.add_session(keynote.("Day 2 keynote", day2_morning))
-  |> Timetable.Programme.add_track(core)
-  |> Timetable.Programme.add_track(web)
+  Agenda.programme("ElixirConf 2027", across: ~o"2027-05-13/2027-05-15")
+  |> Agenda.Programme.add_session(keynote.("Day 1 keynote", day1_morning))
+  |> Agenda.Programme.add_session(keynote.("Day 2 keynote", day2_morning))
+  |> Agenda.Programme.add_track(core)
+  |> Agenda.Programme.add_track(web)
 
-{:ok, arrangements} = Timetable.arrange(programme, [hall, room_a, room_b])
+{:ok, arrangements} = Agenda.arrange(programme, [hall, room_a, room_b])
 length(arrangements)
 #=> 6
 ```
@@ -111,13 +111,13 @@ Both tracks got the same slot — that is correct and is the whole point of para
 
 ```elixir
 impossible =
-  Timetable.session("Impossible keynote", lasting: ~o"PT1H", between: day1_morning)
-  |> Timetable.Session.needs(:room, seats: at_least(5000))
+  Agenda.session("Impossible keynote", lasting: ~o"PT1H", between: day1_morning)
+  |> Agenda.Session.needs(:room, seats: at_least(5000))
 
-Timetable.arrange(programme_with_it, [hall, room_a, room_b])
+Agenda.arrange(programme_with_it, [hall, room_a, room_b])
 #=> {:error, reason}
 
-Timetable.explain(reason)
+Agenda.explain(reason)
 #=> "Impossible keynote cannot be held: nothing satisfies room: Main Hall (seats is 800 —
 #=>  needs at least 5000), Room A (seats is 200 — needs at least 5000), Room B (seats is
 #=>  200 — needs at least 5000)"
@@ -134,14 +134,14 @@ lightning_slot = ~o"2027-05-13T14:00:00/2027-05-13T16:00:00"
 
 crowded =
   Enum.reduce(1..8, programme, fn n, acc ->
-    Timetable.Programme.add_session(acc, talk.("Lightning #{n}", lightning_slot))
+    Agenda.Programme.add_session(acc, talk.("Lightning #{n}", lightning_slot))
   end)
 
-{:partial, layout} = Timetable.arrange(crowded, [hall, room_a, room_b], unplaced: :allow)
+{:partial, layout} = Agenda.arrange(crowded, [hall, room_a, room_b], unplaced: :allow)
 
 length(layout.placed)
 #=> 12
-Timetable.Layout.unplaced_sessions(layout)
+Agenda.Layout.unplaced_sessions(layout)
 #=> ["Lightning 7", "Lightning 8"]
 ```
 
@@ -150,7 +150,7 @@ Three rooms across a two-hour slot hold six lightning talks; eight were offered,
 The result is **never** `{:ok, …}` when something was dropped — the tag is `{:partial, layout}`, so a caller who has not thought about incompleteness cannot mistake one for a finished programme. Each entry in `layout.unplaced` is an ordinary infeasible result, so it still says why:
 
 ```elixir
-Timetable.explain(layout)
+Agenda.explain(layout)
 #=> "ElixirConf 2027: 12 of 14 sessions placed. Lightning 7 cannot be held: cannot be
 #=>  placed without clashing with something already placed Lightning 8 cannot be held:
 #=>  cannot be placed without clashing with something already placed"
@@ -174,15 +174,15 @@ The search is branch-and-bound. It keeps the best complete layout found so far a
 Once the programme is published, re-running it must not move the keynote somebody already booked a flight for. `:pinned` fixes chosen placements and searches around them:
 
 ```elixir
-{:ok, arrangements} = Timetable.arrange(programme, [hall, room_a, room_b])
+{:ok, arrangements} = Agenda.arrange(programme, [hall, room_a, room_b])
 announced = Enum.filter(arrangements, &String.contains?(&1.session, "keynote"))
 
-{:ok, revised} = Timetable.arrange(programme, [hall, room_a, room_b], pinned: announced)
+{:ok, revised} = Agenda.arrange(programme, [hall, room_a, room_b], pinned: announced)
 length(revised)
 #=> 6
 ```
 
-A pin is not a hint. Every constraint still applies to it — a pinned session occupies its room, clashes with its track, and counts against reachability — and a pin that cannot be honoured is an error naming it, not something quietly dropped. Pinning what is already booked is a one-liner via `Timetable.arrangements/3`, which rebuilds ledger allocations into pinnable arrangements.
+A pin is not a hint. Every constraint still applies to it — a pinned session occupies its room, clashes with its track, and counts against reachability — and a pin that cannot be honoured is an error naming it, not something quietly dropped. Pinning what is already booked is a one-liner via `Agenda.arrangements/3`, which rebuilds ledger allocations into pinnable arrangements.
 
 ## Which sessions are actually fighting
 
@@ -190,11 +190,11 @@ When a programme genuinely cannot be laid out, `arrange/3` names *a* session tha
 
 ```elixir
 tight =
-  Timetable.programme("Overbooked", across: ~o"2027-05-13/2027-05-14")
-  |> Timetable.Programme.add_session(keynote.("Keynote A", day1_morning))
-  |> Timetable.Programme.add_session(keynote.("Keynote B", day1_morning))
+  Agenda.programme("Overbooked", across: ~o"2027-05-13/2027-05-14")
+  |> Agenda.Programme.add_session(keynote.("Keynote A", day1_morning))
+  |> Agenda.Programme.add_session(keynote.("Keynote B", day1_morning))
 
-Timetable.conflict(tight, [hall, room_a, room_b])
+Agenda.conflict(tight, [hall, room_a, room_b])
 #=> {:ok, ["Keynote A", "Keynote B"]}
 ```
 
@@ -207,10 +207,10 @@ This is QuickXplain, and it costs a number of trial arrangements logarithmic in 
 Everything so far is hard: a layout is valid or it is not. But several layouts are usually valid, and `arrange/3` has been picking among them arbitrarily. A delegate following the Core track would rather not be marched between floors every hour, and that is a *preference* — it never makes a layout invalid, only worse.
 
 ```elixir
-{:ok, programme} = Timetable.prefer(programme, :room_changes, weight: 10)
+{:ok, programme} = Agenda.prefer(programme, :room_changes, weight: 10)
 
-{:ok, arrangements} = Timetable.arrange(programme, [hall, room_a, room_b])
-Timetable.explain_score(arrangements, programme)
+{:ok, arrangements} = Agenda.arrange(programme, [hall, room_a, room_b])
+Agenda.explain_score(arrangements, programme)
 #=> ["room_changes: 0 × 10 = 0"]
 ```
 
@@ -219,7 +219,7 @@ Zero because both Core talks now sit in the same room. Preferences count *violat
 `:room_spread` is the other built-in, and it discourages piling everything into one room while another stands empty. Your own is a name and a function:
 
 ```elixir
-Timetable.prefer(programme, {:no_late_keynotes, &count_late_keynotes/2}, weight: 5)
+Agenda.prefer(programme, {:no_late_keynotes, &count_late_keynotes/2}, weight: 5)
 ```
 
 **A preference can never cost you a session.** Optimisation is lexicographic and runs in two passes: the first ignores preferences entirely and proves how many sessions can be placed, the second takes that number as a hard ceiling and looks only for a better-scoring layout placing exactly as many. So `minimal?` still means what it meant, and a separate `score_proven?` says whether the scoring pass finished:
@@ -236,7 +236,7 @@ The two are independent, and usually the first is proven while the second is mer
 Past a few dozen sessions this search runs out of road, and the guide has said so from the start: use a real solver and write its output back through `allocate/2`. With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency, that is one call:
 
 ```elixir
-{:ok, arrangements} = Timetable.Fixpoint.solve(programme, [hall, room_a, room_b])
+{:ok, arrangements} = Agenda.Fixpoint.solve(programme, [hall, room_a, room_b])
 ```
 
 The programme does not change shape to suit the solver. Each session already has a finite list of candidate placements that satisfy its requirements, so the variable handed over is *which candidate* — and eligibility, induced requirements, availability and the place tree all stay here, where they are explained. The solver never learns what a room is. Conflicts come from the same predicate `arrange/3` uses, so the two cannot disagree about what a clash is.
@@ -254,12 +254,12 @@ The search is depth-first with backtracking, ordered most-constrained-first, and
 **Both caps report when they are hit.** A partial programme presented as finished is worse than an admitted failure, so hitting the node limit is an error naming the limit, not a short list of arrangements:
 
 ```elixir
-Timetable.arrange(programme, rooms, nodes: 1) |> elem(1) |> Timetable.explain()
+Agenda.arrange(programme, rooms, nodes: 1) |> elem(1) |> Agenda.explain()
 #=> "... the search reached its node limit before placing every session — raise :nodes,
 #=>  or narrow the programme"
 ```
 
-A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Timetable.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
+A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
 
 ## What to take away
 

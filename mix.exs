@@ -1,14 +1,14 @@
-defmodule Timetable.MixProject do
+defmodule Agenda.MixProject do
   use Mix.Project
 
   @version "0.1.0"
 
   def project do
     [
-      app: :timetable,
+      app: :agenda,
       version: @version,
-      name: "Timetable",
-      source_url: "https://github.com/elixir-tempo/timetable",
+      name: "Agenda",
+      source_url: "https://github.com/elixir-tempo/agenda",
       docs: docs(),
       deps: deps(),
       description: description(),
@@ -57,9 +57,9 @@ defmodule Timetable.MixProject do
 
   def links do
     %{
-      "GitHub" => "https://github.com/elixir-tempo/timetable",
-      "Readme" => "https://github.com/elixir-tempo/timetable/blob/v#{@version}/README.md",
-      "Changelog" => "https://github.com/elixir-tempo/timetable/blob/v#{@version}/CHANGELOG.md"
+      "GitHub" => "https://github.com/elixir-tempo/agenda",
+      "Readme" => "https://github.com/elixir-tempo/agenda/blob/v#{@version}/README.md",
+      "Changelog" => "https://github.com/elixir-tempo/agenda/blob/v#{@version}/CHANGELOG.md"
     }
   end
 
@@ -87,9 +87,9 @@ defmodule Timetable.MixProject do
 
   def groups_for_modules do
     [
-      Core: ~r/^Timetable$/,
-      "Resources and places": ~r/^Timetable\.(Resource|Place)$/,
-      "Requirements and matching": ~r/^Timetable\.(Requirement|Predicate)$/
+      Core: ~r/^Agenda$/,
+      "Resources and places": ~r/^Agenda\.(Resource|Place)$/,
+      "Requirements and matching": ~r/^Agenda\.(Requirement|Predicate)$/
     ]
   end
 
@@ -99,7 +99,7 @@ defmodule Timetable.MixProject do
       # support has shipped in `ical` and `ex_tempo`.
       {:ex_tempo, path: "../tempo"},
       {:ical, path: "../ical", optional: true},
-      # A proof-of-concept CP solver. Optional, and `Timetable.Fixpoint`
+      # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
       # is only compiled when it is present.
       {:fixpoint, "~> 0.22", optional: true},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},

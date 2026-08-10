@@ -10,39 +10,45 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
-* `Timetable.Arranger.arrange/3` takes `unplaced: :allow`, which leaves out the fewest sessions it can rather than failing the whole programme, and returns a `Timetable.Layout` under a `{:partial, layout}` tag. Each unplaced session carries its own reason, and `{:ok, arrangements}` still means every session was placed.
+* `Agenda.Arranger.arrange/3` takes `unplaced: :allow`, which leaves out the fewest sessions it can rather than failing the whole programme, and returns a `Agenda.Layout` under a `{:partial, layout}` tag. Each unplaced session carries its own reason, and `{:ok, arrangements}` still means every session was placed.
 
-* `Timetable.Arranger.arrange/3` takes `:pinned`, a list of arrangements whose placements are fixed while everything else is searched around them. `Timetable.Ledger.arrangements/3` rebuilds what is already booked into pinnable arrangements, and `Timetable.Ledger.busy/2`'s `:except` now accepts a list of session names.
+* `Agenda.Arranger.arrange/3` takes `:pinned`, a list of arrangements whose placements are fixed while everything else is searched around them. `Agenda.Ledger.arrangements/3` rebuilds what is already booked into pinnable arrangements, and `Agenda.Ledger.busy/2`'s `:except` now accepts a list of session names.
 
-* Holds. `Timetable.hold/3` claims resources tentatively until a moment, `confirm/2` makes the claim firm, and `expire/2` drops what has lapsed. A hold consumes availability exactly as a booking does, which is why it lives in the ledger; nothing expires on its own, because `expire/2` takes the moment as an argument rather than reading a clock and so the ledger stays a value that answers the same question twice.
+* Precedence. `Agenda.precede/4` requires one session to finish before another starts, with an optional `:gap` and `:within` measured from the predecessor's end — which is what makes a task graph out of a set of tasks, and an interview loop out of two appointments. It is a pairwise constraint, so `Agenda.Arranger.conflict?/4` covers it and the fixpoint bridge enforces it too.
 
-* Soft constraints. `Timetable.prefer/3` adds a weighted `Timetable.Preference` to a programme — `:room_changes`, `:room_spread`, or one of your own — and `arrange/3` prefers a lower-scoring layout among those it could already return. Optimisation is lexicographic and two-pass, so a preference can never cost a placement: `minimal?` still means proven, and the new `score_proven?` says whether the scoring pass finished. `Timetable.explain_score/3` breaks the total down per preference.
+* Load limits. `Agenda.resource("Ann", limits: [day: 1, week: 5])` caps how often a resource may be claimed over a period. This is not concurrency: concurrency is how many claims may overlap at an instant, a limit is how many may fall inside a stretch of calendar however far apart. Claims already in `:busy` count, because no availability calculation can express "at most five this week".
 
-* `Timetable.Fixpoint.solve/3` hands a whole programme to the [fixpoint](https://hex.pm/packages/fixpoint) CP solver and takes the answer back as ordinary arrangements the ledger accepts. Each session becomes one variable over its candidate placements and each pair an `Element2D` conflict lookup, so eligibility, availability and the place tree stay on this side of the boundary where they are explained. Conflicts come from the new `Timetable.Arranger.conflict?/4`, which the built-in search uses too, so the two cannot disagree. Exclusive resources only, and all-or-nothing: concurrency above one is refused rather than mis-solved, because capacity is not a pairwise property and fixpoint has no cumulative constraint.
+* Per-resource wishes. `:avoids` and `:prefers` on a resource say when it would rather and rather not be used, and the `:resource_wishes` preference scores them. Unlike `open/2` these are wishes rather than rules — they make a placement worse, not impossible — so "Ann would rather not work Tuesdays" no longer has to be spelled as "Tuesday does not exist".
 
-* `Timetable.from_ical/1` reads a resource's open hours from an RFC 7953 `VAVAILABILITY` — what a CalDAV server hands you when asked when someone is available. The result is a pattern for `open/2`, held unmaterialised until a query window is known, so `PRIORITY` and each `AVAILABLE` recurrence resolve against the window actually being asked about.
+* Holds. `Agenda.hold/3` claims resources tentatively until a moment, `confirm/2` makes the claim firm, and `expire/2` drops what has lapsed. A hold consumes availability exactly as a booking does, which is why it lives in the ledger; nothing expires on its own, because `expire/2` takes the moment as an argument rather than reading a clock and so the ledger stays a value that answers the same question twice.
 
-* `Timetable.Conflict.minimal/3` implements QuickXplain, finding the smallest set of constraints that still cannot hold together. `Timetable.conflict/3` applies it to a programme (which sessions cannot all be held) or a session (which demands are impossible together, including those induced by a rostered resource).
+* Soft constraints. `Agenda.prefer/3` adds a weighted `Agenda.Preference` to a programme — `:room_changes`, `:room_spread`, or one of your own — and `arrange/3` prefers a lower-scoring layout among those it could already return. Optimisation is lexicographic and two-pass, so a preference can never cost a placement: `minimal?` still means proven, and the new `score_proven?` says whether the scoring pass finished. `Agenda.explain_score/3` breaks the total down per preference.
 
-* `Timetable.Resource` honours `concurrency` — previously the field was accepted, documented, and enforced nowhere, so a twenty-locker bank went fully unavailable after one booking. A window is now unavailable only where overlapping claims reach the resource's concurrency.
+* `Agenda.Fixpoint.solve/3` hands a whole programme to the [fixpoint](https://hex.pm/packages/fixpoint) CP solver and takes the answer back as ordinary arrangements the ledger accepts. Each session becomes one variable over its candidate placements and each pair an `Element2D` conflict lookup, so eligibility, availability and the place tree stay on this side of the boundary where they are explained. Conflicts come from the new `Agenda.Arranger.conflict?/4`, which the built-in search uses too, so the two cannot disagree. Exclusive resources only, and all-or-nothing: concurrency above one is refused rather than mis-solved, because capacity is not a pairwise property and fixpoint has no cumulative constraint.
+
+* `Agenda.from_ical/1` reads a resource's open hours from an RFC 7953 `VAVAILABILITY` — what a CalDAV server hands you when asked when someone is available. The result is a pattern for `open/2`, held unmaterialised until a query window is known, so `PRIORITY` and each `AVAILABLE` recurrence resolve against the window actually being asked about.
+
+* `Agenda.Conflict.minimal/3` implements QuickXplain, finding the smallest set of constraints that still cannot hold together. `Agenda.conflict/3` applies it to a programme (which sessions cannot all be held) or a session (which demands are impossible together, including those induced by a rostered resource).
+
+* `Agenda.Resource` honours `concurrency` — previously the field was accepted, documented, and enforced nowhere, so a twenty-locker bank went fully unavailable after one booking. A window is now unavailable only where overlapping claims reach the resource's concurrency.
 
 * `buffer_before` and `buffer_after` on a resource — turnaround that is genuinely unavailable rather than something the caller must remember to leave free. A 30-minute claim with a 15-minute after-buffer blocks 45 minutes.
 
-* `Timetable.every/3` expands a session over an ISO 8601 recurrence or RFC 5545 `RRULE` into one session per occurrence, sharing a `:series` name; `Timetable.release_series/3` cancels the run, or with `:from` only the part still ahead.
+* `Agenda.every/3` expands a session over an ISO 8601 recurrence or RFC 5545 `RRULE` into one session per occurrence, sharing a `:series` name; `Agenda.release_series/3` cancels the run, or with `:from` only the part still ahead.
 
-* `Timetable.only_during/2`, `during_any/2` and `lasting_at_least/2` — constraint composition, grouped-OR constraints, and minimum durations as named verbs. Each accepts a set or the `{:ok, set}` from a previous step, so refinements read as one sentence and still short-circuit on error.
+* `Agenda.only_during/2`, `during_any/2` and `lasting_at_least/2` — constraint composition, grouped-OR constraints, and minimum durations as named verbs. Each accepts a set or the `{:ok, set}` from a previous step, so refinements read as one sentence and still short-circuit on error.
 
 * A timezone database is configured for development and test. Without one Elixir resolves every zone as UTC and daylight-saving arithmetic is silently wrong; consuming applications must configure their own, which the README now explains.
 
 ### Performance
 
-* `Timetable.Arranger.arrange/3` searches by branch and bound rather than by iterative deepening on the number of sessions left out. Deepening found nothing at all until it reached the correct round, so a badly overbooked programme exhausted `:nodes` and returned an error where it could have returned most of a conference — twelve sessions competing for six slots now answers in 194 ms where it previously gave up. The search is also anytime, so hitting the cap returns the best layout found, flagged `minimal?: false`.
+* `Agenda.Arranger.arrange/3` searches by branch and bound rather than by iterative deepening on the number of sessions left out. Deepening found nothing at all until it reached the correct round, so a badly overbooked programme exhausted `:nodes` and returned an error where it could have returned most of a conference — twelve sessions competing for six slots now answers in 194 ms where it previously gave up. The search is also anytime, so hitting the cap returns the best layout found, flagged `minimal?: false`.
 
 * A relaxation bound — the largest set of non-overlapping candidate placements each resource could hold, times its concurrency — lets the search stop as soon as a layout matches it, rather than exhaustively proving the point. Being further overbooked is now cheaper, not dearer: twenty sessions into six slots is faster than eight into six.
 
-* `Timetable.Arranger.arrange/3` breaks symmetry between interchangeable sessions — same track, length, window, and requirements — by fixing a canonical chronological order among them. Proving a tight programme infeasible previously cost a factorial in the number of look-alike sessions: nine one-hour talks into eight hours took over 100 seconds and now takes 9 ms; seven into six went from 373 ms to 2 ms. No arrangement is lost, because interchangeable sessions can always be relabelled into the canonical order.
+* `Agenda.Arranger.arrange/3` breaks symmetry between interchangeable sessions — same track, length, window, and requirements — by fixing a canonical chronological order among them. Proving a tight programme infeasible previously cost a factorial in the number of look-alike sessions: nine one-hour talks into eight hours took over 100 seconds and now takes 9 ms; seven into six went from 373 ms to 2 ms. No arrangement is lost, because interchangeable sessions can always be relabelled into the canonical order.
 
-* `Timetable.Availability.free/2` collapses everything claiming a resource into one interval set before subtracting, rather than folding one sweep per claim. A resource with 800 prior bookings no longer pays 800 passes over its own open hours.
+* `Agenda.Availability.free/2` collapses everything claiming a resource into one interval set before subtracting, rather than folding one sweep per claim. A resource with 800 prior bookings no longer pays 800 passes over its own open hours.
 
 ### Fixed
 
@@ -56,40 +62,40 @@ All notable changes to this project are documented here. The format follows [Kee
 
 Phases 1 to 4 of the design — the model, matching, availability, single-session planning, the allocation ledger, and whole-programme arrangement. The AshScheduling adapter follows.
 
-* `Timetable.Track` — sessions constrained against each other rather than against a resource. Not overlapping is intrinsic to being a track; `reachable/2` adds the requirement that a delegate can walk between consecutive sessions in the gap, derived from the place tree.
+* `Agenda.Track` — sessions constrained against each other rather than against a resource. Not overlapping is intrinsic to being a track; `reachable/2` adds the requirement that a delegate can walk between consecutive sessions in the gap, derived from the place tree.
 
-* `Timetable.Programme` — the whole layout: tracks, standalone sessions, and the span they fall inside.
+* `Agenda.Programme` — the whole layout: tracks, standalone sessions, and the span they fall inside.
 
-* `Timetable.Arranger.arrange/3` — a placement for every session such that no resource is in two places at once, no track clashes with itself, and every consecutive pair is reachable. Depth-first with backtracking, ordered most-constrained first. Both the `:candidates` and `:nodes` caps report when they are hit rather than returning a partial programme as though it were finished.
+* `Agenda.Arranger.arrange/3` — a placement for every session such that no resource is in two places at once, no track clashes with itself, and every consecutive pair is reachable. Depth-first with backtracking, ordered most-constrained first. Both the `:candidates` and `:nodes` caps report when they are hit rather than returning a partial programme as though it were finished.
 
 * Three worked case-study guides — consultants on customer sites, meeting rooms with AV, and a two-day conference with parallel tracks. Every value shown in them is executed output, not illustration.
 
 
-* `Timetable.Ledger` — what is allocated, keyed by the session holding it. `allocate/2` is idempotent, `release/2` frees everything a session held, and `busy/2` shapes the ledger for `plan/3` so planning and allocating compose into a loop.
+* `Agenda.Ledger` — what is allocated, keyed by the session holding it. `allocate/2` is idempotent, `release/2` frees everything a session held, and `busy/2` shapes the ledger for `plan/3` so planning and allocating compose into a loop.
 
-* `Timetable.Ledger.diff/3` — what would change if a session moved, as `:keep` / `:release` / `:allocate`. A binding the new arrangement still wants is never released and re-allocated; that pair would hand the resource to a competing booking in the gap.
+* `Agenda.Ledger.diff/3` — what would change if a session moved, as `:keep` / `:release` / `:allocate`. A binding the new arrangement still wants is never released and re-allocated; that pair would hand the resource to a competing booking in the gap.
 
-* `Timetable.Allocation` — one resource bound to one session over one interval.
+* `Agenda.Allocation` — one resource bound to one session over one interval.
 
 
-* `Timetable.Session` — what is being scheduled: a duration, a window, requirements by attribute or by named roster, and soft preferences.
+* `Agenda.Session` — what is being scheduled: a duration, a window, requirements by attribute or by named roster, and soft preferences.
 
-* `Timetable.Availability` — `open/2` accepts a Tempo value, an ISO 8601 string (preferred), or an RFC 5545 `RRULE`; `free/2` derives `open − busy` on demand, so free time can never go stale.
+* `Agenda.Availability` — `open/2` accepts a Tempo value, an ISO 8601 string (preferred), or an RFC 5545 `RRULE`; `free/2` derives `open − busy` on demand, so free time can never go stale.
 
-* `Timetable.Planner.plan/3` — ranks the ways a session could be held: attribute eligibility, then availability, then co-availability across the roster, then slotting, then preference ranking.
+* `Agenda.Planner.plan/3` — ranks the ways a session could be held: attribute eligibility, then availability, then co-availability across the roster, then slotting, then preference ranking.
 
-* `Timetable.Arrangement` and `Timetable.Infeasible` — a candidate placement, and a failure that always carries its reasons.
+* `Agenda.Arrangement` and `Agenda.Infeasible` — a candidate placement, and a failure that always carries its reasons.
 
 Phase 1:
 
-* `Timetable.Resource` — named, allocatable things. People and rooms differ only in their attributes. Carries `requires` (attributes it demands of co-allocated resources) and `concurrency` (how many sessions may hold it at once, which is *not* `seats`).
+* `Agenda.Resource` — named, allocatable things. People and rooms differ only in their attributes. Carries `requires` (attributes it demands of co-allocated resources) and `concurrency` (how many sessions may hold it at once, which is *not* `seats`).
 
-* `Timetable.Place` — a containment tree of arbitrary depth, with `separation/2` measuring how far apart two places are in levels.
+* `Agenda.Place` — a containment tree of arbitrary depth, with `separation/2` measuring how far apart two places are in levels.
 
-* `Timetable.Predicate` — the attribute vocabulary: `at_least/1`, `at_most/1`, `exactly/1`, `any_of/1`, `all_of/1`, `none_of/1`, mirroring Tempo's duration predicates.
+* `Agenda.Predicate` — the attribute vocabulary: `at_least/1`, `at_most/1`, `exactly/1`, `any_of/1`, `all_of/1`, `none_of/1`, mirroring Tempo's duration predicates.
 
-* `Timetable.Requirement` — what a session demands, by attribute or by named roster. `unmet/2` returns the reasons a resource fails, so eligibility and its explanation are computed together rather than separately.
+* `Agenda.Requirement` — what a session demands, by attribute or by named roster. `unmet/2` returns the reasons a resource fails, so eligibility and its explanation are computed together rather than separately.
 
-* `Timetable.Requirement.induce/2` — folds a resource's own requirements into a requirement, so a person needing step-free access constrains the room they are booked into.
+* `Agenda.Requirement.induce/2` — folds a resource's own requirements into a requirement, so a person needing step-free access constrains the room they are booked into.
 
-* `Timetable.travel_time/3` — derives journey time from the place tree, with per-pair overrides. Unrelated places return `{:error, :unknown}` rather than a guessed duration.
+* `Agenda.travel_time/3` — derives journey time from the place tree, with per-pair overrides. Unrelated places return `{:error, :unknown}` rather than a guessed duration.

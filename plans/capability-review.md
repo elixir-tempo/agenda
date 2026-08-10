@@ -1,8 +1,8 @@
 # Capability review against AshScheduling
 
-A gap assessment, not adapter design. The question is whether `timetable` can *express* the capabilities AshScheduling's implementation requirements state a scheduling system needs — regardless of who eventually wires the two together.
+A gap assessment, not adapter design. The question is whether `agenda` can *express* the capabilities AshScheduling's implementation requirements state a scheduling system needs — regardless of who eventually wires the two together.
 
-Source: `internal_docs/architecture/2026-02-09-implementation-requirements.md` in `team-alembic/ash_scheduling` (private), plus its ROADMAP and ADR-002. Reviewed 2026-08-03 against `timetable` at the tip of `main`.
+Source: `internal_docs/architecture/2026-02-09-implementation-requirements.md` in `team-alembic/ash_scheduling` (private), plus its ROADMAP and ADR-002. Reviewed 2026-08-03 against `agenda` at the tip of `main`.
 
 Every "yes" below was executed, not assumed. Two were assumed on the first pass and turned out to be wrong; both are recorded as defects rather than quietly fixed and forgotten.
 
@@ -12,7 +12,7 @@ Every "yes" below was executed, not assumed. Two were assumed on the first pass 
 
 ## Verdict
 
-Of the capabilities AshScheduling enumerates, `timetable` covers the availability engine, matching, orchestration-as-values, recurrence, and holds. What remains open is the *rest* of the claim lifecycle — completed, cancelled, no-show — which genuinely does belong with persistence, because none of those states changes what is available.
+Of the capabilities AshScheduling enumerates, `agenda` covers the availability engine, matching, orchestration-as-values, recurrence, and holds. What remains open is the *rest* of the claim lifecycle — completed, cancelled, no-show — which genuinely does belong with persistence, because none of those states changes what is available.
 
 ## The engine (their Phase 2)
 
@@ -56,7 +56,7 @@ Of the capabilities AshScheduling enumerates, `timetable` covers the availabilit
 
 ## What the review found, and what was done
 
-**1. `concurrency` was declared and enforced nowhere. Closed.** `Timetable.Resource` accepted `concurrency: 20`, the moduledoc explained it, and the getting-started guide taught it — while the value appeared in no other module. A twenty-locker bank went fully unavailable after one booking. This was worse than an absent feature, because the API promised something it did not do and the documentation taught the promise.
+**1. `concurrency` was declared and enforced nowhere. Closed.** `Agenda.Resource` accepted `concurrency: 20`, the moduledoc explained it, and the getting-started guide taught it — while the value appeared in no other module. A twenty-locker bank went fully unavailable after one booking. This was worse than an absent feature, because the API promised something it did not do and the documentation taught the promise.
 
 Closing it needed a primitive Tempo did not have: *the regions where at least N intervals overlap*. That is general interval algebra, not scheduling, so it went upstream as `Tempo.IntervalSet.overlapping/2`. Availability then reads as the sentence it always meant:
 
@@ -71,7 +71,7 @@ busy
 
 Concurrency 1 falls out as the special case — a resource is used up wherever it is claimed at all.
 
-**2. No timezone database was configured, so DST was silently wrong. Closed.** A London window from midnight to 6am on a spring-forward day measured six hours instead of five, and nothing raised: without `config :elixir, :time_zone_database`, Elixir resolves every zone as UTC and the arithmetic is quietly plausible. Tempo was correct throughout — the gap was ours. `tz` is now a dev/test dependency, configured in `config/config.exs`, with `test/timetable/timezone_test.exs` asserting both transition directions in both hemispheres and that the database is not the UTC-only default. **A consuming application must configure its own**, which the README now says.
+**2. No timezone database was configured, so DST was silently wrong. Closed.** A London window from midnight to 6am on a spring-forward day measured six hours instead of five, and nothing raised: without `config :elixir, :time_zone_database`, Elixir resolves every zone as UTC and the arithmetic is quietly plausible. Tempo was correct throughout — the gap was ours. `tz` is now a dev/test dependency, configured in `config/config.exs`, with `test/agenda/timezone_test.exs` asserting both transition directions in both hemispheres and that the database is not the UTC-only default. **A consuming application must configure its own**, which the README now says.
 
 **3. Buffers. Closed.** `buffer_before` and `buffer_after` are durations on the resource, and each claim is widened by them before availability is computed. AshScheduling's own worked case is a test: a 30-minute claim with a 15-minute after-buffer blocks 45 minutes.
 
@@ -87,9 +87,9 @@ defp earlier_by(point, duration), do: Tempo.shift(point, Duration.negate(duratio
 
 ```elixir
 boardroom
-|> Timetable.free(within: march, busy: taken)
-|> Timetable.only_during(clinic_hours)
-|> Timetable.lasting_at_least("PT2H")
+|> Agenda.free(within: march, busy: taken)
+|> Agenda.only_during(clinic_hours)
+|> Agenda.lasting_at_least("PT2H")
 ```
 
 > *"The boardroom's free time, only during clinic hours, in windows lasting at least two hours."*
@@ -122,11 +122,11 @@ Worth recording, because it shapes what an adapter should delegate rather than r
 
 * **Places as a tree.** ADR-002 lists geography as a non-goal that must stay possible, supported via the `context` map. We derive travel from containment, which is the thing they left open.
 
-* **Whole-programme arrangement.** Their `Optimizer` behaviour is unimplemented and explicitly delegated to the consumer ("consumer brings CP-SAT, OR-Tools"). `arrange/3` fills it for the small-to-medium case, with caps that report truncation — and `Timetable.Fixpoint.solve/3` makes the hand-off itself executable when the consumer does bring a solver.
+* **Whole-programme arrangement.** Their `Optimizer` behaviour is unimplemented and explicitly delegated to the consumer ("consumer brings CP-SAT, OR-Tools"). `arrange/3` fills it for the small-to-medium case, with caps that report truncation — and `Agenda.Fixpoint.solve/3` makes the hand-off itself executable when the consumer does bring a solver.
 
 * **Exactness, which a metaheuristic cannot offer.** Timefold and OptaPlanner return a good answer with no optimality guarantee, ever. `arrange/3` is exact branch-and-bound with a relaxation bound, so `minimal?` means *no layout leaves out fewer* — a claim a local search cannot make at any scale. The trade is that it holds for dozens of sessions, not thousands.
 
-* **Soft constraints that cannot cost a placement.** `Timetable.Preference` optimises lexicographically in two passes: the count is proven first, then a better score is sought only among layouts placing exactly as many. Weighted scoring is ordinary; the guarantee that turning it on cannot lose you a session is not.
+* **Soft constraints that cannot cost a placement.** `Agenda.Preference` optimises lexicographically in two passes: the count is proven first, then a better score is sought only among layouts placing exactly as many. Weighted scoring is ordinary; the guarantee that turning it on cannot lose you a session is not.
 
 * **Calendar correctness beyond Gregorian.** Inherited from Tempo: non-Gregorian calendars, uncertain dates, and ISO 8601-2 semantics that a hand-rolled engine would not attempt.
 

@@ -8,17 +8,17 @@ Every business above a certain size has the same problem, and almost every one o
 day = "2027-03-01T09:00:00/2027-03-01T17:00:00"
 
 {:ok, boardroom} =
-  Timetable.resource("Boardroom",
+  Agenda.resource("Boardroom",
     within: level_4, seats: 14, video_conferencing: true, step_free_access: true)
-  |> Timetable.open(day)
+  |> Agenda.open(day)
 
 {:ok, huddle} =
-  Timetable.resource("Huddle 4A", within: level_4, seats: 4)
-  |> Timetable.open(day)
+  Agenda.resource("Huddle 4A", within: level_4, seats: 4)
+  |> Agenda.open(day)
 
 {:ok, training} =
-  Timetable.resource("Training Room", within: level_1, seats: 20, step_free_access: true)
-  |> Timetable.open(day)
+  Agenda.resource("Training Room", within: level_1, seats: 20, step_free_access: true)
+  |> Agenda.open(day)
 ```
 
 Attributes are whatever your building actually has — there is no fixed vocabulary. `seats`, `video_conferencing`, and `step_free_access` are just names; a room with a `hearing_loop` or a `standing_desk` needs no library change.
@@ -28,19 +28,19 @@ Attributes are whatever your building actually has — there is no fixed vocabul
 ## A booking says what it needs
 
 ```elixir
-import Timetable.Predicate
+import Agenda.Predicate
 
 review =
-  Timetable.session("Quarterly review", lasting: ~o"PT1H", between: ~o"2027-03-01/2027-03-02")
-  |> Timetable.Session.needs(:room, seats: at_least(10), video_conferencing: true)
-  |> Timetable.Session.roster(:attendees, [priya, tom])
+  Agenda.session("Quarterly review", lasting: ~o"PT1H", between: ~o"2027-03-01/2027-03-02")
+  |> Agenda.Session.needs(:room, seats: at_least(10), video_conferencing: true)
+  |> Agenda.Session.roster(:attendees, [priya, tom])
 
-{:ok, options} = Timetable.plan(review, [boardroom, huddle, training])
+{:ok, options} = Agenda.plan(review, [boardroom, huddle, training])
 
 length(options)
 #=> 8
 
-Timetable.explain(hd(options))
+Agenda.explain(hd(options))
 #=> "2027Y3M1DT9H0M0S/2027Y3M1DT10H0M0S — attendees: Priya, Tom, room: Boardroom"
 ```
 
@@ -53,7 +53,7 @@ Eight, not twenty-four: the huddle room is too small and the training room has n
 This is the part that saves the most time in practice. When somebody asks why they cannot book a room, the answer is specific:
 
 ```elixir
-Timetable.explain(Timetable.needs(:room, seats: at_least(10), video_conferencing: true), huddle)
+Agenda.explain(Agenda.needs(:room, seats: at_least(10), video_conferencing: true), huddle)
 #=> "Huddle 4A: seats is 4 — needs at least 10; no video_conferencing — needs true"
 ```
 
@@ -66,15 +66,15 @@ Here is the failure mode worth designing out. Priya uses a wheelchair. In most s
 `step_free_access: true` on Priya is **not** a fact about Priya's availability. It is a constraint she places on whatever room she is booked into:
 
 ```elixir
-priya = Timetable.resource("Priya", requires: [step_free_access: true])
+priya = Agenda.resource("Priya", requires: [step_free_access: true])
 ```
 
 Adding her to a session tightens the room requirement automatically:
 
 ```elixir
-Timetable.needs(:room, seats: at_least(10), video_conferencing: true)
-|> Timetable.Requirement.induce([priya])
-|> Timetable.explain(attic)
+Agenda.needs(:room, seats: at_least(10), video_conferencing: true)
+|> Agenda.Requirement.induce([priya])
+|> Agenda.explain(attic)
 #=> "Attic: no step_free_access — needs true"
 ```
 
@@ -88,20 +88,20 @@ Portable equipment is a resource like any other. It has no seats; it has a proje
 
 ```elixir
 {:ok, cart} =
-  Timetable.resource("Projector cart", within: level_1, projector: true)
-  |> Timetable.open(day)
+  Agenda.resource("Projector cart", within: level_1, projector: true)
+  |> Agenda.open(day)
 
 workshop =
-  Timetable.session("Onboarding workshop", lasting: ~o"PT2H", between: ~o"2027-03-01/2027-03-02")
-  |> Timetable.Session.needs(:room, seats: at_least(15))
-  |> Timetable.Session.needs(:equipment, projector: true)
+  Agenda.session("Onboarding workshop", lasting: ~o"PT2H", between: ~o"2027-03-01/2027-03-02")
+  |> Agenda.Session.needs(:room, seats: at_least(15))
+  |> Agenda.Session.needs(:equipment, projector: true)
 
-{:ok, options} = Timetable.plan(workshop, [boardroom, huddle, training, cart])
+{:ok, options} = Agenda.plan(workshop, [boardroom, huddle, training, cart])
 
 length(options)
 #=> 4
 
-Timetable.explain(hd(options))
+Agenda.explain(hd(options))
 #=> "2027Y3M1DT9H0M0S/2027Y3M1DT11H0M0S — equipment: Projector cart, room: Training Room"
 ```
 
@@ -112,13 +112,13 @@ Two independent roles, each satisfied by a different resource, both booked toget
 ## The ledger makes the second booking see the first
 
 ```elixir
-{:ok, ledger} = Timetable.allocate(Timetable.ledger(), hd(options))
+{:ok, ledger} = Agenda.allocate(Agenda.ledger(), hd(options))
 
-{:ok, remaining} = Timetable.plan(review, rooms, busy: Timetable.busy(ledger))
+{:ok, remaining} = Agenda.plan(review, rooms, busy: Agenda.busy(ledger))
 length(remaining)
 #=> 7
 
-Timetable.explain(hd(remaining))
+Agenda.explain(hd(remaining))
 #=> "2027Y3M1DT10H0M0S/2027Y3M1DT11H0M0S — attendees: Priya, Tom, room: Boardroom"
 ```
 
@@ -127,8 +127,8 @@ Timetable.explain(hd(remaining))
 And releasing puts it straight back:
 
 ```elixir
-{:ok, ledger} = Timetable.release(ledger, "Quarterly review")
-{:ok, restored} = Timetable.plan(review, rooms, busy: Timetable.busy(ledger))
+{:ok, ledger} = Agenda.release(ledger, "Quarterly review")
+{:ok, restored} = Agenda.plan(review, rooms, busy: Agenda.busy(ledger))
 length(restored)
 #=> 8
 ```
@@ -140,9 +140,9 @@ Eight again. Nothing had to be un-marked, because nothing was marked — busy ti
 A booking page shows eight slots. Somebody clicks the nine o'clock one and goes to find a colleague. That room is not booked, but it must not be offered to anyone else for the next few minutes — and a hold is exactly that:
 
 ```elixir
-{:ok, ledger} = Timetable.hold(Timetable.ledger(), hd(options), until: "2027-03-01T09:05:00")
+{:ok, ledger} = Agenda.hold(Agenda.ledger(), hd(options), until: "2027-03-01T09:05:00")
 
-{:ok, remaining} = Timetable.plan(review, rooms, busy: Timetable.busy(ledger))
+{:ok, remaining} = Agenda.plan(review, rooms, busy: Agenda.busy(ledger))
 length(remaining)
 #=> 7
 ```
@@ -152,7 +152,7 @@ Seven — the same as if it had been booked outright. That is the point: a hold 
 It is still visible *as* a hold, not as a booking — and it holds everything the arrangement claimed, not only the room:
 
 ```elixir
-Timetable.holds(ledger) |> Enum.map(& &1.resource)
+Agenda.holds(ledger) |> Enum.map(& &1.resource)
 #=> ["Priya", "Tom", "Boardroom"]
 ```
 
@@ -161,15 +161,15 @@ Priya and Tom are held too, which is what stops a second meeting being offered a
 When the colleague is found, confirm it:
 
 ```elixir
-{:ok, ledger} = Timetable.confirm(ledger, "Quarterly review")
-Timetable.holds(ledger)
+{:ok, ledger} = Agenda.confirm(ledger, "Quarterly review")
+Agenda.holds(ledger)
 #=> []
 ```
 
 **Nothing expires on its own.** There is no timer and no background sweep; time advances only when you say so:
 
 ```elixir
-{:ok, ledger} = Timetable.expire(ledger, "2027-03-01T09:10:00")
+{:ok, ledger} = Agenda.expire(ledger, "2027-03-01T09:10:00")
 ```
 
 That looks like extra work and is worth the trouble. `busy/2` is called inside `plan/3` and `arrange/3`. If it read the system clock, planning the same meeting twice would give different answers as holds lapsed underneath you, and the ledger would stop being a value you can reason about or test. Passing the moment in is the same discipline as `travel_time/3` returning `{:error, :unknown}` rather than guessing an unmeasured journey.
@@ -181,7 +181,7 @@ A hold good *until* five past is gone at five past, not after it. And the rest o
 The operation every hand-rolled system gets wrong. The naive implementation releases everything and re-acquires it, which hands the room to a competing booking in the gap and churns records that never moved. Ask instead what actually changed:
 
 ```elixir
-changes = Timetable.rearrange(ledger, "Quarterly review", new_arrangement)
+changes = Agenda.rearrange(ledger, "Quarterly review", new_arrangement)
 
 Enum.map(changes, &elem(&1, 0))
 #=> [:keep, :keep, :release, :allocate]

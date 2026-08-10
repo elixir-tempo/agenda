@@ -1,13 +1,13 @@
 # Getting started
 
-Timetable answers *what should I book, and where?* It is built on [Tempo](https://hexdocs.pm/ex_tempo), which answers *when is this free?* This guide assumes you know neither.
+Agenda answers *what should I book, and where?* It is built on [Tempo](https://hexdocs.pm/ex_tempo), which answers *when is this free?* This guide assumes you know neither.
 
 ## Installation
 
 ```elixir
 def deps do
   [
-    {:timetable, "~> 0.1"}
+    {:agenda, "~> 0.1"}
   ]
 end
 ```
@@ -28,9 +28,9 @@ A value's span is one unit of its finest *stated* field, so `~o"2027-03"` is the
 
 * **Every interval is half-open** — `[from, to)`, including the start and excluding the end. Adjacent bookings therefore join cleanly with no overlap and no gap: `[9am, 10am)` followed by `[10am, 11am)` is exactly `[9am, 11am)`.
 
-* **Free time is set algebra.** Free is open minus busy; mutual free time is the intersection of everyone's. Timetable does not reimplement any of that — it delegates to Tempo, which is calendar-, timezone-, and DST-correct in ways nothing hand-rolled will be.
+* **Free time is set algebra.** Free is open minus busy; mutual free time is the intersection of everyone's. Agenda does not reimplement any of that — it delegates to Tempo, which is calendar-, timezone-, and DST-correct in ways nothing hand-rolled will be.
 
-The `~o` sigil parses ISO 8601 at compile time. For strings that arrive at runtime, `Tempo.from_iso8601/1` returns `{:ok, value}` or a precise error. Timetable's own functions accept either, plus RFC 5545 `RRULE` strings, so you rarely need to convert anything yourself.
+The `~o` sigil parses ISO 8601 at compile time. For strings that arrive at runtime, `Tempo.from_iso8601/1` returns `{:ok, value}` or a precise error. Agenda's own functions accept either, plus RFC 5545 `RRULE` strings, so you rarely need to convert anything yourself.
 
 ## Five nouns
 
@@ -38,7 +38,7 @@ The `~o` sigil parses ISO 8601 at compile time. For strings that arrive at runti
 
 * **Place** — a container of resources and other places, forming a tree. Travel between resources is *derived* from the tree rather than configured.
 
-* **Session** — the thing being scheduled: how long it runs, the window it must fall inside, and what it requires.
+* **Session** — the thing being scheduled: how long it runs, the window it must fall inside, and what it requires. A meeting, a talk, a shift, a task.
 
 * **Arrangement** — one candidate way to hold a session: a time, and a resource for every role.
 
@@ -50,8 +50,8 @@ Describe a room by what it has:
 
 ```elixir
 {:ok, room} =
-  Timetable.resource("Room 1", seats: 6, video_conferencing: true)
-  |> Timetable.open("2027-03-02T09:00:00/2027-03-02T12:00:00")
+  Agenda.resource("Room 1", seats: 6, video_conferencing: true)
+  |> Agenda.open("2027-03-02T09:00:00/2027-03-02T12:00:00")
 ```
 
 Attributes are whatever your world actually has — `seats` and `video_conferencing` are just names, and nothing needs registering.
@@ -59,11 +59,11 @@ Attributes are whatever your world actually has — `seats` and `video_conferenc
 Describe what you want:
 
 ```elixir
-import Timetable.Predicate
+import Agenda.Predicate
 
 review =
-  Timetable.session("Sprint review", lasting: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
-  |> Timetable.Session.needs(:room, seats: at_least(4), video_conferencing: true)
+  Agenda.session("Sprint review", lasting: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
+  |> Agenda.Session.needs(:room, seats: at_least(4), video_conferencing: true)
 ```
 
 > *"The sprint review runs for an hour on the 2nd, and needs a room seating at least four with video conferencing."*
@@ -71,27 +71,27 @@ review =
 Ask:
 
 ```elixir
-{:ok, options} = Timetable.plan(review, [room])
+{:ok, options} = Agenda.plan(review, [room])
 
 length(options)
 #=> 3
 
-Timetable.explain(hd(options))
+Agenda.explain(hd(options))
 #=> "2027Y3M2DT9H0M0S/2027Y3M2DT10H0M0S — room: Room 1"
 ```
 
 Three one-hour windows in a three-hour morning. Commit one:
 
 ```elixir
-{:ok, ledger} = Timetable.allocate(Timetable.ledger(), hd(options))
-Timetable.count(ledger)
+{:ok, ledger} = Agenda.allocate(Agenda.ledger(), hd(options))
+Agenda.count(ledger)
 #=> 1
 ```
 
 And the next plan sees it:
 
 ```elixir
-{:ok, remaining} = Timetable.plan(review, [room], busy: Timetable.busy(ledger))
+{:ok, remaining} = Agenda.plan(review, [room], busy: Agenda.busy(ledger))
 length(remaining)
 #=> 2
 ```
@@ -99,8 +99,8 @@ length(remaining)
 Cancelling puts it back, with no bookkeeping:
 
 ```elixir
-{:ok, ledger} = Timetable.release(ledger, "Sprint review")
-{:ok, restored} = Timetable.plan(review, [room], busy: Timetable.busy(ledger))
+{:ok, ledger} = Agenda.release(ledger, "Sprint review")
+{:ok, restored} = Agenda.plan(review, [room], busy: Agenda.busy(ledger))
 length(restored)
 #=> 3
 ```
@@ -112,18 +112,18 @@ That is the whole loop: **describe, plan, allocate, release.** Free time is deri
 The feature that saves the most time in practice. A resource that does not qualify says why:
 
 ```elixir
-booth = Timetable.resource("Phone booth", seats: 1)
+booth = Agenda.resource("Phone booth", seats: 1)
 
-Timetable.explain(Timetable.needs(:room, seats: at_least(4), video_conferencing: true), booth)
+Agenda.explain(Agenda.needs(:room, seats: at_least(4), video_conferencing: true), booth)
 #=> "Phone booth: seats is 1 — needs at least 4; no video_conferencing — needs true"
 ```
 
 Both reasons, not the first. And when nothing works at all:
 
 ```elixir
-{:error, reason} = Timetable.plan(review, [booth])
+{:error, reason} = Agenda.plan(review, [booth])
 
-Timetable.explain(reason)
+Agenda.explain(reason)
 #=> "Sprint review cannot be held: nothing satisfies room: Phone booth (seats is 1 —
 #=>  needs at least 4, no video_conferencing — needs true)"
 ```
@@ -136,7 +136,7 @@ You do not have to go through `plan/3`. When you just want the gaps:
 
 ```elixir
 {:ok, free} =
-  Timetable.free(room,
+  Agenda.free(room,
     within: "2027-03-02/2027-03-03",
     busy: "2027-03-02T10:00:00/2027-03-02T11:00:00")
 
@@ -163,7 +163,7 @@ Two habits worth forming early:
 
 * **`needs/3` describes, `roster/3` names.** Use `needs` when any qualifying resource will do and let the planner choose; use `roster` when the choice is already made — these three people, that customer's office.
 
-* **Put a person's access needs on the person.** `Timetable.resource("Priya", requires: [step_free_access: true])` turns "somebody must remember" into "the room is not eligible". The requirement travels with them into every session they join.
+* **Put a person's access needs on the person.** `Agenda.resource("Priya", requires: [step_free_access: true])` turns "somebody must remember" into "the room is not eligible". The requirement travels with them into every session they join.
 
 ## Two words that are not what you expect
 
@@ -186,29 +186,46 @@ Three worked case studies, each end to end, with every value in them executed ra
 Availability usually exists somewhere before it exists in your code. `from_ical/1` reads an RFC 7953 `VAVAILABILITY` — what a CalDAV server returns when asked when someone is free — into a pattern `open/2` accepts:
 
 ```elixir
-{:ok, hours} = Timetable.from_ical(vavailability)
-{:ok, clinic} = Timetable.open(Timetable.resource("Clinic"), hours)
+{:ok, hours} = Agenda.from_ical(vavailability)
+{:ok, clinic} = Agenda.open(Agenda.resource("Clinic"), hours)
 ```
 
 It stays unmaterialised until you ask about a window, so a recurring `AVAILABLE` and `PRIORITY` across overlapping components resolve against the dates you actually query. `VEVENT`s in the same document are ignored — those are time *taken*, and belong in `free/2`'s `:busy`. Needs the optional `ical` dependency.
+
+## Three constraints beyond "does it fit"
+
+Each answers a different question, and picking the wrong one is the commonest modelling mistake:
+
+```elixir
+# Order — the installation follows the survey, an hour later at least.
+{:ok, programme} = Agenda.precede(programme, "Survey", "Installation", gap: "PT1H")
+
+# A contract — at most three jobs a day, twelve a week.
+Agenda.resource("Dana", limits: [day: 3, week: 12])
+
+# A wish — Priya would rather not, but could.
+Agenda.resource("Priya", avoids: friday_afternoons)
+```
+
+A **limit is not concurrency**: concurrency is how many claims may overlap at one instant, a limit is how many fall inside a stretch of calendar however far apart. And a **wish is not an absence**: `avoids` makes a placement worse, `open/2` makes it impossible — writing a preference as unavailability takes the option away from everyone.
 
 ## Holding something before you book it
 
 A booking page needs to take a room tentatively while somebody decides. A hold occupies the resource exactly as a booking does:
 
 ```elixir
-{:ok, ledger} = Timetable.hold(ledger, arrangement, until: "2027-03-01T09:05:00")
-{:ok, ledger} = Timetable.confirm(ledger, "Quarterly review")
+{:ok, ledger} = Agenda.hold(ledger, arrangement, until: "2027-03-01T09:05:00")
+{:ok, ledger} = Agenda.confirm(ledger, "Quarterly review")
 ```
 
-Nothing expires on its own — `Timetable.expire(ledger, now)` takes the moment as an argument rather than reading a clock, so planning the same session twice always gives the same answer. That matters more than the convenience it costs: `busy/2` runs inside `plan/3` and `arrange/3`, and a ledger that shifts underneath them is one you cannot test.
+Nothing expires on its own — `Agenda.expire(ledger, now)` takes the moment as an argument rather than reading a clock, so planning the same session twice always gives the same answer. That matters more than the convenience it costs: `busy/2` runs inside `plan/3` and `arrange/3`, and a ledger that shifts underneath them is one you cannot test.
 
 ## Preferring one workable answer to another
 
 Everything above is hard — a layout is valid or it is not. Several are usually valid, and a preference chooses among them without ever making one invalid:
 
 ```elixir
-{:ok, programme} = Timetable.prefer(programme, :room_changes, weight: 10)
+{:ok, programme} = Agenda.prefer(programme, :room_changes, weight: 10)
 ```
 
 `:room_changes` and `:room_spread` are built in; your own is a name and a function. Preferences count violations, so zero is ideal. Crucially **a preference can never cost you a session** — the number placed is settled and proven first, and only then is a better-scoring layout preferred among those placing just as many.
@@ -229,12 +246,12 @@ The conference case study works all three end to end.
 
 `plan/3` enumerates the ways one session could be held. `arrange/3` searches for a consistent layout across many. Both are exact, and both are bounded by caps that *report* when they are hit rather than returning a partial answer as though it were complete.
 
-A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Timetable.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
+A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
 
 With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that hand-off is already written:
 
 ```elixir
-{:ok, arrangements} = Timetable.Fixpoint.solve(programme, rooms)
+{:ok, arrangements} = Agenda.Fixpoint.solve(programme, rooms)
 ```
 
 The solver is only asked to *choose*. Eligibility, induced requirements, availability and the place tree all stay here, where they are explained — the model handed over is which of each session's candidate placements to take, and the answer comes back as ordinary arrangements the ledger accepts. It covers the all-or-nothing question for exclusive resources; partial layouts, preferences and concurrency above one stay with `arrange/3`.
