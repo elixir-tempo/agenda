@@ -96,9 +96,13 @@ defmodule Agenda.MixProject do
   defp deps do
     [
       # TODO revert both to hex releases once RFC 7953 VAVAILABILITY
-      # support has shipped in `ical` and `ex_tempo`.
-      {:ex_tempo, path: "../tempo"},
-      {:ical, path: "../ical", optional: true},
+      # support has shipped in `ical` and `ex_tempo`. Git rather than path
+      # dependencies so CI can resolve them; `mix.lock` pins the commits.
+      # The `ical` declaration must stay identical to the one in
+      # `ex_tempo`'s own `mix.exs` — Mix rejects a diverging child
+      # dependency rather than picking one.
+      {:ex_tempo, github: "kipcole9/tempo"},
+      {:ical, github: "elixir-tempo/ical", branch: "vavailability", optional: true},
       # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
       # is only compiled when it is present.
       {:fixpoint, "~> 0.22", optional: true},
