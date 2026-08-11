@@ -24,16 +24,23 @@ jobs:
         # OTP 27 is the floor, inherited from `ex_tempo` — its tokenizer's
         # optimiser-off `@compile` flags expose an OTP-26 code-generation bug.
         include:
-          # Elixir 1.17 — the declared floor in mix.exs
+          # Elixir 1.17 — the declared floor in mix.exs, on OTP 27
           - elixir: "1.17-otp-27"
             otp: "27"
 
+          # Elixir 1.18 — on OTP 27
           - elixir: "1.18-otp-27"
             otp: "27"
 
+          # Elixir 1.19 — on OTP 27–28
+          - elixir: "1.19-otp-27"
+            otp: "27"
           - elixir: "1.19-otp-28"
             otp: "28"
 
+          # Elixir 1.20 — on OTP 27–29
+          - elixir: "1.20.2-otp-27"
+            otp: "27"
           - elixir: "1.20.2-otp-28"
             otp: "28"
           - elixir: "1.20.2-otp-29"
