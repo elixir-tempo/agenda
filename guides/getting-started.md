@@ -4,10 +4,12 @@ Agenda answers *what should I book, and where?* It is built on [Tempo](https://h
 
 ## Installation
 
+Not yet published to Hex. Until the first release:
+
 ```elixir
 def deps do
   [
-    {:agenda, "~> 0.1"}
+    {:agenda, github: "elixir-tempo/agenda"}
   ]
 end
 ```

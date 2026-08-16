@@ -213,7 +213,7 @@ Still open: the rest of the claim lifecycle — completed, cancelled, no-show �
 
 ### Optional dependencies
 
-* [`ical`](https://hex.pm/packages/ical) for RFC 7953 `VAVAILABILITY` import.
+* [`ical`](https://hex.pm/packages/ical) `~> 3.2` for RFC 7953 `VAVAILABILITY` import — 3.2 is the first release carrying it.
 
 * [`fixpoint`](https://hex.pm/packages/fixpoint) for the solver bridge. It describes itself as a proof of concept, so treat that path accordingly.
 
