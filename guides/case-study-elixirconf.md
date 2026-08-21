@@ -135,7 +135,17 @@ Agenda.explain(reason)
 
 ## Two honest notes
 
-**The layout is denser than the real one.** Agenda placed talks at 10:45, 11:25 and 12:05; the published programme used 10:45, 11:35 and 12:25. The extra ten minutes is changeover — time for one speaker to unplug and the next to set up — and Agenda does not invent it, because nothing in the programme said to. Model it as part of the slot: a 40-minute talk in a 50-minute session, or open hours cut into the grid you actually want. `buffer_before` and `buffer_after` on a resource are for a *different* job — they widen claims that already exist, protecting a room from the booking either side of it, rather than spacing out sessions being arranged together.
+**The layout is denser than the real one.** Agenda placed talks at 10:45, 11:25 and 12:05; the published programme used 10:45, 11:35 and 12:25. The extra ten minutes is changeover — one speaker unplugging while the next sets up — and Agenda does not invent it, because nothing here asked for it.
+
+Saying so is `buffer_after` on the room:
+
+```elixir
+Agenda.resource("Canaveral", within: venue, seats: 250, buffer_after: "PT10M")
+```
+
+That is turnaround the room genuinely needs, so it holds against every other claim — a session already booked, or another talk in the same programme — and candidate start times shift to match: four 40-minute talks in a room wanting ten minutes fall at 9:00, 9:50, 10:40 and 11:30 rather than being packed end to end.
+
+It is deliberately *not* used above, and the reason is worth knowing. The window this case study models — 10:45 to 12:45 — was taken from the published grid, which already spends those ten minutes: 40 + 10, 40 + 10, 20 fills it exactly. Declaring the turnaround as well asks for it twice, and the programme stops fitting. Model the changeover **or** carve it out of the hours, not both.
 
 **Two days is not two problems.** Sessions that cannot constrain each other are solved separately and concurrently, and at first glance a two-day conference should split cleanly down the middle. This one does not, and the reason is Anna Sherman: she speaks on Thursday *and* Friday, so she links the days into a single component. That is worth knowing before assuming a long conference will decompose — one shared speaker, one shared room, or one precedence is enough to join two halves that otherwise have nothing to do with each other.
 

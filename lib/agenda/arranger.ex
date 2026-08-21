@@ -12,7 +12,10 @@ defmodule Agenda.Arranger do
   Three constraints hold a programme together:
 
   * **No resource is in two places at once.** Two placements sharing a
-    resource must not overlap.
+    resource must not overlap — and must be separated by that
+    resource's `buffer_before`/`buffer_after` turnaround, if it needs
+    any, whether the neighbour is another session in this programme or
+    a booking that already existed.
 
   * **A track cannot clash with itself.** Sessions sharing an audience
     must not overlap, which is what makes a track a track.
@@ -660,6 +663,7 @@ defmodule Agenda.Arranger do
       |> Keyword.take([:busy])
       |> Keyword.put(:limit, limit)
       |> Keyword.put(:spread, true)
+      |> Keyword.put(:turnaround, true)
 
     Planner.plan(session, pool, plan_options)
   end
@@ -1474,15 +1478,45 @@ defmodule Agenda.Arranger do
   # answer "is it free at all", which is the concurrency-1 special case.
   defp within_capacity?(candidate, placed) do
     Enum.all?(Arrangement.resources(candidate), fn resource ->
-      holders = Enum.count(placed, &holds_at?(&1, resource.name, candidate.interval))
+      claim = turnaround(candidate.interval, resource)
+      holders = Enum.count(placed, &holds_at?(&1, resource, claim))
 
       holders + 1 <= resource.concurrency
     end)
   end
 
-  defp holds_at?({arrangement, _symmetry}, name, interval) do
-    Tempo.overlaps?(arrangement.interval, interval) and
-      Enum.any?(Arrangement.resources(arrangement), &(&1.name == name))
+  # A resource costs more than the time it is booked for: a room has to
+  # be reset, a machine has to cool, a van has to be reloaded. That is
+  # what `buffer_before` and `buffer_after` say, and until now they said
+  # it only against bookings that already existed — two sessions the
+  # search placed together could sit back to back in a room that needs
+  # twenty minutes between them.
+  #
+  # Both sides of the pair are widened, and both have to be: stretching
+  # only the newcomer's end would still let it start the instant the
+  # session before it finished. Two intervals each widened by the
+  # resource's turnaround overlap exactly when the real gap between
+  # them is smaller than that turnaround, so one overlap test measures
+  # the separation in either direction.
+  defp turnaround(interval, %Resource{buffer_before: nil, buffer_after: nil}), do: interval
+
+  defp turnaround(%Interval{} = interval, %Resource{} = resource) do
+    %{
+      interval
+      | from: earlier_by(interval.from, resource.buffer_before),
+        to: later_by(interval.to, resource.buffer_after)
+    }
+  end
+
+  defp earlier_by(moment, nil), do: moment
+  defp earlier_by(moment, duration), do: Tempo.shift(moment, Duration.negate(duration))
+
+  defp later_by(moment, nil), do: moment
+  defp later_by(moment, duration), do: Tempo.shift(moment, duration)
+
+  defp holds_at?({arrangement, _symmetry}, %Resource{} = resource, interval) do
+    Enum.any?(Arrangement.resources(arrangement), &(&1.name == resource.name)) and
+      Tempo.overlaps?(turnaround(arrangement.interval, resource), interval)
   end
 
   # A limit counts claims that fall in the same *period*, however far

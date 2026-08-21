@@ -99,9 +99,10 @@ defmodule Agenda.Planner do
          {:ok, window} <- Availability.normalise(session.window),
          {:ok, duration} <- Availability.normalise(session.duration),
          {:ok, roster_free} <- co_free(named, window, window, options) do
-      session
-      |> arrangements(candidates, roster_free, window, duration, options)
-      |> ranked(session, options)
+      with {:ok, placements} <-
+             arrangements(session, candidates, roster_free, window, duration, options) do
+        ranked(placements, session, options)
+      end
     end
   end
 
@@ -299,10 +300,23 @@ defmodule Agenda.Planner do
 
   # --- stage 4: slotting ------------------------------------------
 
+  # An empty result and a failure are different answers. A combination
+  # with nowhere to go contributes no placements, and the session may
+  # still be held some other way; a resource whose *configuration* will
+  # not compute — an unparseable buffer, a malformed `:busy` value —
+  # is a defect, and every combination will hit it. Reporting the
+  # second as though it were the first is what turns a typo into "no
+  # window is long enough with everyone free", which sends the caller
+  # looking at their calendar instead of at their code.
   defp arrangements(session, candidates, roster_free, window, duration, options) do
     candidates
     |> combinations()
-    |> Enum.flat_map(&placements(session, &1, roster_free, window, duration, options))
+    |> Enum.reduce_while({:ok, []}, fn combination, {:ok, acc} ->
+      case placements(session, combination, roster_free, window, duration, options) do
+        {:ok, placements} -> {:cont, {:ok, acc ++ placements}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
   end
 
   # One resource per open role: the cartesian product across roles.
@@ -326,8 +340,8 @@ defmodule Agenda.Planner do
     chosen = allocation |> Map.values() |> List.flatten()
 
     case co_free(chosen, roster_free, window, options) do
-      {:ok, free} -> slots(session, allocation, free, duration)
-      {:error, _reason} -> []
+      {:ok, free} -> {:ok, slots(session, allocation, free, duration, options)}
+      {:error, _reason} = error -> error
     end
   end
 
@@ -337,11 +351,11 @@ defmodule Agenda.Planner do
   # double-book someone the session had explicitly reserved. Their
   # availability is already folded into `free` via the roster
   # intersection, which is why they are merged only here.
-  defp slots(session, allocation, free, duration) do
+  defp slots(session, allocation, free, duration, options) do
     allocations = Map.merge(allocation, rosters_of(session))
 
     free
-    |> IntervalSet.slots(duration)
+    |> IntervalSet.slots(duration, every: step(duration, allocations, options))
     |> IntervalSet.to_list()
     |> Enum.map(fn interval ->
       %Arrangement{
@@ -352,6 +366,54 @@ defmodule Agenda.Planner do
         series: session.series
       }
     end)
+  end
+
+  # Candidate start times step by the session's own length, which packs
+  # a free stretch end to end. That is right until a resource needs
+  # turnaround between uses: a forty-minute talk in a room wanting ten
+  # minutes to reset cannot start every forty minutes, and offering
+  # only those starts leaves the search choosing between a clash and
+  # skipping a whole slot.
+  #
+  # Stepping by length *plus* turnaround offers the starts that
+  # actually work — 9:00, 9:50, 10:40 rather than 9:00, 9:40, 10:20.
+  # Only `Agenda.Arranger.arrange/3` asks for this: a caller planning
+  # one session needs no gap from itself, and narrowing their options
+  # would be an answer to a question they did not ask.
+  defp step(duration, allocations, options) do
+    if Keyword.get(options, :turnaround, false) do
+      widen(duration, longest_turnaround(allocations))
+    else
+      duration
+    end
+  end
+
+  defp longest_turnaround(allocations) do
+    allocations
+    |> Map.values()
+    |> List.flatten()
+    |> Enum.flat_map(fn %Resource{} = resource ->
+      Enum.reject([resource.buffer_before, resource.buffer_after], &is_nil/1)
+    end)
+    |> case do
+      [] -> nil
+      buffers -> Enum.max_by(buffers, &seconds/1)
+    end
+  end
+
+  defp widen(duration, nil), do: duration
+
+  defp widen(duration, turnaround) do
+    %Tempo.Duration{time: [second: seconds(duration) + seconds(turnaround)]}
+  end
+
+  # A duration has no fixed length in general — a month depends on which
+  # month — but a turnaround and a session length are both spans of
+  # clock time, so measuring them from a common epoch is exact here.
+  defp seconds(duration) do
+    {:ok, epoch} = Tempo.from_iso8601("2000-01-01T00:00:00")
+
+    Compare.to_utc_seconds(Tempo.shift(epoch, duration)) - Compare.to_utc_seconds(epoch)
   end
 
   # --- stage 5: ranking -------------------------------------------

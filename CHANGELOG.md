@@ -10,6 +10,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+* `buffer_before` and `buffer_after` now hold between two sessions the search places together, not only against bookings that already existed. A room needing ten minutes to reset could previously be handed back-to-back talks by `Agenda.Arranger.arrange/3`, which is the one thing the option exists to prevent. Candidate start times account for the turnaround too, so four forty-minute talks in such a room fall at 9:00, 9:50, 10:40 and 11:30 rather than losing a whole slot to the gap.
+
+* `Agenda.Planner.plan/3` no longer reports a malformed resource as "no window is long enough with everyone free". An error computing a resource's availability — an unparseable buffer, a bad `:busy` value — was discarded and read as an absence of free time, sending the caller to look at their calendar instead of at their code. Absence of availability is still `{:ok, []}`; a configuration that will not compute is now returned as the error it is.
+
 * A resource's `buffer_before` or `buffer_after` written as a string — `buffer_after: "PT10M"`, the spelling every other duration in the library accepts — raised a `FunctionClauseError` from inside `Tempo.shift/2` the first time that resource turned out to be busy. Buffers are now parsed when the resource is built, and a value that is not a duration is reported as `{:error, {:invalid_buffer, name, which, value}}` rather than crashing several frames away on a later call.
 
 * `Agenda.Arranger.arrange/3` no longer reports a satisfiable programme as impossible. Both caps were fixed while the work they bound grows with the programme: `:candidates` at 40 made any programme of more than 40 interchangeable sessions unsatisfiable however long it searched, and `:nodes` at 10,000 ran out somewhere past 120 sessions. Both now scale with the session count, and the error says which cap was reached, since raising the wrong one only makes the same failure slower.
