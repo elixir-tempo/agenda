@@ -87,7 +87,7 @@ if Code.ensure_loaded?(CPSolver) do
     * `:travel` is passed to `Agenda.travel_time/3`.
 
     * `:timeout` is milliseconds to let the solver run. The default is
-      the solver's own.
+      the solver's own, currently 30 seconds.
 
     ### Returns
 
@@ -96,7 +96,14 @@ if Code.ensure_loaded?(CPSolver) do
 
     * `{:error, t:Agenda.Infeasible.t/0}` when a session has no
       eligible placement, the pool contains a resource with
-      concurrency above one, or the solver proves there is no layout.
+      concurrency above one, or the solver *proves* there is no
+      layout; or
+
+    * `{:error, :timeout}` when the solver ran out of time before it
+      could decide. This is deliberately not an `t:Agenda.Infeasible.t/0`
+      — "no arrangement exists" and "nobody finished looking" are
+      different facts, and a caller that retries with a longer
+      `:timeout` needs to tell them apart.
 
     ### Examples
 
@@ -116,7 +123,7 @@ if Code.ensure_loaded?(CPSolver) do
 
     """
     @spec solve(Programme.t(), [Resource.t()], keyword()) ::
-            {:ok, [Agenda.Arrangement.t()]} | {:error, Infeasible.t()}
+            {:ok, [Agenda.Arrangement.t()]} | {:error, Infeasible.t() | :timeout}
     def solve(%Programme{} = programme, pool, options \\ []) when is_list(pool) do
       with :ok <- all_exclusive(pool, programme),
            {:ok, programme} <- Arranger.readable(programme),
@@ -231,11 +238,44 @@ if Code.ensure_loaded?(CPSolver) do
       solve_options = Keyword.take(options, [:timeout])
 
       # `CPSolver.solve/2` answers `{:ok, result}` whether or not it
-      # found anything — an empty solution list is how it says the
-      # programme has no layout, not an error.
+      # found anything, so an empty solution list has to be read against
+      # the status before it means anything.
+      #
+      # The status alone will not do. When fixpoint's timeout fires it
+      # logs, calls `set_complete/1`, and returns — so an abandoned run
+      # reports `status: :unsatisfiable` with no solutions, exactly as a
+      # genuinely impossible programme does. Worse, fixpoint derives
+      # that status from `active_node_count <= 1`, so a search with a
+      # node still waiting counts as finished.
+      #
+      # The statistics do separate them, and on principle rather than by
+      # timing. Unsatisfiability is a claim about the *whole* search
+      # space, so a proof needs both halves of "we looked everywhere":
+      #
+      #   * `node_count > 0` — the tree was actually walked. A run that
+      #     expanded nothing has established nothing.
+      #
+      #   * `active_node_count == 0` — nothing was left waiting. One
+      #     pending node means the search was abandoned mid-flight, and
+      #     it is the shape a timeout under load takes.
+      #
+      # Anything else empty-handed means nobody finished looking, which
+      # is a different answer and gets a different reason.
       case CPSolver.solve(model, solve_options) do
-        {:ok, %{solutions: [solution | _rest]}} -> {:ok, chosen(solution, candidates)}
-        {:ok, %{solutions: []}} -> {:error, no_layout(programme)}
+        {:ok, %{solutions: [solution | _rest]}} ->
+          {:ok, chosen(solution, candidates)}
+
+        {:ok,
+         %{
+           solutions: [],
+           status: :unsatisfiable,
+           statistics: %{node_count: explored, active_node_count: 0}
+         }}
+        when explored > 0 ->
+          {:error, no_layout(programme)}
+
+        {:ok, %{solutions: []}} ->
+          {:error, :timeout}
       end
     end
 

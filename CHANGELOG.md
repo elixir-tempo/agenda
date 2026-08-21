@@ -6,7 +6,11 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-* Requires `ex_tempo ~> 1.2`. Beyond the new `Tempo.compare/3` sorter callback, 1.1.1 fixed two defects that reach this library directly: intervals built from a duration could not be rendered or inspected, and `Tempo.IntervalSet.new/2` raised rather than returning `{:error, reason}` when handed a member that was not an interval.
+* Requires `ex_tempo ~> 1.3`, the first release carrying the RFC 7953 availability support `from_ical/1` is built on, and `ical ~> 3.2`, the first release that parses `VAVAILABILITY` at all.
+
+### Fixed
+
+* `Agenda.Fixpoint.solve/3` returns `{:error, :timeout}` when the solver runs out of time, rather than the `Agenda.Infeasible` it previously gave. A timed-out search reports the same status as a proven-impossible one, so the two were indistinguishable and a satisfiable programme could be called impossible.
 
 ### Added
 

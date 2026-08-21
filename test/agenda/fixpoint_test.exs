@@ -175,6 +175,35 @@ defmodule Agenda.FixpointTest do
       assert {:error, reason} = Fixpoint.solve(programme, [context.hall])
       assert Agenda.explain(reason) =~ "Agenda.conflict/3"
     end
+
+    test "running out of time is not the same answer as no layout", context do
+      # A programme big enough that one millisecond cannot settle it.
+      # The solver logs its own timeout and then marks itself complete,
+      # so an empty result here is indistinguishable from infeasible
+      # unless the status is read — which is exactly the bug.
+      programme = conf(Enum.map(1..9, &talk("S#{&1}")))
+      pool = [context.hall, context.studio, context.far]
+
+      assert {:error, :timeout} = Fixpoint.solve(programme, pool, timeout: 1)
+    end
+
+    test "a timeout is not reported as an Infeasible", context do
+      programme = conf(Enum.map(1..9, &talk("S#{&1}")))
+      pool = [context.hall, context.studio, context.far]
+
+      assert {:error, reason} = Fixpoint.solve(programme, pool, timeout: 1)
+      refute match?(%Agenda.Infeasible{}, reason)
+    end
+
+    test "the same programme succeeds when given time", context do
+      # The other half of the proof: the timeout above is about the
+      # clock, not about the programme being unsatisfiable.
+      programme = conf(Enum.map(1..9, &talk("S#{&1}")))
+      pool = [context.hall, context.studio, context.far]
+
+      assert {:ok, arrangements} = Fixpoint.solve(programme, pool, timeout: 10_000)
+      assert length(arrangements) == 9
+    end
   end
 
   describe "scale" do
