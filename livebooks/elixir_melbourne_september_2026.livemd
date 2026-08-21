@@ -70,8 +70,8 @@ Lunch is not a rule to enforce. It is simply time the rooms are not open, and ev
 import Agenda.Predicate
 import Tempo.Sigils
 
-talk_hours =
-  Tempo.IntervalSet.new!([
+{:ok, talk_hours} =
+  Tempo.IntervalSet.new([
     ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
     ~o"2025-08-28T13:45:00/2025-08-28T15:05:00",
     ~o"2025-08-28T15:35:00/2025-08-28T16:05:00",
@@ -92,8 +92,8 @@ Peninsula 4-7 is also the plenary room, so it opens earlier and closes later tha
 ```elixir
 venue = Agenda.place("Renaissance Orlando at SeaWorld")
 
-plenary_hours =
-  Tempo.IntervalSet.new!([
+{:ok, plenary_hours} =
+  Tempo.IntervalSet.new([
     ~o"2025-08-28T09:00:00/2025-08-28T10:15:00",
     ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
     ~o"2025-08-28T13:45:00/2025-08-28T15:05:00",
@@ -104,9 +104,15 @@ plenary_hours =
     ~o"2025-08-29T15:50:00/2025-08-29T17:30:00"
   ])
 
-{:ok, peninsula} = Agenda.resource("Peninsula 4-7", within: venue, seats: 700) |> Agenda.open(plenary_hours)
-{:ok, canaveral} = Agenda.resource("Canaveral", within: venue, seats: 250) |> Agenda.open(talk_hours)
-{:ok, biscayne} = Agenda.resource("Biscayne", within: venue, seats: 250) |> Agenda.open(talk_hours)
+room = fn name, seats, hours ->
+  with {:ok, resource} <- Agenda.resource(name, within: venue, seats: seats) |> Agenda.open(hours) do
+    resource
+  end
+end
+
+peninsula = room.("Peninsula 4-7", 700, plenary_hours)
+canaveral = room.("Canaveral", 250, talk_hours)
+biscayne = room.("Biscayne", 250, talk_hours)
 
 rooms = [peninsula, canaveral, biscayne]
 Enum.map(rooms, & &1.name)
@@ -151,8 +157,9 @@ speaker_names =
 
 speakers =
   Enum.map(speaker_names, fn name ->
-    {:ok, speaker} = Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours)
-    speaker
+    with {:ok, speaker} <- Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours) do
+      speaker
+    end
   end)
 
 by_name = Map.new(speakers, &{&1.name, &1})
@@ -226,11 +233,13 @@ window = fn
   :fri -> "2025-08-29/2025-08-30"
 end
 
+named = fn names -> Enum.flat_map(names, &List.wrap(Map.get(by_name, &1))) end
+
 sessions =
   Enum.map(talks, fn {title, minutes, day, presenters} ->
     Agenda.session(title, lasting: "PT#{minutes}M", between: window.(day))
     |> Agenda.Session.needs(:room, seats: at_least(250))
-    |> Agenda.Session.roster(:speaker, Enum.map(presenters, &Map.fetch!(by_name, &1)))
+    |> Agenda.Session.roster(:speaker, named.(presenters))
   end)
 
 length(sessions)
@@ -260,14 +269,15 @@ plenaries =
 
     case presenters do
       [] -> session
-      names -> Agenda.Session.roster(session, :speaker, Enum.map(names, &Map.fetch!(by_name, &1)))
+      names -> Agenda.Session.roster(session, :speaker, named.(names))
     end
   end)
 
 pinned =
   Enum.map(plenaries, fn session ->
-    {:ok, [arrangement | _rest]} = Agenda.plan(session, rooms ++ speakers)
-    arrangement
+    with {:ok, [arrangement | _rest]} <- Agenda.plan(session, rooms ++ speakers) do
+      arrangement
+    end
   end)
 
 length(pinned)
@@ -352,7 +362,7 @@ clash =
   |> Agenda.Session.needs(:room, seats: at_least(250))
   |> Agenda.Session.roster(
     :speaker,
-    Enum.map(["Savannah Manning", "Anna Sherman", "Allison Randal", "Lorena Mireles"], &Map.fetch!(by_name, &1))
+    named.(["Savannah Manning", "Anna Sherman", "Allison Randal", "Lorena Mireles"])
   )
 
 forced =
@@ -361,8 +371,10 @@ forced =
   |> Kernel.++([clash])
   |> Enum.reduce(Agenda.programme("ElixirConf US 2025"), &Agenda.Programme.add_session(&2, &1))
 
-{:error, reason} = Agenda.arrange(forced, pool, pinned: pinned)
-Agenda.explain(reason)
+case Agenda.arrange(forced, pool, pinned: pinned) do
+  {:error, reason} -> Agenda.explain(reason)
+  {:ok, _arrangements} -> "unexpectedly satisfiable"
+end
 ```
 
 ## Failures are sentences
@@ -381,9 +393,12 @@ Agenda placed talks at 10:45, 11:25, 12:05. The real conference used 10:45, 11:3
 <!-- slide: code -->
 
 ```elixir
-{:ok, hall} =
-  Agenda.resource("Hall", seats: 250, buffer_after: "PT10M")
-  |> Agenda.open(~o"2025-08-28T09:00:00/2025-08-28T13:00:00")
+hall =
+  with {:ok, resource} <-
+         Agenda.resource("Hall", seats: 250, buffer_after: "PT10M")
+         |> Agenda.open(~o"2025-08-28T09:00:00/2025-08-28T13:00:00") do
+    resource
+  end
 
 four_talks =
   Enum.reduce(1..4, Agenda.programme("Turnaround"), fn i, programme ->
@@ -394,11 +409,13 @@ four_talks =
     )
   end)
 
-{:ok, spaced} = Agenda.arrange(four_talks, [hall])
-
-spaced
-|> Enum.sort_by(&Tempo.Compare.to_utc_seconds(&1.interval.from))
-|> Enum.map_join("   ", fn a -> a.interval.from |> Tempo.to_iso8601() |> String.split("T") |> List.last() end)
+with {:ok, spaced} <- Agenda.arrange(four_talks, [hall]) do
+  spaced
+  |> Enum.sort_by(&Tempo.Compare.to_utc_seconds(&1.interval.from))
+  |> Enum.map_join("   ", fn a ->
+    a.interval.from |> Tempo.to_iso8601() |> String.split("T") |> List.last()
+  end)
+end
 ```
 
 ## Model the gap, or carve it out
