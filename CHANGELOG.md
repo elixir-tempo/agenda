@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+* A resource's `buffer_before` or `buffer_after` written as a string — `buffer_after: "PT10M"`, the spelling every other duration in the library accepts — raised a `FunctionClauseError` from inside `Tempo.shift/2` the first time that resource turned out to be busy. Buffers are now parsed when the resource is built, and a value that is not a duration is reported as `{:error, {:invalid_buffer, name, which, value}}` rather than crashing several frames away on a later call.
+
 * `Agenda.Arranger.arrange/3` no longer reports a satisfiable programme as impossible. Both caps were fixed while the work they bound grows with the programme: `:candidates` at 40 made any programme of more than 40 interchangeable sessions unsatisfiable however long it searched, and `:nodes` at 10,000 ran out somewhere past 120 sessions. Both now scale with the session count, and the error says which cap was reached, since raising the wrong one only makes the same failure slower.
 
 * `Agenda.Fixpoint.solve/3` returns `{:error, :timeout}` when the solver runs out of time, rather than the `Agenda.Infeasible` it previously gave. A timed-out search reports the same status as a proven-impossible one, so the two were indistinguishable and a satisfiable programme could be called impossible.

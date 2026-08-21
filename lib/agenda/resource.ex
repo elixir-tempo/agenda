@@ -152,10 +152,28 @@ defmodule Agenda.Resource do
       avoids: Keyword.get(reserved, :avoids),
       prefers: Keyword.get(reserved, :prefers),
       open: Keyword.get(reserved, :open),
-      buffer_before: Keyword.get(reserved, :buffer_before),
-      buffer_after: Keyword.get(reserved, :buffer_after)
+      buffer_before: duration(Keyword.get(reserved, :buffer_before)),
+      buffer_after: duration(Keyword.get(reserved, :buffer_after))
     }
   end
+
+  # A buffer is written the way every other duration in this library is
+  # written — `"PT10M"` or `~o"PT10M"` — but it is the only one that is
+  # not used until something is already booked. Left as a string it
+  # reaches `Tempo.shift/2` the first time a claim has to be widened,
+  # which is a crash a long way from the line that caused it, and only
+  # on resources that turned out to be busy. Parsing it here means the
+  # value is either usable or unchanged from the moment it is given.
+  defp duration(nil), do: nil
+
+  defp duration(value) when is_binary(value) do
+    case Tempo.from_iso8601(value) do
+      {:ok, parsed} -> parsed
+      {:error, _reason} -> value
+    end
+  end
+
+  defp duration(value), do: value
 
   @doc """
   The value of `name` on `resource`, or `nil` when the resource does

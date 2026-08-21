@@ -181,6 +181,8 @@ Three worked case studies, each end to end, with every value in them executed ra
 
 * **[Meeting rooms and AV equipment](case-study-meeting-rooms.md)** — a larger business. Booking a room *and* a projector as one unit, accessibility that cannot be forgotten, and moving a meeting without losing the room. Read this one first if you are scheduling a building.
 
+* **[ElixirConf US 2025](case-study-elixirconf.md)** — a real conference programme, laid out from scratch. Speakers as resources, announced keynotes as pins, and what happens when one person is booked against themselves. Read this one if your sessions involve people who appear more than once.
+
 * **[ElixirConf 2027](case-study-conference.md)** — two days, keynotes, parallel tracks. Where planning becomes searching, and where the search stops. Read this one if you are laying out many sessions at once rather than booking them one at a time.
 
 ## Open hours you already have

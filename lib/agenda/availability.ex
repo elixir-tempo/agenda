@@ -250,13 +250,28 @@ defmodule Agenda.Availability do
   def free(%Resource{open: nil}, _options), do: {:ok, IntervalSet.new!([])}
 
   def free(%Resource{} = resource, options) do
-    with {:ok, window} <- normalise(Keyword.fetch!(options, :within)),
+    with :ok <- usable_buffers(resource),
+         {:ok, window} <- normalise(Keyword.fetch!(options, :within)),
          {:ok, open} <- within(resource.open, window),
          {:ok, busy} <- busy_set(Keyword.get(options, :busy, []), window) do
       busy
       |> with_turnaround(resource)
       |> saturated(resource.concurrency)
       |> then(&Tempo.difference(open, &1))
+    end
+  end
+
+  # `Agenda.Resource.new/2` parses a buffer written as a string, so
+  # anything still unparsed here was never a duration. Saying so is the
+  # difference between an error the caller can act on and a
+  # `FunctionClauseError` raised several frames inside `Tempo.shift/2`,
+  # on some later call where the resource happened to be busy.
+  defp usable_buffers(%Resource{} = resource) do
+    [before: resource.buffer_before, after: resource.buffer_after]
+    |> Enum.reject(fn {_which, value} -> value == nil or is_struct(value, Tempo.Duration) end)
+    |> case do
+      [] -> :ok
+      [{which, value} | _rest] -> {:error, {:invalid_buffer, resource.name, which, value}}
     end
   end
 

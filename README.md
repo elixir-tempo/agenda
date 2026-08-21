@@ -74,6 +74,8 @@ Then three worked problems, each end to end with executed output:
 
 * [Meeting rooms and AV equipment](https://hexdocs.pm/agenda/case-study-meeting-rooms.html) — a larger business. Room attributes, booking a room *and* a projector together, accessibility that cannot be forgotten, and moving a meeting without losing the room.
 
+* [ElixirConf US 2025](https://hexdocs.pm/agenda/case-study-elixirconf.html) — the real programme: 42 talks, three rooms, two days, and the constraint invented data misses. Why a speaker is a resource, not a label.
+
 * [ElixirConf 2027](https://hexdocs.pm/agenda/case-study-conference.html) — two days, keynotes, and parallel tracks. Where planning becomes searching, and where the search stops.
 
 ## When not everything fits
