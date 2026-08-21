@@ -88,7 +88,7 @@ length(arrangements)
 #=> 46
 ```
 
-Forty-two talks and four plenaries, against three rooms and forty-five speakers, in **357 ms**. Thursday morning comes out as:
+Forty-two talks and four plenaries, against three rooms and forty-five speakers, in about **175 ms** — five consecutive runs measured 171, 172, 174, 175 and 180. Thursday morning comes out as:
 
 ```
 9H15M0S    Peninsula 4-7  Keynote: Open Source Resilience
