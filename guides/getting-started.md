@@ -248,7 +248,7 @@ The conference case study works all three end to end.
 
 `plan/3` enumerates the ways one session could be held. `arrange/3` searches for a consistent layout across many. Both are exact, and both are bounded by caps that *report* when they are hit rather than returning a partial answer as though it were complete.
 
-A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
+A few hundred sessions is comfortable — 240 across six days lays out in about five seconds, because days that share no room are solved as separate problems. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
 
 With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that hand-off is already written:
 

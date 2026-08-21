@@ -10,9 +10,15 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+* `Agenda.Arranger.arrange/3` no longer reports a satisfiable programme as impossible. Interchangeable sessions are offered the same ranked placements, so the fixed cap of 40 made any programme of more than 40 such sessions unsatisfiable however long it searched — the enumeration had no answer in it, and the error advised raising `:nodes`, which only made the same failure slower.
+
 * `Agenda.Fixpoint.solve/3` returns `{:error, :timeout}` when the solver runs out of time, rather than the `Agenda.Infeasible` it previously gave. A timed-out search reports the same status as a proven-impossible one, so the two were indistinguishable and a satisfiable programme could be called impossible.
 
 ### Added
+
+* Sessions that cannot constrain each other are now solved as separate problems. A shared resource, track or precedence is what relates two sessions; without one they are independent, so a conference whose days share no room splits into one subproblem per day. This is exact — no layout is lost and `minimal?` still means proven — and it is skipped where preferences are declared, since those score a layout as a whole.
+
+* `Agenda.Planner.plan/3` takes `:spread`, which round-robins the returned placements across distinct start moments instead of taking the best `:limit` of them. `arrange/3` uses it: a ranked prefix of 40 placements across ten rooms covers only the earliest four hours, so sessions were handed near-identical options and collided. The default is unchanged, since a caller picking one meeting time wants the best, not the broadest.
 
 * `Agenda.Arranger.arrange/3` takes `unplaced: :allow`, which leaves out the fewest sessions it can rather than failing the whole programme, and returns a `Agenda.Layout` under a `{:partial, layout}` tag. Each unplaced session carries its own reason, and `{:ok, arrangements}` still means every session was placed.
 

@@ -64,6 +64,13 @@ defmodule Agenda.Planner do
     Truncation is reported rather than silent — see `:truncated?` on
     the result.
 
+  * `:spread` chooses *how* the list is truncated. `false`, the
+    default, keeps the best `:limit` placements, which is what a caller
+    picking one time wants. `true` round-robins across distinct start
+    moments instead, trading depth at the front of the window for
+    coverage of all of it — which is what `Agenda.Arranger.arrange/3`
+    needs, since sessions handed identical placements collide.
+
   ### Returns
 
   * `{:ok, arrangements}` ranked best-first; or
@@ -360,9 +367,49 @@ defmodule Agenda.Planner do
       arrangements
       |> Enum.map(&%{&1 | score: score(&1, session.preferences)})
       |> Enum.sort(&better?/2)
-      |> Enum.take(limit)
+      |> take(limit, Keyword.get(options, :spread, false))
 
     {:ok, scored}
+  end
+
+  # Truncating a ranked list takes a *prefix*, and for a session with no
+  # preferences the ranking is chronological — so the best twenty
+  # placements across ten rooms are twenty of the earliest two hours,
+  # and the rest of the day is never offered. That is the right answer
+  # when a person is choosing one meeting time and the wrong one when a
+  # search needs many sessions to go in different slots: they are all
+  # handed the same narrow window and fight over it.
+  #
+  # Spreading takes the same number of placements but round-robins them
+  # across distinct start moments, so the cap buys coverage of the whole
+  # window instead of depth at the front of it. The result is sorted
+  # back into rank order, because the search should still try the better
+  # placements first.
+  defp take(scored, limit, false), do: Enum.take(scored, limit)
+
+  defp take(scored, limit, true) when length(scored) <= limit, do: scored
+
+  defp take(scored, limit, true) do
+    scored
+    |> Enum.group_by(&Compare.to_utc_seconds(&1.interval.from))
+    |> Enum.sort_by(fn {moment, _group} -> moment end)
+    |> Enum.map(fn {_moment, group} -> group end)
+    |> round_robin([])
+    |> Enum.take(limit)
+    |> Enum.sort(&better?/2)
+  end
+
+  # One from each bucket in turn, until every bucket is empty.
+  defp round_robin([], taken), do: Enum.reverse(taken)
+
+  defp round_robin(buckets, taken) do
+    {heads, rest} =
+      Enum.reduce(buckets, {[], []}, fn
+        [head | tail], {heads, rest} ->
+          {[head | heads], (tail == [] && rest) || [tail | rest]}
+      end)
+
+    round_robin(Enum.reverse(rest), Enum.reverse(heads) ++ taken)
   end
 
   # Best score first, then earliest. Times must be compared

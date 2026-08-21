@@ -259,7 +259,7 @@ Agenda.arrange(programme, rooms, nodes: 1) |> elem(1) |> Agenda.explain()
 #=>  or narrow the programme"
 ```
 
-A conference of a few dozen sessions across a handful of rooms is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
+A few hundred sessions is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
 
 ## What to take away
 

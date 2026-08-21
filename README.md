@@ -180,7 +180,7 @@ What is not promised is soft *optimality*. Proving a weighted optimum needs a bo
 
 ## Handing it to a solver
 
-Past a few dozen sessions the exact search runs out of road. The answer has always been "use a solver, then write the result back through `allocate/2`" — and with the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that sentence is executable:
+Past a few hundred sessions the exact search runs out of road. The answer has always been "use a solver, then write the result back through `allocate/2`" — and with the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that sentence is executable:
 
 ```elixir
 {:ok, arrangements} = Agenda.Fixpoint.solve(programme, rooms)

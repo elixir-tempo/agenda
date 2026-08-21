@@ -74,15 +74,36 @@ defmodule Agenda.Arranger do
   ### Scale, and where this stops
 
   The search is depth-first with backtracking, ordered most-constrained
-  first, and bounded by an explicit node cap. A conference of a few
-  dozen sessions across a handful of rooms is comfortable. A university
-  timetable of thousands of classes is not — that wants a real
-  constraint solver, and the way to use one here is to write its output
-  back through `Agenda.Ledger.allocate/2`, which stays authoritative
-  either way.
+  first, and bounded by an explicit node cap. Two things decide how far
+  it reaches.
 
-  When the cap is reached the result says so rather than returning a
-  partial layout as though it were complete.
+  **Sessions that cannot constrain each other are solved apart.** A
+  shared resource, a shared track or a precedence is what carries a
+  constraint between two sessions; without one of those they are
+  independent, and searching them together costs the product of their
+  choices where it should cost the sum. A conference whose days share
+  no room splits into one subproblem per day. This is exact — the
+  components are disjoint, so no layout is lost and `minimal?` still
+  means proven.
+
+  **Every session must be offered enough distinct placements.**
+  Interchangeable sessions receive the same ranked candidates, so a cap
+  below the session count makes a satisfiable programme unsatisfiable —
+  which is why `:candidates` scales with the programme and why the
+  placements offered are spread across the window rather than taken
+  from the front of it.
+
+  In practice a few hundred sessions is comfortable: 240 across six
+  days lays out in about five seconds, and 120 competing for one day in
+  under four. Past that, or for a university timetable of thousands of
+  classes, the answer is still a real constraint solver, and the way to
+  use one here is to write its output back through
+  `Agenda.Ledger.allocate/2`, which stays authoritative either way.
+
+  When a cap is reached the result says so rather than returning a
+  partial layout as though it were complete, and says *which* cap —
+  running out of nodes and running out of placements need opposite
+  responses from the caller.
 
   """
 
@@ -105,7 +126,17 @@ defmodule Agenda.Arranger do
   alias Tempo.Interval
 
   @default_nodes 10_000
+
+  # The floor, not the answer. Interchangeable sessions are offered the
+  # *same* ranked candidate list, so a programme of N such sessions
+  # needs at least N distinct placements between them or it is
+  # unsatisfiable however long the search runs — the enumeration, not
+  # the programme, is what has no solution. Scaling the cap with the
+  # session count is what keeps that failure from being reachable by
+  # accident; `@candidate_headroom` leaves room for the placements lost
+  # to sessions that are *not* interchangeable.
   @default_candidates 40
+  @candidate_headroom 10
 
   # The scoring pass is capped far lower than the counting pass. It is
   # looking for a nicer answer, not a correct one, and every node it
@@ -147,7 +178,10 @@ defmodule Agenda.Arranger do
     `{:partial, layout}`.
 
   * `:candidates` caps how many placements are considered per session.
-    The default is `40`.
+    The default scales with the programme — `40`, or ten more than the
+    number of sessions, whichever is larger. Interchangeable sessions
+    are offered the same ranked placements, so a cap below the session
+    count makes a satisfiable programme unsatisfiable.
 
   * `:nodes` caps how many search steps are taken across the whole
     call, including every round of the `unplaced: :allow` search. The
@@ -194,7 +228,7 @@ defmodule Agenda.Arranger do
 
       candidates
       |> Enum.sort_by(fn {_session, _symmetry, placements} -> length(placements) end)
-      |> resolve(programme, pinned, unplaceable, options)
+      |> decompose(programme, pinned, unplaceable, options)
     end
   end
 
@@ -456,12 +490,16 @@ defmodule Agenda.Arranger do
   # --- candidate placements, one session at a time ----------------
 
   defp candidates_per_session(programme, pool, pinned, options) do
-    limit = Keyword.get(options, :candidates, @default_candidates)
     fixed = MapSet.new(pinned, & &1.session)
 
-    programme
-    |> Programme.all_sessions()
-    |> Enum.reject(&MapSet.member?(fixed, &1.name))
+    free =
+      programme
+      |> Programme.all_sessions()
+      |> Enum.reject(&MapSet.member?(fixed, &1.name))
+
+    limit = candidate_limit(length(free), options)
+
+    free
     |> Enum.reduce({[], []}, fn session, {candidates, unplaceable} ->
       case placements_for(session, programme, pool, options, limit) do
         {:ok, placements} ->
@@ -471,6 +509,14 @@ defmodule Agenda.Arranger do
           {candidates, unplaceable ++ [reason]}
       end
     end)
+  end
+
+  # An explicit `:candidates` is taken at face value — a caller who
+  # names a number has a reason, and second-guessing it would make the
+  # option useless for narrowing a search deliberately.
+  defp candidate_limit(session_count, options) do
+    Keyword.get(options, :candidates) ||
+      max(@default_candidates, session_count + @candidate_headroom)
   end
 
   # Two sessions are interchangeable when nothing distinguishes them
@@ -513,6 +559,7 @@ defmodule Agenda.Arranger do
       options
       |> Keyword.take([:busy])
       |> Keyword.put(:limit, limit)
+      |> Keyword.put(:spread, true)
 
     Planner.plan(session, pool, plan_options)
   end
@@ -525,7 +572,176 @@ defmodule Agenda.Arranger do
 
   # --- how many sessions may be left out --------------------------
 
-  defp resolve(candidates, programme, pinned, unplaceable, options) do
+  # --- independent subproblems ------------------------------------
+
+  # Two sessions constrain each other only if something can carry a
+  # constraint between them: a shared resource, a shared track, or a
+  # precedence. Sessions with none of those cannot affect each other's
+  # placement at all, so solving them together only means searching
+  # their choices as one combined space — the cost is the product of
+  # the parts where it should be the sum. A two-day conference whose
+  # days share no room splits in two for free.
+  #
+  # This is exact. Nothing is approximated and no layout is lost; the
+  # components are genuinely disjoint, so the minimum for the whole is
+  # the sum of the minima and `minimal?` survives.
+  #
+  # Preferences are the exception, and the reason for the guard below:
+  # `:room_spread` and friends score a layout as a whole, so a
+  # component that scores well alone may not be part of the best
+  # scoring layout overall. Where preferences are declared the
+  # programme is solved in one piece, as before.
+  defp decompose(candidates, programme, pinned, unplaceable, options) do
+    candidates
+    |> components(programme, unplaceable)
+    |> solve_components(candidates, programme, pinned, unplaceable, options)
+  end
+
+  # Three cases keep the whole programme together, and each is about
+  # correctness rather than cost:
+  #
+  #   * **Preferences** score a layout as a whole, so a component that
+  #     scores well alone need not belong to the best layout overall.
+  #
+  #   * **An unplaceable session** never reaches `candidates` at all —
+  #     it is already known to have nowhere to go. Whether that makes
+  #     the programme fail or merely makes the layout partial is a
+  #     question about the programme, not about any one component, and
+  #     splitting would answer it per part.
+  #
+  #   * **Fewer than two sessions** has nothing to split.
+  defp components(candidates, _programme, [_first | _rest] = _unplaceable), do: [candidates]
+
+  defp components(candidates, _programme, _unplaceable) when length(candidates) < 2,
+    do: [candidates]
+
+  defp components(candidates, %Programme{preferences: [_first | _rest]}, _unplaceable),
+    do: [candidates]
+
+  defp components(candidates, programme, _unplaceable),
+    do: connected_components(candidates, programme)
+
+  defp solve_components([_only], candidates, programme, pinned, unplaceable, options) do
+    resolve(candidates, programme, pinned, unplaceable, options, starvation(candidates))
+  end
+
+  defp solve_components(components, _candidates, programme, pinned, unplaceable, options) do
+    components
+    |> Enum.reduce_while({:ok, [], [], true}, fn component, {:ok, placed, skipped, minimal?} ->
+      # Every component sees the pins: a pin outside this component
+      # still occupies its resources, and dropping it would let the
+      # search place a session on top of one.
+      case resolve(component, programme, pinned, unplaceable, options, starvation(component)) do
+        {:ok, arrangements} ->
+          {:cont, {:ok, placed ++ own(arrangements, pinned), skipped, minimal?}}
+
+        {:partial, layout} ->
+          {:cont,
+           {:ok, placed ++ own(layout.placed, pinned), skipped ++ layout.unplaced,
+            minimal? and layout.minimal?}}
+
+        {:error, _reason} = error ->
+          {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, placed, [], _minimal?} ->
+        {:ok, pinned ++ placed}
+
+      {:ok, placed, skipped, minimal?} ->
+        {:partial, Layout.new(programme.name, pinned ++ placed, skipped, minimal?)}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  # Each component's result carries the pins back with it, so they are
+  # stripped before the parts are concatenated and added once.
+  defp own(arrangements, pinned) do
+    fixed = MapSet.new(pinned, & &1.session)
+
+    Enum.reject(arrangements, &MapSet.member?(fixed, &1.session))
+  end
+
+  defp connected_components(candidates, programme) do
+    index = Enum.with_index(candidates)
+
+    edges =
+      for {left, i} <- index,
+          {right, j} <- index,
+          i < j,
+          interacts?(left, right, programme),
+          reduce: %{} do
+        acc ->
+          acc
+          |> Map.update(i, [j], &[j | &1])
+          |> Map.update(j, [i], &[i | &1])
+      end
+
+    index
+    |> Enum.map(fn {_candidate, i} -> i end)
+    |> group_components(edges, %{}, [])
+    |> Enum.map(fn members ->
+      Enum.map(members, fn i -> Enum.at(candidates, i) end)
+    end)
+  end
+
+  defp group_components([], _edges, _seen, components), do: Enum.reverse(components)
+
+  defp group_components([node | rest], edges, seen, components) do
+    if Map.has_key?(seen, node) do
+      group_components(rest, edges, seen, components)
+    else
+      members = reachable([node], edges, %{})
+
+      group_components(
+        rest,
+        edges,
+        Map.merge(seen, members),
+        [members |> Map.keys() |> Enum.sort() | components]
+      )
+    end
+  end
+
+  defp reachable([], _edges, seen), do: seen
+
+  defp reachable([node | rest], edges, seen) do
+    if Map.has_key?(seen, node) do
+      reachable(rest, edges, seen)
+    else
+      reachable(Map.get(edges, node, []) ++ rest, edges, Map.put(seen, node, true))
+    end
+  end
+
+  # An over-approximation on purpose: anything that *might* carry a
+  # constraint counts as an edge. Splitting two sessions that actually
+  # do interact would lose layouts; joining two that do not merely
+  # forgoes a speed-up.
+  defp interacts?({left, _ls, left_places}, {right, _rs, right_places}, programme) do
+    same_track?(left, right, programme) or
+      Precedence.between(programme.precedences, left.name, right.name) != nil or
+      shares_resource?(left_places, right_places)
+  end
+
+  defp same_track?(left, right, programme) do
+    track = Programme.track_of(programme, left.name)
+
+    track != nil and track == Programme.track_of(programme, right.name)
+  end
+
+  defp shares_resource?(left_places, right_places) do
+    not MapSet.disjoint?(resource_names(left_places), resource_names(right_places))
+  end
+
+  defp resource_names(placements) do
+    for placement <- placements,
+        resource <- Arrangement.resources(placement),
+        into: MapSet.new(),
+        do: resource.name
+  end
+
+  defp resolve(candidates, programme, pinned, unplaceable, options, starved) do
     allow? = allow_unplaced?(options)
 
     if not allow? and unplaceable != [] do
@@ -534,8 +750,31 @@ defmodule Agenda.Arranger do
       candidates
       |> optimise(programme, pinned, allow?, options, [])
       |> refine(candidates, programme, pinned, allow?, options)
-      |> to_result(programme, unplaceable)
+      |> to_result(programme, unplaceable, starved)
     end
+  end
+
+  # Sessions cannot all be placed in fewer distinct placements than
+  # there are sessions, so when the enumeration offers fewer than that
+  # the search is doomed before it starts and no node budget will save
+  # it. Saying so is the difference between a caller raising `:nodes`
+  # — which only makes the same failure slower — and raising
+  # `:candidates`, which fixes it.
+  defp starvation(candidates) do
+    distinct =
+      candidates
+      |> Enum.flat_map(fn {_session, _symmetry, placements} ->
+        Enum.map(placements, &placement_key/1)
+      end)
+      |> Enum.uniq()
+      |> length()
+
+    if distinct < length(candidates), do: {distinct, length(candidates)}
+  end
+
+  defp placement_key(%Arrangement{} = arrangement) do
+    {arrangement.interval.from, arrangement.interval.to,
+     arrangement |> Arrangement.resources() |> Enum.map(& &1.name) |> Enum.sort()}
   end
 
   # Only two values are meaningful, and a third is a typo worth hearing
@@ -865,7 +1104,12 @@ defmodule Agenda.Arranger do
 
   # --- shaping the outcome ----------------------------------------
 
-  defp to_result(%{best: {_count, score, arrangements, skipped}} = state, programme, unplaceable) do
+  defp to_result(
+         %{best: {_count, score, arrangements, skipped}} = state,
+         programme,
+         unplaceable,
+         _starved
+       ) do
     placed = in_programme_order(arrangements, programme)
 
     case unplaceable ++ Enum.map(skipped, &clashed/1) do
@@ -886,31 +1130,38 @@ defmodule Agenda.Arranger do
   # placements all failed may have failed only because the search never
   # got far enough to try the arrangement that would have fitted it, so
   # claiming it is impossible would be claiming more than was proved.
-  defp to_result(%{best: nil, exhausted?: true}, programme, _unplaceable) do
-    {:error,
-     Infeasible.new(programme.name, [
-       "the search reached its node limit before placing every session — " <>
-         "raise :nodes, or narrow the programme"
-     ])}
+  defp to_result(%{best: nil, exhausted?: true}, programme, _unplaceable, starved) do
+    {:error, Infeasible.new(programme.name, [exhausted_because(starved)])}
   end
 
   # The programme is the subject when the whole thing fails, because
   # the whole thing is what the caller asked for. Inside a layout the
   # session is the subject instead — there, the programme succeeded and
   # this one session is what did not.
-  defp to_result(%{best: nil, stuck: %Session{} = session}, programme, _unplaceable) do
+  defp to_result(%{best: nil, stuck: %Session{} = session}, programme, _unplaceable, _starved) do
     {:error, Infeasible.new(programme.name, [unplaceable_because(session.name)])}
   end
 
   # No layout, nothing named, no exhaustion flag — the budget ran out
   # somewhere that did not record it. Reporting the cap is the honest
   # reading, and a clause here is cheaper than a FunctionClauseError.
-  defp to_result(%{best: nil}, programme, _unplaceable) do
-    {:error,
-     Infeasible.new(programme.name, [
-       "the search reached its node limit before placing every session — " <>
-         "raise :nodes, or narrow the programme"
-     ])}
+  defp to_result(%{best: nil}, programme, _unplaceable, starved) do
+    {:error, Infeasible.new(programme.name, [exhausted_because(starved)])}
+  end
+
+  # Two different failures wear the same face. Which one it is decides
+  # what the caller should do about it, and the wrong advice here costs
+  # them a slower run of the identical failure.
+  defp exhausted_because(nil) do
+    "the search reached its node limit before placing every session — " <>
+      "raise :nodes, or narrow the programme"
+  end
+
+  defp exhausted_because({distinct, sessions}) do
+    "the sessions were offered only #{distinct} distinct placements between " <>
+      "#{sessions} of them, so no arrangement can place them all — raise " <>
+      ":candidates, widen the window, or add resources. Raising :nodes will " <>
+      "not help: the placements searched do not contain an answer"
   end
 
   # A layout is provably the fewest left out when the search finished
