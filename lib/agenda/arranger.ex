@@ -86,16 +86,20 @@ defmodule Agenda.Arranger do
   components are disjoint, so no layout is lost and `minimal?` still
   means proven.
 
-  **Every session must be offered enough distinct placements.**
-  Interchangeable sessions receive the same ranked candidates, so a cap
-  below the session count makes a satisfiable programme unsatisfiable —
-  which is why `:candidates` scales with the programme and why the
+  **The caps scale with the programme.** Interchangeable sessions
+  receive the same ranked candidates, so a `:candidates` cap below the
+  session count makes a satisfiable programme unsatisfiable, and the
+  work per session grows with the programme, so a fixed `:nodes` cap
+  does the same. Both now grow with the session count, and the
   placements offered are spread across the window rather than taken
-  from the front of it.
+  from the front of it. A fixed cap of either kind does not narrow the
+  search — it reports a workable programme as impossible.
 
-  In practice a few hundred sessions is comfortable: 240 across six
-  days lays out in about five seconds, and 120 competing for one day in
-  under four. Past that, or for a university timetable of thousands of
+  In practice a few hundred sessions is comfortable on defaults: 240
+  across six days lays out in about four seconds, 120 competing for a
+  single day in under four, and 300 competing for one day in about
+  forty. Saying "no" stays fast — an impossible programme is cut off by
+  the relaxation bound long before the cap. Past that, or for a university timetable of thousands of
   classes, the answer is still a real constraint solver, and the way to
   use one here is to write its output back through
   `Agenda.Ledger.allocate/2`, which stays authoritative either way.
@@ -126,6 +130,27 @@ defmodule Agenda.Arranger do
   alias Tempo.Interval
 
   @default_nodes 10_000
+
+  # How much the node cap grows per session once a programme is large
+  # enough to need more than the floor. Measured rather than guessed:
+  # the search needs roughly 33 nodes per session at sixty sessions and
+  # 156 at a hundred and sixty, so the requirement grows with the
+  # programme and a fixed cap turns into a false "impossible" exactly
+  # as the fixed candidate cap did. This leaves about double the
+  # measured need.
+  #
+  # A larger cap costs nothing on a programme that succeeds — the
+  # search stops when it finds a layout, and the cap only bounds how
+  # long it will look before admitting defeat. What it does buy is a
+  # slower answer on a genuinely impossible programme, which is the
+  # right way round: being told "no" late is better than being told
+  # "no" wrongly.
+  @nodes_per_session 250
+
+  # No component is searched with less than this, however small its
+  # share works out. A floor costs little — a small component that
+  # succeeds stops long before spending it.
+  @minimum_component_nodes 2_000
 
   # The floor, not the answer. Interchangeable sessions are offered the
   # *same* ranked candidate list, so a programme of N such sessions
@@ -184,8 +209,11 @@ defmodule Agenda.Arranger do
     count makes a satisfiable programme unsatisfiable.
 
   * `:nodes` caps how many search steps are taken across the whole
-    call, including every round of the `unplaced: :allow` search. The
-    default is `10_000`.
+    call, including every round of the `unplaced: :allow` search and
+    every independent subproblem the programme splits into. The default
+    scales with the programme — `10_000`, or 250 per session, whichever
+    is larger — because the work per session grows with the programme
+    and a fixed cap reports a satisfiable one as impossible.
 
   * `:travel` is passed to `Agenda.travel_time/3` for the
     reachability check — use it to supply per-pair overrides.
@@ -592,6 +620,8 @@ defmodule Agenda.Arranger do
   # scoring layout overall. Where preferences are declared the
   # programme is solved in one piece, as before.
   defp decompose(candidates, programme, pinned, unplaceable, options) do
+    options = Keyword.put(options, :nodes, node_budget(length(candidates), options))
+
     candidates
     |> components(programme, unplaceable)
     |> solve_components(candidates, programme, pinned, unplaceable, options)
@@ -625,12 +655,18 @@ defmodule Agenda.Arranger do
     resolve(candidates, programme, pinned, unplaceable, options, starvation(candidates))
   end
 
-  defp solve_components(components, _candidates, programme, pinned, unplaceable, options) do
+  defp solve_components(components, candidates, programme, pinned, unplaceable, options) do
+    shares = budget_shares(components, length(candidates), options)
+
     components
-    |> Enum.reduce_while({:ok, [], [], true}, fn component, {:ok, placed, skipped, minimal?} ->
+    |> Enum.zip(shares)
+    |> Enum.reduce_while({:ok, [], [], true}, fn {component, share},
+                                                 {:ok, placed, skipped, minimal?} ->
       # Every component sees the pins: a pin outside this component
       # still occupies its resources, and dropping it would let the
       # search place a session on top of one.
+      options = Keyword.put(options, :nodes, share)
+
       case resolve(component, programme, pinned, unplaceable, options, starvation(component)) do
         {:ok, arrangements} ->
           {:cont, {:ok, placed ++ own(arrangements, pinned), skipped, minimal?}}
@@ -654,6 +690,20 @@ defmodule Agenda.Arranger do
       {:error, _reason} = error ->
         error
     end
+  end
+
+  # `:nodes` caps the whole call, so splitting the programme must not
+  # multiply the budget by the number of parts. Each component gets a
+  # share in proportion to its size, with a floor so that a component
+  # of two sessions is not handed a budget too small to search it.
+  defp budget_shares(components, total_sessions, options) do
+    total = budget(options, [])
+
+    Enum.map(components, fn component ->
+      share = div(total * length(component), max(total_sessions, 1))
+
+      max(share, @minimum_component_nodes)
+    end)
   end
 
   # Each component's result carries the pins back with it, so they are
@@ -874,6 +924,11 @@ defmodule Agenda.Arranger do
 
   defp budget(options, [_first | _rest]) do
     Keyword.get(options, :score_nodes, @default_score_nodes)
+  end
+
+  # As with `:candidates`, an explicit `:nodes` is taken at face value.
+  defp node_budget(session_count, options) do
+    Keyword.get(options, :nodes) || max(@default_nodes, session_count * @nodes_per_session)
   end
 
   # --- the relaxation bound ---------------------------------------
