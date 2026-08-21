@@ -180,7 +180,7 @@ What is not promised is soft *optimality*. Proving a weighted optimum needs a bo
 
 ## Handing it to a solver
 
-Past a few hundred sessions the exact search runs out of road. The answer has always been "use a solver, then write the result back through `allocate/2`" — and with the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that sentence is executable:
+How far the exact search reaches depends on the shape of a programme rather than its size — sessions that cannot interact are solved separately and concurrently, so 1,200 across twenty days lay out in under three seconds, while 200 all competing for one day take about five. A programme that is one dense component past a few hundred sessions runs out of road. The answer has always been "use a solver, then write the result back through `allocate/2`" — and with the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that sentence is executable:
 
 ```elixir
 {:ok, arrangements} = Agenda.Fixpoint.solve(programme, rooms)

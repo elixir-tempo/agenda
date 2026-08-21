@@ -95,11 +95,21 @@ defmodule Agenda.Arranger do
   from the front of it. A fixed cap of either kind does not narrow the
   search — it reports a workable programme as impossible.
 
-  In practice a few hundred sessions is comfortable on defaults: 240
-  across six days lays out in about four seconds, 120 competing for a
-  single day in under four, and 300 competing for one day in about
-  forty. Saying "no" stays fast — an impossible programme is cut off by
-  the relaxation bound long before the cap. Past that, or for a university timetable of thousands of
+  **Independent work is done at the same time.** Enumerating one
+  session's placements cannot affect another's, and neither can
+  searching two disjoint components, so both are spread across
+  `:concurrency` processes. Order is preserved, so the answer does not
+  depend on which scheduler finished first.
+
+  What that adds up to on defaults: 1,200 sessions across twenty days
+  lay out in under three seconds, 240 across six days in about four
+  hundred milliseconds, and 200 competing for a *single* day — one
+  component, so nothing to divide — in about five seconds. The shape of
+  the programme matters more than its size: sessions that cannot
+  interact are nearly free, and sessions that all compete for the same
+  rooms are the real cost. Saying "no" stays fast either way, since an
+  impossible programme is cut off by the relaxation bound long before
+  any cap. Past that, or for a university timetable of thousands of
   classes, the answer is still a real constraint solver, and the way to
   use one here is to write its output back through
   `Agenda.Ledger.allocate/2`, which stays authoritative either way.
@@ -151,6 +161,14 @@ defmodule Agenda.Arranger do
   # share works out. A floor costs little — a small component that
   # succeeds stops long before spending it.
   @minimum_component_nodes 2_000
+
+  # Below this many items, spawning costs more than it saves — but
+  # "worth it" depends on the item. Enumerating one session's
+  # placements is milliseconds, so a handful of them is not worth
+  # distributing; searching one component is a substantial fraction of
+  # the whole call, so even two are.
+  @parallel_enumeration 8
+  @parallel_components 2
 
   # The floor, not the answer. Interchangeable sessions are offered the
   # *same* ranked candidate list, so a programme of N such sessions
@@ -214,6 +232,14 @@ defmodule Agenda.Arranger do
     scales with the programme — `10_000`, or 250 per session, whichever
     is larger — because the work per session grows with the programme
     and a fixed cap reports a satisfiable one as impossible.
+
+  * `:concurrency` is how many processes may work at once, defaulting
+    to `System.schedulers_online/0`. Candidate enumeration and
+    independent subproblems are both spread across them. Pass `1` to
+    stay on the calling process — what you want when the caller already
+    runs this inside a pool of its own. The answer does not depend on
+    it: results are collected in order, so the same programme arranges
+    the same way at any setting.
 
   * `:travel` is passed to `Agenda.travel_time/3` for the
     reachability check — use it to supply per-pair overrides.
@@ -527,16 +553,62 @@ defmodule Agenda.Arranger do
 
     limit = candidate_limit(length(free), options)
 
+    # Enumerating one session's placements cannot affect another's —
+    # each is a fresh question about the same unchanging pool — so this
+    # is the one part of the call that parallelises without any
+    # argument about correctness. It is worth doing: enumeration is
+    # about a quarter of a large `arrange/3`, and it is the quarter
+    # that a single component cannot otherwise share out.
     free
-    |> Enum.reduce({[], []}, fn session, {candidates, unplaceable} ->
-      case placements_for(session, programme, pool, options, limit) do
-        {:ok, placements} ->
-          {candidates ++ [{session, symmetry_of(session, programme), placements}], unplaceable}
+    |> in_parallel(
+      fn session ->
+        {session, placements_for(session, programme, pool, options, limit)}
+      end,
+      options,
+      @parallel_enumeration
+    )
+    |> Enum.reduce({[], []}, fn
+      {session, {:ok, placements}}, {candidates, unplaceable} ->
+        {candidates ++ [{session, symmetry_of(session, programme), placements}], unplaceable}
 
-        {:error, reason} ->
-          {candidates, unplaceable ++ [reason]}
-      end
+      {_session, {:error, reason}}, {candidates, unplaceable} ->
+        {candidates, unplaceable ++ [reason]}
     end)
+  end
+
+  # `ordered: true` is not incidental. The results feed a search whose
+  # answer depends on the order it considers things, so arranging the
+  # same programme twice must give the same layout — a scheduler that
+  # returned a different-but-equally-valid answer on every call would
+  # be untestable and unnerving to use.
+  #
+  # Below the threshold the spawn costs more than the work saved, and
+  # `concurrency: 1` opts out entirely, which a caller already running
+  # this inside a pool of their own will want.
+  defp in_parallel(items, fun, options, threshold) do
+    concurrency = concurrency(options)
+
+    if concurrency > 1 and length(items) >= threshold do
+      items
+      |> Task.async_stream(fun,
+        max_concurrency: concurrency,
+        ordered: true,
+        timeout: :infinity
+      )
+      |> Enum.map(fn {:ok, result} -> result end)
+    else
+      Enum.map(items, fun)
+    end
+  end
+
+  # Per call first, then application config, then one process per
+  # scheduler. The middle rung is what lets an application that runs
+  # this inside its own pool set the policy once rather than at every
+  # call site.
+  defp concurrency(options) do
+    Keyword.get(options, :concurrency) ||
+      Application.get_env(:agenda, :concurrency) ||
+      System.schedulers_online()
   end
 
   # An explicit `:candidates` is taken at face value — a caller who
@@ -658,27 +730,42 @@ defmodule Agenda.Arranger do
   defp solve_components(components, candidates, programme, pinned, unplaceable, options) do
     shares = budget_shares(components, length(candidates), options)
 
+    # The components are disjoint by construction and each already has
+    # its own slice of the node budget, so searching them at the same
+    # time changes nothing about the answer — only how long it takes to
+    # get. Order is preserved, so the layout does not depend on which
+    # scheduler finished first.
+    #
+    # Every component sees the pins: a pin outside this component still
+    # occupies its resources, and dropping it would let the search
+    # place a session on top of one.
     components
     |> Enum.zip(shares)
-    |> Enum.reduce_while({:ok, [], [], true}, fn {component, share},
-                                                 {:ok, placed, skipped, minimal?} ->
-      # Every component sees the pins: a pin outside this component
-      # still occupies its resources, and dropping it would let the
-      # search place a session on top of one.
-      options = Keyword.put(options, :nodes, share)
+    |> in_parallel(
+      fn {component, share} ->
+        resolve(
+          component,
+          programme,
+          pinned,
+          unplaceable,
+          Keyword.put(options, :nodes, share),
+          starvation(component)
+        )
+      end,
+      options,
+      @parallel_components
+    )
+    |> Enum.reduce_while({:ok, [], [], true}, fn
+      {:ok, arrangements}, {:ok, placed, skipped, minimal?} ->
+        {:cont, {:ok, placed ++ own(arrangements, pinned), skipped, minimal?}}
 
-      case resolve(component, programme, pinned, unplaceable, options, starvation(component)) do
-        {:ok, arrangements} ->
-          {:cont, {:ok, placed ++ own(arrangements, pinned), skipped, minimal?}}
+      {:partial, layout}, {:ok, placed, skipped, minimal?} ->
+        {:cont,
+         {:ok, placed ++ own(layout.placed, pinned), skipped ++ layout.unplaced,
+          minimal? and layout.minimal?}}
 
-        {:partial, layout} ->
-          {:cont,
-           {:ok, placed ++ own(layout.placed, pinned), skipped ++ layout.unplaced,
-            minimal? and layout.minimal?}}
-
-        {:error, _reason} = error ->
-          {:halt, error}
-      end
+      {:error, _reason} = error, {:ok, _placed, _skipped, _minimal?} ->
+        {:halt, error}
     end)
     |> case do
       {:ok, placed, [], _minimal?} ->
@@ -714,26 +801,82 @@ defmodule Agenda.Arranger do
     Enum.reject(arrangements, &MapSet.member?(fixed, &1.session))
   end
 
+  # Building this by comparing every pair costs a quadratic number of
+  # comparisons, each of which has to know which resources two sessions
+  # could use — and rebuilding those sets per comparison made finding
+  # the components cost more than the search they were meant to speed
+  # up. Inverting it is both faster and simpler to state: walk each
+  # session's placements once, note which resources it could use, and
+  # let every resource join the sessions that named it. Tracks and
+  # precedences join their members the same way.
+  #
+  # The cost is then proportional to the number of placements rather
+  # than to the square of the number of sessions.
   defp connected_components(candidates, programme) do
-    index = Enum.with_index(candidates)
+    indexed = Enum.with_index(candidates)
 
     edges =
-      for {left, i} <- index,
-          {right, j} <- index,
-          i < j,
-          interacts?(left, right, programme),
-          reduce: %{} do
-        acc ->
-          acc
-          |> Map.update(i, [j], &[j | &1])
-          |> Map.update(j, [i], &[i | &1])
-      end
+      %{}
+      |> join(groups_by_resource(indexed))
+      |> join(groups_by_track(indexed, programme))
+      |> join(groups_by_precedence(indexed, programme))
 
-    index
+    indexed
     |> Enum.map(fn {_candidate, i} -> i end)
     |> group_components(edges, %{}, [])
-    |> Enum.map(fn members ->
-      Enum.map(members, fn i -> Enum.at(candidates, i) end)
+    |> Enum.map(fn members -> Enum.map(members, &Enum.at(candidates, &1)) end)
+  end
+
+  defp groups_by_resource(indexed) do
+    indexed
+    |> Enum.reduce(%{}, fn {{_session, _symmetry, placements}, i}, acc ->
+      placements
+      |> resource_names()
+      |> Enum.reduce(acc, fn name, inner ->
+        Map.update(inner, name, [i], &[i | &1])
+      end)
+    end)
+    |> Map.values()
+  end
+
+  defp groups_by_track(indexed, programme) do
+    indexed
+    |> Enum.reduce(%{}, fn {{session, _symmetry, _placements}, i}, acc ->
+      case Programme.track_of(programme, session.name) do
+        nil -> acc
+        track -> Map.update(acc, track.name, [i], &[i | &1])
+      end
+    end)
+    |> Map.values()
+  end
+
+  defp groups_by_precedence(indexed, %Programme{precedences: precedences}) do
+    positions =
+      Map.new(indexed, fn {{session, _symmetry, _placements}, i} -> {session.name, i} end)
+
+    for precedence <- precedences,
+        first = Map.get(positions, precedence.first),
+        then = Map.get(positions, precedence.then),
+        first != nil and then != nil,
+        do: [first, then]
+  end
+
+  # Every member of a group is connected to every other, and a chain
+  # through the first is enough to make them one component.
+  defp join(edges, groups) do
+    Enum.reduce(groups, edges, fn
+      [_only], acc ->
+        acc
+
+      [head | rest], acc ->
+        Enum.reduce(rest, acc, fn member, inner ->
+          inner
+          |> Map.update(head, [member], &[member | &1])
+          |> Map.update(member, [head], &[head | &1])
+        end)
+
+      [], acc ->
+        acc
     end)
   end
 
@@ -762,26 +905,6 @@ defmodule Agenda.Arranger do
     else
       reachable(Map.get(edges, node, []) ++ rest, edges, Map.put(seen, node, true))
     end
-  end
-
-  # An over-approximation on purpose: anything that *might* carry a
-  # constraint counts as an edge. Splitting two sessions that actually
-  # do interact would lose layouts; joining two that do not merely
-  # forgoes a speed-up.
-  defp interacts?({left, _ls, left_places}, {right, _rs, right_places}, programme) do
-    same_track?(left, right, programme) or
-      Precedence.between(programme.precedences, left.name, right.name) != nil or
-      shares_resource?(left_places, right_places)
-  end
-
-  defp same_track?(left, right, programme) do
-    track = Programme.track_of(programme, left.name)
-
-    track != nil and track == Programme.track_of(programme, right.name)
-  end
-
-  defp shares_resource?(left_places, right_places) do
-    not MapSet.disjoint?(resource_names(left_places), resource_names(right_places))
   end
 
   defp resource_names(placements) do

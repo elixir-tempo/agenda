@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+* Independent work now runs concurrently, across `System.schedulers_online/0` processes by default. Candidate enumeration parallelises for every programme and the disjoint subproblems parallelise when there are any, taking 240 sessions over six days from 4.6 seconds to 400 milliseconds and 1,200 over twenty days to under three. Set `:concurrency` per call or `config :agenda, concurrency:` for the application; results are collected in order, so the layout is the same at any setting.
+
 * Sessions that cannot constrain each other are now solved as separate problems. A shared resource, track or precedence is what relates two sessions; without one they are independent, so a conference whose days share no room splits into one subproblem per day. This is exact — no layout is lost and `minimal?` still means proven — and it is skipped where preferences are declared, since those score a layout as a whole.
 
 * `Agenda.Planner.plan/3` takes `:spread`, which round-robins the returned placements across distinct start moments instead of taking the best `:limit` of them. `arrange/3` uses it: a ranked prefix of 40 placements across ten rooms covers only the earliest four hours, so sessions were handed near-identical options and collided. The default is unchanged, since a caller picking one meeting time wants the best, not the broadest.

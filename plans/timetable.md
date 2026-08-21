@@ -18,7 +18,7 @@ Three things break structurally if timetabling is pushed into `agenda`, and each
 
 **The objective is the job, not the garnish.** In meeting scheduling, feasibility is hard and preferences break ties; `agenda`'s two-phase lexicographic design encodes exactly that priority, proving the placement count first and only then improving score. In timetabling, feasibility is usually easy — a valid timetable is often reachable greedily — and the whole difficulty is minimising student idle gaps, teacher compactness, and subject spread. A violation counter with three built-ins and no proven soft optimality is the wrong end of the telescope. Worse, `agenda`'s guarantee that *a preference can never cost you a session* is precisely the guarantee a timetabler does not want, because they will trade a lesson's preferred slot for a cohort's whole-week compactness without hesitating.
 
-Add to that the scale: roughly a thousand lessons against a search whose honest working range is a few hundred sessions. That gap is not closed by tuning.
+Add to that the scale, and note *why* it does not yield to the trick that works elsewhere. `agenda` reaches a thousand-odd sessions comfortably by splitting a programme into parts that cannot affect each other and searching them concurrently — a twenty-day conference is twenty small problems. A timetable never decomposes that way: every teacher and every cohort recurs on every day of the grid, so the whole week is one dense component and there is nothing to split. What is left is a single search over roughly a thousand lessons, which is exactly the regime the exact engine is worst at.
 
 ## What transfers, and should not be rebuilt
 
