@@ -45,6 +45,7 @@ defmodule Agenda.Ledger do
   alias Agenda.Infeasible
   alias Agenda.Resource
   alias Tempo.Compare
+  alias Tempo.IntervalSet
 
   @typedoc "Allocations held against the sessions that hold them."
   @type t :: %__MODULE__{sessions: %{optional(String.t()) => [Allocation.t()]}}
@@ -128,6 +129,134 @@ defmodule Agenda.Ledger do
   def allocate(%__MODULE__{} = ledger, %Arrangement{} = arrangement, options \\ []) do
     allocations = Allocation.from_arrangement(arrangement, options)
     {:ok, %{ledger | sessions: Map.put(ledger.sessions, arrangement.session, allocations)}}
+  end
+
+  @doc """
+  Book one resource over one interval, refusing what it cannot honour.
+
+  `allocate/3` records; `claim/4` **books**. The difference is the
+  difference between a timesheet and a schedule, and both are wanted:
+
+  * A schedule is a request about the future, so it must be checked. A
+    consultant cannot be booked on a Saturday they do not work, nor
+    twice over the same hour, and finding that out at the moment of
+    booking is the point.
+
+  * A timesheet is a record of what happened, and the world is not
+    obliged to match the contract. Somebody *did* work that Saturday.
+    Refusing to write it down would leave the system unable to
+    represent overtime, so `allocate/3` still records anything and
+    `Agenda.reconcile/3` is what reports the disagreement afterwards.
+
+  Both write to the same ledger, so a booking and a recorded hour
+  cannot double-claim the same person.
+
+  ### Arguments
+
+  * `ledger` is a `t:t/0`.
+
+  * `resource` is the `t:Agenda.Resource.t/0` being claimed.
+
+  * `interval` is when — a Tempo value or an ISO 8601 string.
+
+  ### Options
+
+  * `:tag` is what the claim is for, as a `t:Agenda.Allocation.tag/0`.
+
+  * `:role` is the role the resource is filling. The default is
+    `:resource`.
+
+  * `:session` names the claim, and is what `release/2` takes. The
+    default is the interval's ISO 8601 form, which is unique per
+    resource per span.
+
+  ### Returns
+
+  * `{:ok, ledger}`; or
+
+  * `{:error, reason}` — a sentence naming the time that could not be
+    claimed and why, when the resource is not open then or is already
+    claimed for part of it.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
+      iex> {:ok, ledger} = Agenda.Ledger.claim(Agenda.Ledger.new(), dana, ~o"2026-08-10T09:00:00/2026-08-10T12:00:00")
+      iex> Agenda.Ledger.count(ledger)
+      1
+
+  Booking the same hour twice is refused rather than recorded:
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
+      iex> {:ok, ledger} = Agenda.Ledger.claim(Agenda.Ledger.new(), dana, ~o"2026-08-10T09:00:00/2026-08-10T12:00:00")
+      iex> {:error, reason} = Agenda.Ledger.claim(ledger, dana, ~o"2026-08-10T11:00:00/2026-08-10T13:00:00")
+      iex> reason
+      "Dana is already claimed for 2026Y8M10DT11H0M0S/2026Y8M10DT12H0M0S"
+
+  And so is time the resource does not work:
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
+      iex> {:error, reason} = Agenda.Ledger.claim(Agenda.Ledger.new(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00")
+      iex> reason
+      "Dana is not open for 2026Y8M15DT9H0M0S/2026Y8M15DT12H0M0S"
+
+  """
+  @spec claim(t(), Resource.t(), Availability.pattern(), keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def claim(%__MODULE__{} = ledger, %Resource{} = resource, interval, options \\ []) do
+    with {:ok, interval} <- Availability.normalise(interval),
+         :ok <- claimable(ledger, resource, interval) do
+      role = Keyword.get(options, :role, :resource)
+      session = Keyword.get(options, :session, Tempo.to_iso8601(interval))
+
+      allocate(
+        ledger,
+        %Arrangement{
+          session: session,
+          interval: interval,
+          allocations: %{role => [resource]}
+        },
+        options
+      )
+    end
+  end
+
+  # Two questions, asked in the order that produces the more useful
+  # answer. Time outside the resource's open hours is a mistake about
+  # the *contract*; time inside them that is already spoken for is a
+  # mistake about the *ledger*, and saying "already claimed" about a
+  # Saturday nobody works would send the caller looking in the wrong
+  # place.
+  defp claimable(ledger, resource, interval) do
+    busy = ledger |> busy() |> Map.get(resource.name, [])
+
+    with {:ok, open} <- Availability.free(resource, within: interval, busy: []),
+         {:ok, free} <- Availability.free(resource, within: interval, busy: busy),
+         {:ok, unopen} <- Tempo.difference(interval, open),
+         {:ok, unfree} <- Tempo.difference(interval, free) do
+      cond do
+        not IntervalSet.empty?(unopen) ->
+          {:error, refusal(resource, "not open", unopen)}
+
+        not IntervalSet.empty?(unfree) ->
+          {:error, refusal(resource, "already claimed", unfree)}
+
+        true ->
+          :ok
+      end
+    end
+  end
+
+  defp refusal(resource, why, set) do
+    spans =
+      set
+      |> IntervalSet.to_list()
+      |> Enum.map_join(", ", &Tempo.to_iso8601/1)
+
+    "#{resource.name} is #{why} for #{spans}"
   end
 
   @doc """

@@ -180,7 +180,22 @@ annual = {:leave, :annual}
 
 > *"Record the shift on that day, against that project."*
 
-`record/3` is the same `Tempo.select/2` the contract used, pointed at one day instead of a quarter — so a day's entry is the shift *by construction*, and no date is ever assembled from a string. It works on a Saturday too, which is what the over-claim further down needs: projecting a shift onto a day says nothing about whether the day was owed, and that is exactly the question reconciliation exists to answer.
+`record/3` is the same `Tempo.select/2` the contract used, pointed at one day instead of a quarter — so a day's entry is the shift *by construction*, and no date is ever assembled from a string.
+
+### Recording is not booking
+
+`record/3` uses `Agenda.allocate/3`, which writes down whatever it is given. Its counterpart `Agenda.claim/4` **books**, and checks — it refuses an hour the consultant does not work, and an hour already spoken for, naming the offending span:
+
+```elixir
+%{
+  saturday: Agenda.claim(Agenda.ledger(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00"),
+  ten_hour_day: Agenda.claim(Agenda.ledger(), dana, ~o"2026-08-10T09:00:00/2026-08-10T19:00:00")
+}
+```
+
+Both are wanted, and the difference is the difference between a schedule and a timesheet. A schedule is a request about the future, so it must be checked before it is accepted. A timesheet is a record of what happened, and the world is not obliged to match the contract — somebody *did* work that Saturday, and refusing to write it down would leave the system unable to represent overtime.
+
+Both write to the same ledger, so a booking and a recorded hour cannot double-claim the same person. What `claim/4` refuses at the door, `reconcile/3` reports after the fact — and the two cells below are exactly those two refusals, recorded instead of rejected, then found by the report.
 
 `agenda` does not know what a project or a leave type is, and does not decide which kinds exist. What it gains is that **a day cannot be two things** — billing a client while on annual leave is two claims on one person over one span, which is the overlap the ledger already refuses. That is not a validation rule somebody has to remember to write.
 

@@ -18,6 +18,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.Arranger.arrange/3` no longer reports a satisfiable programme as impossible. Both caps were fixed while the work they bound grows with the programme: `:candidates` at 40 made any programme of more than 40 interchangeable sessions unsatisfiable however long it searched, and `:nodes` at 10,000 ran out somewhere past 120 sessions. Both now scale with the session count, and the error says which cap was reached, since raising the wrong one only makes the same failure slower.
 
+* `Agenda.claim/4` books one resource over one interval and refuses what it cannot honour, naming the span that is not open or is already claimed. `allocate/3` still records anything, unchecked — a schedule is a request and must be validated, a timesheet is a record and the world is not obliged to match the contract. Both write to the same ledger.
+
 * `Agenda.Fixpoint.solve/3` enforces a resource's `:limits` instead of silently ignoring them. The bridge could return a layout the built-in search would reject — three shifts in a day that allows two — because limits never reached the model. Each ceiling is now a sum over `Element` indicators bounded by its budget, with claims already in `:busy` coming off that budget. Floors stay ignored, exactly as in `Agenda.Arranger`, so the two engines still agree.
 
 * `Agenda.Fixpoint.solve/3` plans candidates with `spread: true`, matching `Agenda.Arranger`. A truncated candidate list was the earliest placements, which cluster into the first days of the window, so a resource limited per day could be offered candidates that never reach the later periods.
