@@ -20,43 +20,34 @@ The design document behind it is `plans/timesheets.md` in this repository. `elix
 
 ## Setup
 
-Two helpers. `business_hours/1` builds a working pattern over a window — Monday to Friday, 09:00–13:00 and 14:00–17:36. That is **7.6 hours a day and 38 a week**, the Australian full-time standard, and a number chosen to embarrass anyone storing hours as a float.
+Two helpers. `business_hours/1` builds a working pattern over a window — Monday to Friday, 09:00–12:00 and 13:00–17:00. Seven hours a day, thirty-five a week.
 
-`hours/1` is for display only.
+It is two `Tempo.select/2` calls: the first narrows a window to its workdays, the second narrows each of those days to the hours actually worked. `hours/1` is for display only.
 
 ```elixir
 import Tempo.Sigils
 
 alias Agenda.Reconciliation
 
-pad = fn number -> String.pad_leading("#{number}", 2, "0") end
-
 business_hours = fn window ->
   {:ok, workdays} = Tempo.select(window, Tempo.workdays(:AU))
-
-  workdays
-  |> Tempo.IntervalSet.to_list()
-  |> Enum.flat_map(fn day ->
-    date = "#{day.from.time[:year]}-#{pad.(day.from.time[:month])}-#{pad.(day.from.time[:day])}"
-
-    [
-      Tempo.from_iso8601!("#{date}T09:00:00/#{date}T13:00:00"),
-      Tempo.from_iso8601!("#{date}T14:00:00/#{date}T17:36:00")
-    ]
-  end)
-  |> Tempo.IntervalSet.new!()
+  {:ok, hours} = Tempo.select(workdays, [~o"T09/T12", ~o"T13/T17"])
+  hours
 end
 
 hours = fn set ->
-  {_count, duration} = Agenda.Limit.total(Tempo.IntervalSet.to_list(set))
-  {:ok, value} = Tempo.Duration.to_unit(duration, :hour)
+  {:ok, value} = Tempo.Duration.to_unit(Tempo.duration(set), :hour)
   Float.round(value, 2)
 end
 
 :ready
 ```
 
+> *"The workdays of the window, nine to five with an hour for lunch."*
+
 Note what `Tempo.workdays(:AU)` did there: weekends are territory-specific and the library knows them. Holidays are **not** in that call, and the section below is about why.
+
+Note also what the second `select` did **not** need: no loop over days, no coalescing of hour granules, no subtracting lunch afterwards. Two windows a day, said once. Because Tempo's bounds are half-open throughout, nine-to-five is written as nine to five — and a shift that runs past midnight (`~o"T21/T05"`) or a statutory day that is not hour-aligned (`~o"T09/PT7H36M"`, the Australian 7.6-hour day) are the same call.
 
 ## The consultant is a resource with a contract
 
@@ -68,14 +59,14 @@ quarter = ~o"2026-07-01/2026-10-01"
 {:ok, dana} =
   Agenda.resource("Dana",
     skills: [:elixir, :postgres],
-    limits: [day: ~o"PT7H36M"]
+    limits: [day: ~o"PT7H"]
   )
   |> Agenda.open(business_hours.(quarter))
 
 %{blocks: Tempo.IntervalSet.count(dana.open), hours: hours.(dana.open)}
 ```
 
-132 blocks — a morning and an afternoon on each of 66 working days — totalling 501.6 hours, which is `66 × 7.6`. Nobody wrote 66; it fell out of the calendar, and neither weekends nor the lunch break needed a rule. **Lunch is not a constraint to enforce; it is simply time Dana is not open**, and every calculation downstream inherits that for free.
+132 blocks — a morning and an afternoon on each of 66 working days — totalling 462 hours, which is `66 × 7`. Nobody wrote 66; it fell out of the calendar, and weekends needed no rule. **Lunch is not a constraint to enforce either; it is simply time Dana is not open**, and every calculation downstream inherits that for free.
 
 The limit is a **ceiling measured in time**, not in bookings:
 
@@ -101,8 +92,8 @@ end
 
 full_day = fn ledger, day, name, tag ->
   ledger
-  |> enter.("#{name} #{day} am", "2026-08-#{day}T09:00:00/2026-08-#{day}T13:00:00", tag)
-  |> enter.("#{name} #{day} pm", "2026-08-#{day}T14:00:00/2026-08-#{day}T17:36:00", tag)
+  |> enter.("#{name} #{day} am", "2026-08-#{day}T09:00:00/2026-08-#{day}T12:00:00", tag)
+  |> enter.("#{name} #{day} pm", "2026-08-#{day}T13:00:00/2026-08-#{day}T17:00:00", tag)
 end
 
 acme = {:project, "ACME-2026-01"}
@@ -167,7 +158,7 @@ Brisbane's show holiday falls on the Wednesday of the Ekka, and 12 August 2026 i
 %{without_holiday: hours.(plain.expected), with_show_day: hours.(holiday.expected)}
 ```
 
-> *"A week is 38 hours. The week of the Ekka is 30.4."*
+> *"A week is 35 hours. The week of the Ekka is 28."*
 
 The consultant's calendar and the client site's calendar are **different axes**. A Sydney-employed consultant on a Brisbane site during the Ekka cannot get into the building — an availability fact about the site resource — and still owes a normal working day. Because holidays are just data attached to whichever resource they belong to, that needs no mechanism at all.
 
@@ -222,7 +213,7 @@ Reconciliation.explain(wrong_report)
 
 ## Limits catch the day that ran long
 
-A ten-hour Monday, against a 7.6-hour ceiling:
+A ten-hour Monday, against a seven-hour ceiling:
 
 ```elixir
 crunch = %Agenda.Arrangement{
@@ -247,7 +238,7 @@ But watch what an **absolute** weekly floor does in a week containing a public h
 
 ```elixir
 {:ok, contracted} =
-  Agenda.resource("Dana", limits: [day: ~o"PT7H36M", week: [at_least: ~o"PT38H"]])
+  Agenda.resource("Dana", limits: [day: ~o"PT7H", week: [at_least: ~o"PT35H"]])
   |> Agenda.open(business_hours.(quarter))
 
 worked =
@@ -262,7 +253,7 @@ worked =
 }
 ```
 
-Dana worked every hour she owed — `unaccounted` and `overclaimed` are both zero — and the 38-hour floor still reports a breach, because the show day means only 30.4 hours were ever owed.
+Dana worked every hour she owed — `unaccounted` and `overclaimed` are both zero — and the 35-hour floor still reports a breach, because the show day means only 28 hours were ever owed.
 
 **This is a question rather than a defect, and it is Alembic's to answer.** Is a weekly floor an absolute contractual constant, in which case a holiday week genuinely under-runs it and the report is right? Or is it a proportion of the hours actually owed, in which case the floor should be prorated against `expected` and this library should offer that? The current behaviour is the literal reading. Say which you want and it is a small change.
 
@@ -313,11 +304,30 @@ Two things deliberately stayed out:
 * **Holiday resolution.** The jurisdiction tree, effective-dated calendars, and the data behind them. Its own library, with its own maintainers, feeding an interval set in.
 * **Leave balances.** Accrual, carry-over caps, cash-out, leave loading. That is payroll, none of it expressible as interval algebra, and it belongs in Alembic's application.
 
+## A note on where this got easier
+
+An earlier draft of this notebook opened with a loop: take the workdays, walk each one, shift its start to 09:00 and 13:00, build two intervals, reassemble the set. Four concepts to say *"nine to five with an hour for lunch"*.
+
+Narrowing a set of days to a time-of-day window is a fundamental calendar operation — opening hours, shift patterns, rosters, market hours and statutory working time are all the same shape — so it belonged in Tempo rather than in every consumer. It is now one call:
+
+```
+{:ok, workdays} = Tempo.select(quarter, Tempo.workdays(:AU))
+{:ok, open} = Tempo.select(workdays, [~o"T09/T12", ~o"T13/T17"])
+```
+
+Three forms come with it, and each answers a real rostering question:
+
+* `~o"T09/T17"` — a single window. Half-open, so nine-to-five is written as nine to five.
+* `~o"T09/PT7H36M"` — start plus duration, which is how you express a statutory day that is not hour-aligned. The Australian 7.6-hour day is unreachable any other way.
+* `~o"T21/T05"` — a window that crosses midnight rolls into the next day, so a night shift is the same call as a day shift.
+
+The same change fixed a defect worth knowing about if you have Tempo code that selects by integer index. A day whose interval ended in the next month used to be read as a *month*-resolution span, so `Tempo.select(~o"2026-07-31/2026-08-01", 9..16)` returned days 9–16 of July rather than the hours of 31 July — and at a year boundary it returned months. Because every month has a last day, a whole-quarter selection silently produced three malformed members out of 528, with a total member count exactly matching a correct run. Both are fixed.
+
 ## Questions for Josh
 
 1. **Is a timesheet entry placed or unplaced?** *"Six hours on Acme on Tuesday"* is a quantity in a bucket; *"09:00–15:00 on Acme"* is an interval. Everything above uses intervals, and only intervals can detect that a consultant was double-booked. Which do consultants actually type?
 2. **Absolute or prorated floors?** The open question above.
-3. **What granularity is billed?** Six-minute units are conventional, and interact with the 7.6-hour day in ways worth deciding once, in decimal, up front.
+3. **What granularity is billed?** Six-minute units are conventional in professional services, and a 7.6-hour statutory day does not divide into them neatly. Worth deciding once, in decimal, up front.
 4. **Can a closed period be reopened?** If a holiday is proclaimed late, does reconciliation re-run and restate? This decides whether a closed period must record which calendar version it was closed against.
 5. **Half-days.** A half-day of personal leave plus a half-day billed is the smallest case that breaks a day-granular model.
 6. **Time zones.** Perth to Sydney is two hours, three in summer. Tempo handles it given a real IANA database configured — Elixir's default is UTC-only and makes DST arithmetic silently wrong rather than failing.

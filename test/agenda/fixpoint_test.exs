@@ -276,7 +276,7 @@ defmodule Agenda.FixpointTest do
         arrangements
         |> Enum.group_by(&Limit.bucket(&1.interval.from, limit.period))
         |> Enum.all?(fn {_bucket, held} ->
-          {count, duration} = Limit.total(Enum.map(held, & &1.interval))
+          {count, duration} = Limit.sum(held)
           Limit.permits?(limit, count, duration)
         end)
       end)

@@ -336,7 +336,7 @@ if Code.ensure_loaded?(CPSolver) do
     # placement that does not use the resource contributes nowhere.
     defp contribution(placement, resource, limit) do
       if Enum.any?(Arrangement.resources(placement), &(&1.name == resource.name)) do
-        {_count, duration} = Limit.total([placement.interval])
+        {_count, duration} = Limit.sum([placement.interval])
         {Limit.bucket(placement.interval.from, limit.period), Limit.measure(limit, 1, duration)}
       else
         {nil, 0}
@@ -426,7 +426,7 @@ if Code.ensure_loaded?(CPSolver) do
         |> List.wrap()
         |> Enum.filter(&(Limit.bucket(interval_start(&1), limit.period) == bucket))
 
-      {count, duration} = Limit.total(claimed)
+      {count, duration} = Limit.sum(claimed)
 
       max(0, Limit.ceiling(limit) - Limit.measure(limit, count, duration))
     end

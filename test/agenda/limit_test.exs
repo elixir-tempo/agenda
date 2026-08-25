@@ -5,6 +5,7 @@ defmodule Agenda.LimitTest do
 
   alias Agenda.Limit
   alias Tempo.Duration
+  alias Tempo.IntervalSet
 
   doctest Agenda.Limit
 
@@ -64,10 +65,10 @@ defmodule Agenda.LimitTest do
     end
   end
 
-  describe "total/1" do
+  describe "sum/1" do
     test "sums measurable intervals" do
       {count, duration} =
-        Limit.total([
+        Limit.sum([
           ~o"2026-06-16T09:00:00/2026-06-16T12:00:00",
           ~o"2026-06-16T13:00:00/2026-06-16T17:00:00"
         ])
@@ -76,8 +77,37 @@ defmodule Agenda.LimitTest do
       assert Duration.to_unit(duration, :hour) == {:ok, 7.0}
     end
 
-    test "an empty list totals nothing" do
-      assert {0, duration} = Limit.total([])
+    test "an interval set needs no taking apart" do
+      {:ok, set} =
+        IntervalSet.new([
+          ~o"2026-06-16T09:00:00/2026-06-16T12:00:00",
+          ~o"2026-06-16T13:00:00/2026-06-16T17:00:00"
+        ])
+
+      assert Limit.sum(set) == Limit.sum(IntervalSet.to_list(set))
+      assert {2, duration} = Limit.sum(set)
+      assert Duration.to_unit(duration, :hour) == {:ok, 7.0}
+    end
+
+    test "allocations are summed by their intervals" do
+      allocations = [
+        %Agenda.Allocation{interval: ~o"2026-06-16T09:00:00/2026-06-16T12:00:00"},
+        %Agenda.Allocation{interval: ~o"2026-06-16T13:00:00/2026-06-16T17:00:00"}
+      ]
+
+      assert {2, duration} = Limit.sum(allocations)
+      assert Duration.to_unit(duration, :hour) == {:ok, 7.0}
+    end
+
+    test "an empty list sums to nothing" do
+      assert {0, duration} = Limit.sum([])
+      assert Duration.to_unit(duration, :second) == {:ok, 0.0}
+    end
+
+    test "an unmeasurable claim still counts, but adds no time" do
+      # An unbounded interval has no length; dropping it from the count
+      # would make a limit silently unenforced.
+      assert {1, duration} = Limit.sum([~o"2026-06-16T09:00:00/.."])
       assert Duration.to_unit(duration, :second) == {:ok, 0.0}
     end
   end

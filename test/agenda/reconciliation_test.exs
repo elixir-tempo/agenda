@@ -50,7 +50,7 @@ defmodule Agenda.ReconciliationTest do
   end
 
   defp total(set) do
-    {_count, duration} = Limit.total(IntervalSet.to_list(set))
+    {_count, duration} = Limit.sum(set)
     hours(duration)
   end
 

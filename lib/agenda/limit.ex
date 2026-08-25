@@ -47,6 +47,7 @@ defmodule Agenda.Limit do
   alias Agenda.Allocation
   alias Tempo.Duration
   alias Tempo.Interval
+  alias Tempo.IntervalSet
 
   @periods [:day, :week, :month]
 
@@ -200,68 +201,67 @@ defmodule Agenda.Limit do
   end
 
   @doc """
-  What a set of allocations amounts to, as a count and a duration.
+  What a set of claims comes to, as a count and a duration.
 
-  Both measures are computed together because a limit may be expressed
-  either way and the caller does not know which until it looks.
+  Named for `Tempo.Duration.sum/1`, and both measures are computed in
+  one pass because a limit may be expressed either way and the caller
+  does not know which until it looks at the limit.
 
   ### Arguments
 
-  * `allocations` is a list of `t:Agenda.Allocation.t/0`.
+  * `claims` is a `t:Tempo.IntervalSet.t/0`, a list of
+    `t:Tempo.Interval.t/0`, or a list of `t:Agenda.Allocation.t/0`.
+    Agenda knows Tempo's types intimately, so a caller holding a set
+    should not have to take it apart first.
 
   ### Returns
 
-  * `{count, duration}`, where `duration` is a `t:Tempo.Duration.t/0`
-    summing every allocation's interval. An allocation whose interval
-    has no measurable length contributes nothing to the duration and
-    still contributes one to the count.
+  * `{count, duration}`. A claim with no measurable length — unbounded,
+    or a recurrence — contributes nothing to the duration and still
+    contributes one to the count. That keeps a limit conservative
+    rather than silently unenforced.
 
   ### Examples
+
+  An interval set, taken whole:
+
+      iex> import Tempo.Sigils
+      iex> {:ok, set} = Tempo.IntervalSet.new([
+      ...>   ~o"2026-06-16T09:00:00/2026-06-16T12:00:00",
+      ...>   ~o"2026-06-16T13:00:00/2026-06-16T17:00:00"
+      ...> ])
+      iex> {count, duration} = Agenda.Limit.sum(set)
+      iex> {count, Tempo.Duration.to_unit(duration, :hour)}
+      {2, {:ok, 7.0}}
+
+  A list of intervals:
+
+      iex> import Tempo.Sigils
+      iex> {count, duration} = Agenda.Limit.sum([~o"2026-06-16T09:00:00/2026-06-16T12:00:00"])
+      iex> {count, Tempo.Duration.to_unit(duration, :hour)}
+      {1, {:ok, 3.0}}
+
+  A list of allocations, summed by their intervals:
 
       iex> import Tempo.Sigils
       iex> allocations = [
       ...>   %Agenda.Allocation{interval: ~o"2026-06-16T09:00:00/2026-06-16T12:00:00"},
       ...>   %Agenda.Allocation{interval: ~o"2026-06-16T13:00:00/2026-06-16T17:00:00"}
       ...> ]
-      iex> {count, duration} = Agenda.Limit.amount(allocations)
+      iex> {count, duration} = Agenda.Limit.sum(allocations)
       iex> {count, Tempo.Duration.to_unit(duration, :hour)}
       {2, {:ok, 7.0}}
 
   """
-  @spec amount([Allocation.t()]) :: {non_neg_integer(), Tempo.Duration.t()}
-  def amount(allocations) when is_list(allocations) do
-    allocations |> Enum.map(& &1.interval) |> total()
+  @spec sum(IntervalSet.t() | [Interval.t() | Allocation.t()]) ::
+          {non_neg_integer(), Duration.t()}
+  def sum(%IntervalSet{} = claims), do: claims |> IntervalSet.to_list() |> sum()
+
+  def sum(claims) when is_list(claims) do
+    {length(claims), claims |> Enum.flat_map(&measurable/1) |> Duration.sum()}
   end
 
-  @doc """
-  What a set of intervals amounts to, as a count and a duration.
-
-  The primitive under `amount/1`, for callers holding intervals rather
-  than allocations — the arranger weighs a candidate placement before
-  any allocation exists.
-
-  ### Arguments
-
-  * `intervals` is a list of `t:Tempo.Interval.t/0`.
-
-  ### Returns
-
-  * `{count, duration}`. An interval with no measurable length —
-    unbounded, or a recurrence — contributes nothing to the duration
-    and still contributes one to the count.
-
-  ### Examples
-
-      iex> import Tempo.Sigils
-      iex> {count, duration} = Agenda.Limit.total([~o"2026-06-16T09:00:00/2026-06-16T12:00:00"])
-      iex> {count, Tempo.Duration.to_unit(duration, :hour)}
-      {1, {:ok, 3.0}}
-
-  """
-  @spec total([Tempo.Interval.t()]) :: {non_neg_integer(), Tempo.Duration.t()}
-  def total(intervals) when is_list(intervals) do
-    {length(intervals), intervals |> Enum.flat_map(&measurable/1) |> Duration.sum()}
-  end
+  defp measurable(%Allocation{interval: interval}), do: measurable(interval)
 
   defp measurable(%Interval{} = interval) do
     case Interval.duration(interval) do

@@ -217,7 +217,7 @@ defmodule Agenda.Reconciliation do
     allocations
     |> Enum.group_by(& &1.tag)
     |> Map.new(fn {tag, held} ->
-      {_count, duration} = Limit.amount(held)
+      {_count, duration} = Limit.sum(held)
       {tag, duration}
     end)
   end
@@ -238,7 +238,7 @@ defmodule Agenda.Reconciliation do
   end
 
   defp breached_bucket(%Limit{} = limit, {bucket, held}) do
-    {count, duration} = Limit.amount(held)
+    {count, duration} = Limit.sum(held)
 
     case Limit.breach(limit, count, duration) do
       nil -> []
@@ -327,7 +327,7 @@ defmodule Agenda.Reconciliation do
         []
 
       intervals ->
-        {_count, duration} = Limit.total(intervals)
+        {_count, duration} = Limit.sum(intervals)
         spans = Enum.map_join(intervals, ", ", &Tempo.to_iso8601/1)
         ["#{reconciliation.resource}: #{hours(duration)} #{what} — #{spans}"]
     end

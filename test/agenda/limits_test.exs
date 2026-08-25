@@ -58,7 +58,7 @@ defmodule Agenda.LimitsTest do
 
       assert {:partial, layout} = Agenda.arrange(roster(10), [ann], unplaced: :allow)
 
-      {_count, worked} = Limit.total(Enum.map(layout.placed, & &1.interval))
+      {_count, worked} = Limit.sum(Enum.map(layout.placed, & &1.interval))
       assert {:ok, hours} = Duration.to_unit(worked, :hour)
       assert hours <= 32.0
     end

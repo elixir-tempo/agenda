@@ -1566,7 +1566,7 @@ defmodule Agenda.Arranger do
       |> List.wrap()
       |> Enum.filter(&(Limit.bucket(interval_start(&1), period) == bucket))
 
-    Limit.total([candidate.interval | already] ++ booked)
+    Limit.sum([candidate.interval | already] ++ booked)
   end
 
   defp interval_start(%Interval{from: from}), do: from
