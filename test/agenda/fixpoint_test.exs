@@ -1,11 +1,15 @@
 defmodule Agenda.FixpointTest do
   use ExUnit.Case, async: true
 
+  import Tempo.Sigils
+
   alias Agenda.Arrangement
   alias Agenda.Fixpoint
+  alias Agenda.Limit
   alias Agenda.Programme
   alias Agenda.Session
   alias Agenda.Track
+  alias Tempo.IntervalSet
 
   doctest Agenda.Fixpoint
 
@@ -233,6 +237,129 @@ defmodule Agenda.FixpointTest do
         end)
 
       assert length(Enum.uniq(slots)) == 9
+    end
+  end
+
+  describe "load limits" do
+    # Three days of three one-hour slots, one person. Small enough that
+    # the whole candidate list fits in the model, so a proof means the
+    # programme rather than the truncation.
+    defp days(limits) do
+      hours =
+        IntervalSet.new!(
+          for day <- 5..7 do
+            Tempo.from_iso8601!("2027-04-0#{day}T09:00:00/2027-04-0#{day}T12:00:00")
+          end
+        )
+
+      {:ok, ann} = Agenda.open(Agenda.resource("Ann", qualified: true, limits: limits), hours)
+      ann
+    end
+
+    defp shifts(count) do
+      Enum.reduce(
+        1..count,
+        Agenda.programme("Roster", across: "2027-04-05/2027-04-08"),
+        fn index, programme ->
+          session =
+            "S#{index}"
+            |> Agenda.session(lasting: "PT1H", between: "2027-04-05/2027-04-08")
+            |> Session.needs(:staff, qualified: true)
+
+          Programme.add_session(programme, session)
+        end
+      )
+    end
+
+    defp respects?(arrangements, resource) do
+      Enum.all?(resource.limits, fn limit ->
+        arrangements
+        |> Enum.group_by(&Limit.bucket(&1.interval.from, limit.period))
+        |> Enum.all?(fn {_bucket, held} ->
+          {count, duration} = Limit.total(Enum.map(held, & &1.interval))
+          Limit.permits?(limit, count, duration)
+        end)
+      end)
+    end
+
+    test "a count limit is enforced rather than ignored" do
+      ann = days(day: 1)
+
+      assert {:ok, arrangements} =
+               Fixpoint.solve(shifts(3), [ann], candidates: 9, timeout: 10_000)
+
+      assert length(arrangements) == 3
+      assert respects?(arrangements, ann)
+
+      # One a day, so one on each of the three days.
+      assert arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort() == [5, 6, 7]
+    end
+
+    test "a duration limit is enforced rather than ignored" do
+      ann = days(day: ~o"PT1H")
+
+      assert {:ok, arrangements} =
+               Fixpoint.solve(shifts(3), [ann], candidates: 9, timeout: 10_000)
+
+      assert length(arrangements) == 3
+      assert respects?(arrangements, ann)
+
+      # One hour a day and one-hour shifts, so one on each day.
+      assert arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort() == [5, 6, 7]
+    end
+
+    test "a programme that cannot fit inside the limit is proved impossible" do
+      # Four one-hour shifts, one a day, three days.
+      ann = days(day: 1)
+
+      assert {:error, %Agenda.Infeasible{}} =
+               Fixpoint.solve(shifts(4), [ann], candidates: 9, timeout: 20_000)
+    end
+
+    test "the same programme fits once the limit allows it" do
+      assert {:ok, arrangements} =
+               Fixpoint.solve(shifts(4), [days(day: 2)], candidates: 9, timeout: 20_000)
+
+      assert length(arrangements) == 4
+    end
+
+    test "a duration limit and the count limit it is equivalent to agree" do
+      # One hour a day and one one-hour shift a day are the same
+      # contract written two ways, so they must decide alike — on the
+      # programme that fits, and on the one that cannot.
+      assert {:ok, counted} =
+               Fixpoint.solve(shifts(3), [days(day: 1)], candidates: 9, timeout: 10_000)
+
+      assert {:ok, timed} =
+               Fixpoint.solve(shifts(3), [days(day: ~o"PT1H")], candidates: 9, timeout: 10_000)
+
+      assert length(counted) == length(timed)
+
+      assert {:error, %Agenda.Infeasible{}} =
+               Fixpoint.solve(shifts(4), [days(day: ~o"PT1H")], candidates: 9, timeout: 20_000)
+    end
+
+    test "a floor is ignored, exactly as the built-in search ignores it" do
+      # A floor no layout could reach must not cost a placement.
+      ann = days(week: [at_least: ~o"PT500H"])
+
+      assert {:ok, arrangements} =
+               Fixpoint.solve(shifts(3), [ann], candidates: 9, timeout: 10_000)
+
+      assert length(arrangements) == 3
+    end
+
+    test "claims already in the ledger come off the budget" do
+      ann = days(day: 1)
+
+      # Ann already has the 5th. One more shift must go elsewhere.
+      busy = %{"Ann" => [Tempo.from_iso8601!("2027-04-05T09:00:00/2027-04-05T10:00:00")]}
+
+      assert {:ok, arrangements} =
+               Fixpoint.solve(shifts(2), [ann], candidates: 9, busy: busy, timeout: 10_000)
+
+      days_used = arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort()
+      refute 5 in days_used
     end
   end
 end

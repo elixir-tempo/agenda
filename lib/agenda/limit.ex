@@ -377,6 +377,95 @@ defmodule Agenda.Limit do
   end
 
   @doc """
+  A limit's ceiling as a plain integer in the unit the limit measures.
+
+  Counts are themselves; durations are whole seconds. This is what a
+  solver needs — a constraint model has integers and no opinion about
+  what they mean — and keeping the conversion here means the bridge
+  and the built-in search cannot disagree about the unit.
+
+  ### Arguments
+
+  * `limit` is a `t:t/0`.
+
+  ### Returns
+
+  * the ceiling as a non-negative integer, or `nil` when the limit sets
+    no ceiling.
+
+  ### Examples
+
+      iex> [limit] = Agenda.Limit.parse!(day: 3)
+      iex> Agenda.Limit.ceiling(limit)
+      3
+
+      iex> import Tempo.Sigils
+      iex> [limit] = Agenda.Limit.parse!(day: ~o"PT8H")
+      iex> Agenda.Limit.ceiling(limit)
+      28800
+
+      iex> import Tempo.Sigils
+      iex> [limit] = Agenda.Limit.parse!(week: [at_least: ~o"PT38H"])
+      iex> Agenda.Limit.ceiling(limit)
+      nil
+
+  """
+  @spec ceiling(t()) :: non_neg_integer() | nil
+  def ceiling(%__MODULE__{at_most: nil}), do: nil
+  def ceiling(%__MODULE__{at_most: measure}), do: quantity(measure)
+
+  @doc """
+  What a count and a duration amount to, in the unit `limit` measures.
+
+  The companion to `ceiling/1`: both sides of a comparison expressed as
+  integers in the same unit.
+
+  ### Arguments
+
+  * `limit` is a `t:t/0`.
+
+  * `count` is how many claims fall in the period.
+
+  * `duration` is what they total, as a `t:Tempo.Duration.t/0`.
+
+  ### Returns
+
+  * a non-negative integer — the count itself for a limit measuring
+    claims, whole seconds for one measuring time.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> [limit] = Agenda.Limit.parse!(day: 3)
+      iex> Agenda.Limit.measure(limit, 2, ~o"PT8H")
+      2
+
+      iex> import Tempo.Sigils
+      iex> [limit] = Agenda.Limit.parse!(day: ~o"PT8H")
+      iex> Agenda.Limit.measure(limit, 2, ~o"PT3H")
+      10800
+
+  """
+  @spec measure(t(), non_neg_integer(), Duration.t()) :: non_neg_integer()
+  def measure(%__MODULE__{} = limit, count, duration) do
+    case limit.at_most || limit.at_least do
+      {:count, _bound} -> count
+      {:duration, _bound} -> seconds(duration)
+      nil -> count
+    end
+  end
+
+  defp quantity({:count, bound}), do: bound
+  defp quantity({:duration, bound}), do: seconds(bound)
+
+  defp seconds(duration) do
+    case Duration.to_unit(duration, :second) do
+      {:ok, value} -> round(value)
+      {:error, _reason} -> 0
+    end
+  end
+
+  @doc """
   How a period's claims breach a limit, or `nil` when they do not.
 
   Both ends are checked, so this is the function that sees a floor.
