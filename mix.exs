@@ -96,9 +96,12 @@ defmodule Agenda.MixProject do
 
   defp deps do
     [
-      # 1.3 is the first release carrying the RFC 7953 availability and
-      # RFC 8984 JSCalendar support that `from_ical/1` builds on.
-      {:ex_tempo, github: "elixir-tempo/tempo"},
+      # 1.4 is the first release carrying the pieces this library leans
+      # on: `Duration.add/2` and `sum/1`, interval selectors that project
+      # as spans (`Tempo.select(days, ~o"T09/T17")`), `from_date_range/1`,
+      # and `IntervalSet.members/1`. 1.3 brought the RFC 7953
+      # availability and RFC 8984 JSCalendar support `from_ical/1` uses.
+      {:ex_tempo, "~> 1.4"},
       {:ical, "~> 3.2", optional: true},
       # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
       # is only compiled when it is present.
