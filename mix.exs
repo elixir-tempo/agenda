@@ -98,17 +98,7 @@ defmodule Agenda.MixProject do
     [
       # 1.3 is the first release carrying the RFC 7953 availability and
       # RFC 8984 JSCalendar support that `from_ical/1` builds on.
-      #
-      # TEMPORARY, for the duration of this sprint: a path dependency on
-      # the local checkout, which carries `Tempo.Duration.add/2` and
-      # `sum/1` ahead of their release. Restore `{:ex_tempo, "~> 1.4"}`
-      # once that version is published — this must not be committed to a
-      # release, because a path dependency cannot be resolved by anyone
-      # else and Hex refuses to publish a package that declares one.
-      {:ex_tempo, path: "../tempo"},
-      # 3.2 is the first release carrying VAVAILABILITY (RFC 7953). This
-      # must stay compatible with the declaration in `ex_tempo`'s own
-      # `mix.exs` — Mix rejects a diverging child dependency.
+      {:ex_tempo, github: "elixir-tempo/tempo"},
       {:ical, "~> 3.2", optional: true},
       # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
       # is only compiled when it is present.
