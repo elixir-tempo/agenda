@@ -165,9 +165,15 @@ iex> Enum.count(months)
 
 iex> months |> Enum.at(0) |> Tempo.to_iso8601()
 "2026Y1M"
+
+iex> # And that first fiscal month projects onto a real Gregorian one.
+iex> Tempo.relation(Tempo.from_iso8601!("2026-01-01", calendar), ~o"2025-07-01")
+:equals
 ```
 
-> *"Australian FY2026 is twelve fiscal months, and the first of them is July 2026."*
+> *"Australian FY2026 is twelve fiscal months, and the first of them is July 2025."*
+
+That last line is the trap, and it is worth running rather than reasoning about. `"2026Y1M"` is a *fiscal* label, not a Gregorian date, and Australian FY2026 begins in July **2025** — so "FY26" and "2026" name overlapping but different stretches of time. Any report carrying both has to agree with its reader about which calendar year a financial year starts in, and the projection above is what settles it rather than a convention nobody wrote down.
 
 The territory data is already there — `1 July - 30 June` for `AU` — for every country Alembic is likely to employ anyone in. The whole of Josh's day/week/month/quarter/year ladder is then one mechanism rather than five, because each is a granule of some calendar, and the same set algebra runs at every level. A quarter is `~o"2026Y3Q"`; a fiscal quarter is the same expression in a fiscal calendar.
 

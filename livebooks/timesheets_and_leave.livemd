@@ -1,0 +1,323 @@
+# Timesheets, leave, and does the week add up?
+
+```elixir
+Mix.install([
+  {:agenda, github: "elixir-tempo/agenda"}
+])
+```
+
+## What this is
+
+A runnable answer to three things Josh asked for:
+
+* **Timesheets** — consultants record time, billed to clients and allocated to projects.
+* **Leave** — the same structure, allocated to a leave type rather than a project.
+* **Reconciliation** — both must add up to the expected working hours per period: day, week, month, quarter, and year in both the calendar and the financial sense.
+
+Everything below runs, and every number in the prose came out of the notebook rather than out of my head.
+
+The design document behind it is `plans/timesheets.md` in this repository. `elixir-tempo/agenda` is private, so the setup cell above resolves against your own GitHub credentials — you have access as a collaborator.
+
+## Setup
+
+Two helpers. `business_hours/1` builds a working pattern over a window — Monday to Friday, 09:00–13:00 and 14:00–17:36. That is **7.6 hours a day and 38 a week**, the Australian full-time standard, and a number chosen to embarrass anyone storing hours as a float.
+
+`hours/1` is for display only.
+
+```elixir
+import Tempo.Sigils
+
+alias Agenda.Reconciliation
+
+pad = fn number -> String.pad_leading("#{number}", 2, "0") end
+
+business_hours = fn window ->
+  {:ok, workdays} = Tempo.select(window, Tempo.workdays(:AU))
+
+  workdays
+  |> Tempo.IntervalSet.to_list()
+  |> Enum.flat_map(fn day ->
+    date = "#{day.from.time[:year]}-#{pad.(day.from.time[:month])}-#{pad.(day.from.time[:day])}"
+
+    [
+      Tempo.from_iso8601!("#{date}T09:00:00/#{date}T13:00:00"),
+      Tempo.from_iso8601!("#{date}T14:00:00/#{date}T17:36:00")
+    ]
+  end)
+  |> Tempo.IntervalSet.new!()
+end
+
+hours = fn set ->
+  {_count, duration} = Agenda.Limit.total(Tempo.IntervalSet.to_list(set))
+  {:ok, value} = Tempo.Duration.to_unit(duration, :hour)
+  Float.round(value, 2)
+end
+
+:ready
+```
+
+Note what `Tempo.workdays(:AU)` did there: weekends are territory-specific and the library knows them. Holidays are **not** in that call, and the section below is about why.
+
+## The consultant is a resource with a contract
+
+A person and a meeting room are the same kind of thing here; only the attributes differ. The working pattern is availability, and the contract is a limit.
+
+```elixir
+quarter = ~o"2026-07-01/2026-10-01"
+
+{:ok, dana} =
+  Agenda.resource("Dana",
+    skills: [:elixir, :postgres],
+    limits: [day: ~o"PT7H36M"]
+  )
+  |> Agenda.open(business_hours.(quarter))
+
+%{blocks: Tempo.IntervalSet.count(dana.open), hours: hours.(dana.open)}
+```
+
+132 blocks — a morning and an afternoon on each of 66 working days — totalling 501.6 hours, which is `66 × 7.6`. Nobody wrote 66; it fell out of the calendar, and neither weekends nor the lunch break needed a rule. **Lunch is not a constraint to enforce; it is simply time Dana is not open**, and every calculation downstream inherits that for free.
+
+The limit is a **ceiling measured in time**, not in bookings:
+
+```elixir
+dana.limits
+```
+
+## A timesheet entry is a tagged claim
+
+This is the load-bearing decision, and it is Josh's: a timesheet line and a leave line are the same structure, separated by what the time was *for*.
+
+```elixir
+enter = fn ledger, name, interval, tag ->
+  arrangement = %Agenda.Arrangement{
+    session: name,
+    interval: Tempo.from_iso8601!(interval),
+    allocations: %{consultant: [dana]}
+  }
+
+  {:ok, ledger} = Agenda.allocate(ledger, arrangement, tag: tag)
+  ledger
+end
+
+full_day = fn ledger, day, name, tag ->
+  ledger
+  |> enter.("#{name} #{day} am", "2026-08-#{day}T09:00:00/2026-08-#{day}T13:00:00", tag)
+  |> enter.("#{name} #{day} pm", "2026-08-#{day}T14:00:00/2026-08-#{day}T17:36:00", tag)
+end
+
+acme = {:project, "ACME-2026-01"}
+beta = {:project, "BETA-2026-04"}
+annual = {:leave, :annual}
+
+:ready
+```
+
+`agenda` does not know what a project or a leave type is, and does not decide which kinds exist. What it gains is that **a day cannot be two things** — billing a client while on annual leave is two claims on one person over one span, which is the overlap the ledger already refuses. That is not a validation rule somebody has to remember to write.
+
+## A week that adds up
+
+Monday 10 to Friday 14 August 2026. Two days on Acme, two on Beta, one on leave.
+
+```elixir
+week = ~o"2026-08-10/2026-08-15"
+
+ledger =
+  Agenda.ledger()
+  |> full_day.("10", "Acme", acme)
+  |> full_day.("11", "Acme", acme)
+  |> full_day.("12", "Beta", beta)
+  |> full_day.("13", "Beta", beta)
+  |> full_day.("14", "Leave", annual)
+
+{:ok, report} = Agenda.reconcile(ledger, dana, within: week)
+
+%{
+  balanced?: Reconciliation.balanced?(report),
+  expected: hours.(report.expected),
+  claimed: hours.(report.claimed),
+  breaches: report.breaches
+}
+```
+
+And where the week went:
+
+```elixir
+report.by_tag
+|> Enum.map(fn {tag, duration} ->
+  {:ok, value} = Tempo.Duration.to_unit(duration, :hour)
+  {tag, Float.round(value, 2)}
+end)
+|> Enum.sort()
+```
+
+## Holidays are somebody else's problem
+
+Josh's 🤯 about Queensland show days is the right reaction. Under the *Holidays Act 1983* (Qld) a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday while Toowoomba's, Cairns's and Townsville's fall on entirely different dates. Australia Day is national, Labour Day is per state on different dates, Easter Sunday is a holiday in some states and not others.
+
+**None of that is this library's business.** Accurate sub-national holiday data is a maintenance problem with a far wider audience than scheduling, so holidays arrive as an ordinary interval set from wherever you resolve them — a jurisdiction library, a CalDAV feed through `Agenda.from_ical/1`, or a hand-written list.
+
+Brisbane's show holiday falls on the Wednesday of the Ekka, and 12 August 2026 is a Wednesday. The date here is illustrative — a real system would take it from the district's proclaimed calendar. The mechanism is not illustrative.
+
+```elixir
+{:ok, show_day} = Tempo.IntervalSet.new([~o"2026-08-12/2026-08-13"])
+
+{:ok, plain} = Agenda.reconcile(Agenda.ledger(), dana, within: week)
+{:ok, holiday} = Agenda.reconcile(Agenda.ledger(), dana, within: week, excluding: show_day)
+
+%{without_holiday: hours.(plain.expected), with_show_day: hours.(holiday.expected)}
+```
+
+> *"A week is 38 hours. The week of the Ekka is 30.4."*
+
+The consultant's calendar and the client site's calendar are **different axes**. A Sydney-employed consultant on a Brisbane site during the Ekka cannot get into the building — an availability fact about the site resource — and still owes a normal working day. Because holidays are just data attached to whichever resource they belong to, that needs no mechanism at all.
+
+## The trap: a holiday inside a period of leave
+
+Dana takes the whole of that week off. Only four days are owed, so only four are drawn from her leave balance — never five.
+
+```elixir
+on_leave =
+  Enum.reduce(["10", "11", "13", "14"], Agenda.ledger(), &full_day.(&2, &1, "Leave", annual))
+
+{:ok, leave_report} = Agenda.reconcile(on_leave, dana, within: week, excluding: show_day)
+{:ok, drawn} = Tempo.Duration.to_unit(leave_report.by_tag[annual], :hour)
+
+%{
+  balanced?: Reconciliation.balanced?(leave_report),
+  leave_drawn: Float.round(drawn, 2),
+  unaccounted: hours.(leave_report.unaccounted)
+}
+```
+
+This is the perennial payroll bug, and here it is **unrepresentable** rather than guarded against. Holidays leave the expectation *before* claims are compared against it, so a leave request can only ever consume days that were owed in the first place. The counter-based version of this code is where the bug lives.
+
+## The case a sum cannot see
+
+Here is the argument for doing this as set algebra rather than arithmetic.
+
+Dana misses the Monday and works the Saturday. Same hours. Different week.
+
+```elixir
+wrong =
+  ["11", "13", "14"]
+  |> Enum.reduce(Agenda.ledger(), &full_day.(&2, &1, "Acme", acme))
+  |> full_day.("15", "Acme", acme)
+
+{:ok, wrong_report} =
+  Agenda.reconcile(wrong, dana, within: ~o"2026-08-10/2026-08-16", excluding: show_day)
+
+%{
+  expected: hours.(wrong_report.expected),
+  claimed: hours.(wrong_report.claimed),
+  totals_match: hours.(wrong_report.expected) == hours.(wrong_report.claimed),
+  balanced?: Reconciliation.balanced?(wrong_report)
+}
+```
+
+**The totals match exactly and the week is still wrong.** A check that sums hours and compares to a number passes on this data. `unaccounted` and `overclaimed` are interval sets rather than quantities, so they say *which* time is missing — which is what a person can act on:
+
+```elixir
+Reconciliation.explain(wrong_report)
+```
+
+## Limits catch the day that ran long
+
+A ten-hour Monday, against a 7.6-hour ceiling:
+
+```elixir
+crunch = %Agenda.Arrangement{
+  session: "Acme crunch",
+  interval: ~o"2026-08-10T09:00:00/2026-08-10T19:00:00",
+  allocations: %{consultant: [dana]}
+}
+
+{:ok, long_day} = Agenda.allocate(Agenda.ledger(), crunch, tag: acme)
+{:ok, long_report} = Agenda.reconcile(long_day, dana, within: ~o"2026-08-10/2026-08-11")
+
+Reconciliation.explain(long_report)
+```
+
+Two separate findings from one entry, and the first is the subtle one: working through the 13:00–14:00 break is time claimed against hours the contract never offered.
+
+## An open question about floors
+
+A limit may set a floor as well as a ceiling. Only ceilings constrain scheduling — a partial layout is *supposed* to be under its floor — so a floor is checked here, by reconciliation, and nowhere else.
+
+But watch what an **absolute** weekly floor does in a week containing a public holiday:
+
+```elixir
+{:ok, contracted} =
+  Agenda.resource("Dana", limits: [day: ~o"PT7H36M", week: [at_least: ~o"PT38H"]])
+  |> Agenda.open(business_hours.(quarter))
+
+worked =
+  Enum.reduce(["10", "11", "13", "14"], Agenda.ledger(), &full_day.(&2, &1, "Acme", acme))
+
+{:ok, floored} = Agenda.reconcile(worked, contracted, within: week, excluding: show_day)
+
+%{
+  unaccounted: hours.(floored.unaccounted),
+  overclaimed: hours.(floored.overclaimed),
+  breaches: Reconciliation.explain(floored)
+}
+```
+
+Dana worked every hour she owed — `unaccounted` and `overclaimed` are both zero — and the 38-hour floor still reports a breach, because the show day means only 30.4 hours were ever owed.
+
+**This is a question rather than a defect, and it is Alembic's to answer.** Is a weekly floor an absolute contractual constant, in which case a holiday week genuinely under-runs it and the report is right? Or is it a proportion of the hours actually owed, in which case the floor should be prorated against `expected` and this library should offer that? The current behaviour is the literal reading. Say which you want and it is a small change.
+
+## The financial year
+
+The common implementation keeps Gregorian dates and adds six months wherever a report says "FY". Tempo's answer is that a financial year is a **calendar**, so fiscal and Gregorian values sit on one timeline.
+
+```elixir
+{:ok, calendar} = Calendrical.FiscalYear.calendar_for(:AU)
+{:ok, fy26} = Tempo.from_iso8601("2026", calendar)
+{:ok, months} = Tempo.to_interval(fy26)
+
+{Enum.count(months), months |> Enum.at(0) |> Tempo.to_iso8601()}
+```
+
+`"2026Y1M"` is a *fiscal* label, not a Gregorian date, and this is the trap worth running rather than reasoning about:
+
+```elixir
+Tempo.relation(Tempo.from_iso8601!("2026-01-01", calendar), ~o"2025-07-01")
+```
+
+**Australian FY2026 begins in July 2025.** So "FY26" and "2026" name overlapping but different stretches of time, and any report carrying both has to agree with its reader about which calendar year a financial year starts in. The projection settles it, rather than a convention nobody wrote down.
+
+The territory data is already there — `1 July - 30 June` for `AU` — so the whole day/week/month/quarter/year ladder is one mechanism rather than five. Each is a granule of some calendar, and the same set algebra runs at every level:
+
+```elixir
+{:ok, q1} = Agenda.reconcile(Agenda.ledger(), dana, within: quarter)
+{:ok, workdays} = Tempo.select(quarter, Tempo.workdays(:AU))
+
+%{
+  working_days: Tempo.IntervalSet.count(workdays),
+  hours_owed: hours.(q1.expected)
+}
+```
+
+That is Q1 of FY2027 — July to September 2026 — before any holiday is subtracted.
+
+## Where this stops
+
+Three things were built in `agenda` for this, and all three are useful to every existing user without mentioning timesheets:
+
+* `Agenda.Allocation`'s `:tag` — what a claim was for.
+* `Agenda.Limit` — limits measuring time as well as claims, with floors as well as ceilings.
+* `Agenda.reconcile/3` — the report above.
+
+Two things deliberately stayed out:
+
+* **Holiday resolution.** The jurisdiction tree, effective-dated calendars, and the data behind them. Its own library, with its own maintainers, feeding an interval set in.
+* **Leave balances.** Accrual, carry-over caps, cash-out, leave loading. That is payroll, none of it expressible as interval algebra, and it belongs in Alembic's application.
+
+## Questions for Josh
+
+1. **Is a timesheet entry placed or unplaced?** *"Six hours on Acme on Tuesday"* is a quantity in a bucket; *"09:00–15:00 on Acme"* is an interval. Everything above uses intervals, and only intervals can detect that a consultant was double-booked. Which do consultants actually type?
+2. **Absolute or prorated floors?** The open question above.
+3. **What granularity is billed?** Six-minute units are conventional, and interact with the 7.6-hour day in ways worth deciding once, in decimal, up front.
+4. **Can a closed period be reopened?** If a holiday is proclaimed late, does reconciliation re-run and restate? This decides whether a closed period must record which calendar version it was closed against.
+5. **Half-days.** A half-day of personal leave plus a half-day billed is the smallest case that breaks a day-granular model.
+6. **Time zones.** Perth to Sydney is two hours, three in summer. Tempo handles it given a real IANA database configured — Elixir's default is UTC-only and makes DST arithmetic silently wrong rather than failing.
