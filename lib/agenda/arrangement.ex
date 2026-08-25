@@ -83,4 +83,51 @@ defmodule Agenda.Arrangement do
 
     "#{Tempo.to_iso8601(arrangement.interval)} — #{roles}"
   end
+
+  @doc """
+  Compare two arrangements chronologically.
+
+  Present so that `Enum.sort/2` and `Enum.sort_by/3` accept this module
+  the way they accept `Date`, `Time` and `Tempo`:
+
+      Enum.sort(arrangements, Agenda.Arrangement)
+
+  Sorting a programme by time is the commonest thing anyone does with a
+  layout, and without this the call site has to reach inside — first for
+  the interval, then often for its start — which is three levels of
+  structure to say *"in the order they happen"*.
+
+  Ordering is `Tempo.compare/2` on the intervals, so it is by start and
+  then by end: two sessions beginning together put the shorter first.
+  That is a total order, deliberately, where `Tempo.relation/2` gives
+  the thirteen interval relations. Sorting needs the former; reasoning
+  about overlap needs the latter.
+
+  ### Arguments
+
+  * `a` and `b` are each a `t:t/0`.
+
+  ### Returns
+
+  * `:lt`, `:eq` or `:gt`.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> morning = %Agenda.Arrangement{interval: ~o"2026-06-16T09:00:00/2026-06-16T10:00:00"}
+      iex> midday = %Agenda.Arrangement{interval: ~o"2026-06-16T12:00:00/2026-06-16T13:00:00"}
+      iex> Agenda.Arrangement.compare(morning, midday)
+      :lt
+
+      iex> import Tempo.Sigils
+      iex> morning = %Agenda.Arrangement{interval: ~o"2026-06-16T09:00:00/2026-06-16T10:00:00"}
+      iex> midday = %Agenda.Arrangement{interval: ~o"2026-06-16T12:00:00/2026-06-16T13:00:00"}
+      iex> [midday, morning] |> Enum.sort(Agenda.Arrangement) |> Enum.map(&Tempo.to_iso8601(&1.interval))
+      ["2026Y6M16DT9H0M0S/2026Y6M16DT10H0M0S", "2026Y6M16DT12H0M0S/2026Y6M16DT13H0M0S"]
+
+  """
+  @spec compare(t(), t()) :: :lt | :eq | :gt
+  def compare(%__MODULE__{} = a, %__MODULE__{} = b) do
+    Tempo.compare(a.interval, b.interval)
+  end
 end

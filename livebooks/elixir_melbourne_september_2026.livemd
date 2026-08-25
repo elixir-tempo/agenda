@@ -105,9 +105,8 @@ venue = Agenda.place("Renaissance Orlando at SeaWorld")
   ])
 
 room = fn name, seats, hours ->
-  with {:ok, resource} <- Agenda.resource(name, within: venue, seats: seats) |> Agenda.open(hours) do
-    resource
-  end
+  {:ok, resource} = Agenda.resource(name, within: venue, seats: seats) |> Agenda.open(hours)
+  resource
 end
 
 peninsula = room.("Peninsula 4-7", 700, plenary_hours)
@@ -157,9 +156,8 @@ speaker_names =
 
 speakers =
   Enum.map(speaker_names, fn name ->
-    with {:ok, speaker} <- Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours) do
-      speaker
-    end
+    {:ok, speaker} = Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours)
+    speaker
   end)
 
 by_name = Map.new(speakers, &{&1.name, &1})
@@ -229,15 +227,15 @@ talks = [
 ]
 
 window = fn
-  :thu -> "2025-08-28/2025-08-29"
-  :fri -> "2025-08-29/2025-08-30"
+  :thu -> ~o"2025-08-28/2025-08-29"
+  :fri -> ~o"2025-08-29/2025-08-30"
 end
 
 named = fn names -> Enum.flat_map(names, &List.wrap(Map.get(by_name, &1))) end
 
 sessions =
   Enum.map(talks, fn {title, minutes, day, presenters} ->
-    Agenda.session(title, lasting: "PT#{minutes}M", between: window.(day))
+    Agenda.session(title, lasting: Tempo.Duration.new!(minute: minutes), between: window.(day))
     |> Agenda.Session.needs(:room, seats: at_least(250))
     |> Agenda.Session.roster(:speaker, named.(presenters))
   end)
@@ -255,16 +253,17 @@ A pin is not a special kind of value. It is an ordinary arrangement, so you buil
 
 ```elixir
 keynotes = [
-  {"Keynote: Open Source Resilience", 60, "2025-08-28T09:15:00/2025-08-28T10:15:00", ["Allison Randal"]},
-  {"Elixir Update & Q&A", 40, "2025-08-28T16:05:00/2025-08-28T16:45:00", []},
-  {"Keynote: Elixir's AI Future", 60, "2025-08-29T09:10:00/2025-08-29T10:10:00", []},
-  {"Keynote: A New Case for Elixir", 60, "2025-08-29T16:20:00/2025-08-29T17:20:00", []}
+  {"Keynote: Open Source Resilience", 60, ~o"2025-08-28T09:15:00/2025-08-28T10:15:00",
+   ["Allison Randal"]},
+  {"Elixir Update & Q&A", 40, ~o"2025-08-28T16:05:00/2025-08-28T16:45:00", []},
+  {"Keynote: Elixir's AI Future", 60, ~o"2025-08-29T09:10:00/2025-08-29T10:10:00", []},
+  {"Keynote: A New Case for Elixir", 60, ~o"2025-08-29T16:20:00/2025-08-29T17:20:00", []}
 ]
 
 plenaries =
   Enum.map(keynotes, fn {title, minutes, slot, presenters} ->
     session =
-      Agenda.session(title, lasting: "PT#{minutes}M", between: slot)
+      Agenda.session(title, lasting: Tempo.Duration.new!(minute: minutes), between: slot)
       |> Agenda.Session.roster(:room, [peninsula])
 
     case presenters do
@@ -275,9 +274,8 @@ plenaries =
 
 pinned =
   Enum.map(plenaries, fn session ->
-    with {:ok, [arrangement | _rest]} <- Agenda.plan(session, rooms ++ speakers) do
-      arrangement
-    end
+    {:ok, [arrangement | _rest]} = Agenda.plan(session, rooms ++ speakers)
+    arrangement
   end)
 
 length(pinned)
@@ -314,13 +312,19 @@ room_of = fn a ->
   a |> Agenda.Arrangement.resources() |> Enum.find(&Map.has_key?(&1.attributes, :seats))
 end
 
+# A clock time, asked for as a time rather than sliced out of a
+# formatted string.
+clock = fn tempo ->
+  {:ok, naive} = Tempo.to_naive_date_time(tempo)
+  Calendar.strftime(naive, "%H:%M")
+end
+
 arrangements
-|> Enum.filter(&String.starts_with?(Tempo.to_iso8601(&1.interval.from), "2025Y8M28D"))
-|> Enum.sort_by(&Tempo.Compare.to_utc_seconds(&1.interval.from))
+|> Enum.filter(&Tempo.within?(&1.interval.from, ~o"2025-08-28"))
+|> Enum.sort(Agenda.Arrangement)
 |> Enum.take(7)
 |> Enum.map_join("\n", fn a ->
-  [_, time] = a.interval.from |> Tempo.to_iso8601() |> String.split("T")
-  "#{String.pad_trailing(time, 10)} #{String.pad_trailing(room_of.(a).name, 14)} #{a.session}"
+  "#{clock.(a.interval.from)}  #{String.pad_trailing(room_of.(a).name, 14)} #{a.session}"
 end)
 |> IO.puts()
 ```
@@ -335,9 +339,10 @@ Nobody wrote a rule saying Allison Randal cannot be on a panel during her own ke
 for who <- ["Allison Randal", "Anna Sherman"] do
   arrangements
   |> Enum.filter(fn a -> Enum.any?(Agenda.Arrangement.resources(a), &(&1.name == who)) end)
-  |> Enum.sort_by(&Tempo.Compare.to_utc_seconds(&1.interval.from))
+  |> Enum.sort(Agenda.Arrangement)
   |> Enum.map_join("\n", fn a ->
-    "  #{Tempo.to_iso8601(a.interval.from)}  #{room_of.(a).name}  #{a.session}"
+    {:ok, naive} = Tempo.to_naive_date_time(a.interval.from)
+    "  #{Calendar.strftime(naive, "%a %d %b %H:%M")}  #{room_of.(a).name}  #{a.session}"
   end)
   |> then(&IO.puts("#{who}\n#{&1}\n"))
 end
@@ -356,8 +361,8 @@ Force the panel into the keynote slot and the programme stops being satisfiable.
 ```elixir
 clash =
   Agenda.session("Building Careers, Balancing Life",
-    lasting: "PT40M",
-    between: "2025-08-28T09:15:00/2025-08-28T09:55:00"
+    lasting: ~o"PT40M",
+    between: ~o"2025-08-28T09:15:00/2025-08-28T09:55:00"
   )
   |> Agenda.Session.needs(:room, seats: at_least(250))
   |> Agenda.Session.roster(
@@ -393,29 +398,24 @@ Agenda placed talks at 10:45, 11:25, 12:05. The real conference used 10:45, 11:3
 <!-- slide: code -->
 
 ```elixir
-hall =
-  with {:ok, resource} <-
-         Agenda.resource("Hall", seats: 250, buffer_after: "PT10M")
-         |> Agenda.open(~o"2025-08-28T09:00:00/2025-08-28T13:00:00") do
-    resource
-  end
+{:ok, hall} =
+  Agenda.resource("Hall", seats: 250, buffer_after: ~o"PT10M")
+  |> Agenda.open(~o"2025-08-28T09:00:00/2025-08-28T13:00:00")
 
 four_talks =
   Enum.reduce(1..4, Agenda.programme("Turnaround"), fn i, programme ->
     Agenda.Programme.add_session(
       programme,
-      Agenda.session("T#{i}", lasting: "PT40M", between: "2025-08-28/2025-08-29")
+      Agenda.session("T#{i}", lasting: ~o"PT40M", between: ~o"2025-08-28/2025-08-29")
       |> Agenda.Session.needs(:room, seats: 250)
     )
   end)
 
-with {:ok, spaced} <- Agenda.arrange(four_talks, [hall]) do
-  spaced
-  |> Enum.sort_by(&Tempo.Compare.to_utc_seconds(&1.interval.from))
-  |> Enum.map_join("   ", fn a ->
-    a.interval.from |> Tempo.to_iso8601() |> String.split("T") |> List.last()
-  end)
-end
+{:ok, spaced} = Agenda.arrange(four_talks, [hall])
+
+spaced
+|> Enum.sort(Agenda.Arrangement)
+|> Enum.map_join("   ", fn a -> clock.(a.interval.from) end)
 ```
 
 ## Model the gap, or carve it out
@@ -433,7 +433,7 @@ Shape matters more than size. Sessions that cannot interact are solved separatel
 
 | Programme | Time |
 | --- | --- |
-| ElixirConf: 46 sessions, 3 rooms, 2 days | ~175 ms |
+| ElixirConf: 46 sessions, 3 rooms, 2 days | ~30 ms |
 | 240 sessions over 6 days | ~400 ms |
 | 1,200 sessions over 20 days | ~2.8 s |
 | 200 sessions competing for **one** day | ~5 s |
