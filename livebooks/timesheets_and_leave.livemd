@@ -74,16 +74,48 @@ One string, and the fiscal year's own shape decides which months those are. It a
 
 ### The same period, said through Calendrical
 
-Calendrical reaches it from the other direction — ask the calendar module for the period and get the days back:
+Calendrical reaches it from the other direction — ask the calendar module for the period, and get back the days it contains:
 
+```elixir
+fiscal_q1 = calendar.quarter(2027, 1)
 ```
-calendar.quarter(2027, 1)
-#=> Date.range(~D[2027-01-01 Calendrical.FiscalYear.AU], ~D[2027-03-30 Calendrical.FiscalYear.AU])
+
+That is a `Date.Range`, and `Tempo.from_elixir/2` converts one into an interval:
+
+```elixir
+{:ok, from_range} = Tempo.from_elixir(fiscal_q1)
+
+%{designator: Tempo.to_iso8601(quarter), from_range: Tempo.to_iso8601(from_range)}
 ```
 
-That form is the better one when the period is computed rather than written — *"the quarter containing today"*, or a loop over four of them. It needs one conversion Tempo does not yet have: `Date.Range` is **inclusive** and Tempo intervals are **half-open**, so taking `range.last` directly drops the final day of the quarter and quietly turns 66 working days into 65. `Tempo.from_elixir/2` gaining a `Date.Range` clause is planned; until then the designator above needs no bridge at all.
+The two notations describe the same stretch of time, and each has its moment. The designator is one string and reads as the period's name, so it wins when the period is *written*. The Calendrical form wins when the period is *computed* — "the quarter containing today", or a loop over four of them — because the calendar module is doing the arithmetic.
 
-One limitation worth knowing: the calendar has to be passed to `Tempo.from_iso8601/2` rather than named inside the sigil. `~o"…"` resolves a calendar from an IXDTF `[u-ca=NAME]` suffix, and those are CLDR calendar identifiers — there is no name for a fiscal calendar module, so `~o"2027Y33M"` alone is Gregorian Q1 2027.
+There is a conversion happening in that second form that is worth naming, because getting it wrong is silent. **`Date.Range` is inclusive; Tempo intervals are half-open.** Taking `range.last` directly would put the final day of the quarter outside the interval and quietly turn 66 working days into 65 — a day of billable capacity missing from a quarter, with nothing raised. `from_elixir/2` does the conversion once, correctly:
+
+```elixir
+{:ok, from_designator} = Tempo.select(quarter, Tempo.workdays(:AU))
+{:ok, from_calendrical} = Tempo.select(from_range, Tempo.workdays(:AU))
+
+%{
+  designator: Tempo.IntervalSet.count(from_designator),
+  calendrical: Tempo.IntervalSet.count(from_calendrical)
+}
+```
+
+A range that does not describe a contiguous span — stepped, or descending — is refused rather than guessed at, with a message pointing at `Tempo.select/2`, which is the right tool for *"every second day"*.
+
+Two limitations worth knowing.
+
+The calendar has to be passed to `Tempo.from_iso8601/2` rather than named inside the sigil. `~o"…"` resolves a calendar from an IXDTF `[u-ca=NAME]` suffix, and those are CLDR calendar identifiers — there is no name for a fiscal calendar module, so `~o"2027Y33M"` alone is Gregorian Q1 2027.
+
+And **a value keeps the calendar it was derived in**, all the way through to the report. Open hours built from the fiscal quarter render as `2027Y2M10D` — fiscal year 2027, month 2 — where a timesheet entry typed as `"2026-08-10T09:00:00"` renders as `2026Y8M10D`. Both name the same Monday. Mixing them in one sentence is the *"FY26 versus 2026"* confusion again, one layer down, so the worked example below stays in Gregorian and the counts above are the proof that it is the same quarter:
+
+```elixir
+window = ~o"2026-07-01/2026-10-01"
+
+{:ok, same_days} = Tempo.select(window, Tempo.workdays(:AU))
+Tempo.IntervalSet.count(same_days)
+```
 
 ## The consultant is a resource with a contract
 
@@ -95,7 +127,7 @@ A person and a meeting room are the same kind of thing here; only the attributes
     skills: [:elixir, :postgres],
     limits: [day: ~o"PT7H"]
   )
-  |> Agenda.open(business_hours.(quarter))
+  |> Agenda.open(business_hours.(window))
 
 %{blocks: Tempo.IntervalSet.count(dana.open), hours: hours.(dana.open)}
 ```
