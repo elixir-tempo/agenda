@@ -185,7 +185,43 @@ defmodule Agenda.ReconciliationTest do
       assert Reconciliation.balanced?(report)
 
       # Four days of leave drawn, not five.
-      assert hours(report.by_tag[{:leave, :annual}]) == 32.0
+      assert total(report.by_tag[{:leave, :annual}]) == 32.0
+    end
+  end
+
+  describe ":excluding takes any span, not only an interval set" do
+    test "a bare day is the natural way to write a holiday" do
+      dana = dana()
+
+      assert {:ok, from_set} =
+               Agenda.reconcile(Agenda.ledger(), dana,
+                 within: @week,
+                 excluding: IntervalSet.new!([~o"2026-06-15/2026-06-16"])
+               )
+
+      assert {:ok, from_day} =
+               Agenda.reconcile(Agenda.ledger(), dana, within: @week, excluding: ~o"2026-06-15")
+
+      assert {:ok, from_string} =
+               Agenda.reconcile(Agenda.ledger(), dana, within: @week, excluding: "2026-06-15")
+
+      assert total(from_set.expected) == total(from_day.expected)
+      assert total(from_string.expected) == total(from_day.expected)
+    end
+
+    test "a list of days works too" do
+      dana = dana()
+
+      assert {:ok, one} =
+               Agenda.reconcile(Agenda.ledger(), dana, within: @week, excluding: ~o"2026-06-15")
+
+      assert {:ok, two} =
+               Agenda.reconcile(Agenda.ledger(), dana,
+                 within: @week,
+                 excluding: [~o"2026-06-15", ~o"2026-06-16"]
+               )
+
+      assert total(two.expected) < total(one.expected)
     end
   end
 
@@ -201,9 +237,30 @@ defmodule Agenda.ReconciliationTest do
 
       assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
 
-      assert hours(report.by_tag[{:project, "ACME"}]) == 8.0
-      assert hours(report.by_tag[{:project, "BETA"}]) == 8.0
-      assert hours(report.by_tag[{:leave, :annual}]) == 8.0
+      assert total(report.by_tag[{:project, "ACME"}]) == 8.0
+      assert total(report.by_tag[{:project, "BETA"}]) == 8.0
+      assert total(report.by_tag[{:leave, :annual}]) == 8.0
+    end
+
+    test "a tag's value is the hours themselves, not just their total" do
+      # An invoice line is made of *which* hours, and a duration cannot
+      # be taken apart again into the spans that produced it.
+      dana = dana()
+
+      ledger =
+        claim(
+          Agenda.ledger(),
+          dana,
+          "Acme",
+          "2026-06-15T09:00:00/2026-06-15T17:00:00",
+          {:project, "ACME"}
+        )
+
+      assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
+
+      assert %IntervalSet{} = billed = report.by_tag[{:project, "ACME"}]
+      assert [interval] = IntervalSet.members(billed)
+      assert Tempo.to_iso8601(interval) == "2026Y6M15DT9H0M0S/2026Y6M15DT17H0M0S"
     end
 
     test "untagged claims group under nil rather than being dropped" do

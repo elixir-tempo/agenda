@@ -152,10 +152,10 @@ This is the load-bearing decision, and it is Josh's: a timesheet line and a leav
 record_day = fn ledger, day, tag ->
   {:ok, blocks} = Tempo.select(day, shift)
 
-  # `to_list/1` rather than enumerating `blocks` directly: an
-  # IntervalSet enumerates the *instants* it contains, so `Enum` over
-  # this one would walk 25,200 seconds instead of two blocks.
-  Enum.reduce(Tempo.IntervalSet.to_list(blocks), ledger, fn block, acc ->
+  # `members/1`, not `Enum` over the set: an IntervalSet enumerates the
+  # *instants* it contains, so `Enum` here would walk 25,200 seconds
+  # rather than two blocks.
+  Enum.reduce(Tempo.IntervalSet.members(blocks), ledger, fn block, acc ->
     {:ok, acc} = Agenda.record(acc, dana, block, role: :consultant, tag: tag)
     acc
   end)
@@ -221,11 +221,17 @@ And where the week went:
 
 ```elixir
 report.by_tag
-|> Enum.map(fn {tag, duration} ->
-  {:ok, value} = Tempo.Duration.to_unit(duration, :hour)
-  {tag, Float.round(value, 2)}
-end)
+|> Enum.map(fn {tag, claimed} -> {tag, hours.(claimed)} end)
 |> Enum.sort()
+```
+
+Every value in the report is an interval set, `by_tag` included — so it answers *which* hours went to Acme, not merely how many. That is what an invoice line is made of, and a total cannot be taken apart again into the spans that produced it:
+
+```elixir
+report.by_tag
+|> Map.fetch!(acme)
+|> Tempo.IntervalSet.members()
+|> Enum.map(&Tempo.to_iso8601/1)
 ```
 
 ## Holidays are somebody else's problem
@@ -237,7 +243,7 @@ Josh's 🤯 about Queensland show days is the right reaction. Under the *Holiday
 Brisbane's show holiday falls on the Wednesday of the Ekka, and 12 August 2026 is a Wednesday. The date here is illustrative — a real system would take it from the district's proclaimed calendar. The mechanism is not illustrative.
 
 ```elixir
-{:ok, show_day} = Tempo.IntervalSet.new([~o"2026-08-12/2026-08-13"])
+show_day = ~o"2026-08-12"
 
 {:ok, plain} = Agenda.reconcile(Agenda.ledger(), dana, within: week)
 {:ok, holiday} = Agenda.reconcile(Agenda.ledger(), dana, within: week, excluding: show_day)
@@ -258,11 +264,10 @@ on_leave =
   Enum.reduce(ekka_week, Agenda.ledger(), &record_day.(&2, &1, annual))
 
 {:ok, leave_report} = Agenda.reconcile(on_leave, dana, within: week, excluding: show_day)
-{:ok, drawn} = Tempo.Duration.to_unit(leave_report.by_tag[annual], :hour)
 
 %{
   balanced?: Reconciliation.balanced?(leave_report),
-  leave_drawn: Float.round(drawn, 2),
+  leave_drawn: hours.(leave_report.by_tag[annual]),
   unaccounted: hours.(leave_report.unaccounted)
 }
 ```

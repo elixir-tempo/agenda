@@ -18,6 +18,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.Arranger.arrange/3` no longer reports a satisfiable programme as impossible. Both caps were fixed while the work they bound grows with the programme: `:candidates` at 40 made any programme of more than 40 interchangeable sessions unsatisfiable however long it searched, and `:nodes` at 10,000 ran out somewhere past 120 sessions. Both now scale with the session count, and the error says which cap was reached, since raising the wrong one only makes the same failure slower.
 
+* `Agenda.reconcile/3`'s `:by_tag` is an interval set per tag rather than a duration, making every field of the report the same kind of thing. It answers *which* hours went to a project — what an invoice line is made of — and `Tempo.duration/1` still recovers the total, where nothing recovers the hours from a total.
+
+* `Agenda.reconcile/3`'s `:excluding` and `:expected` accept any Tempo value that denotes a span, a string, or a list of either, as their documentation already promised. A holiday is naturally written as the day it falls on — `excluding: ~o"2026-08-12"` — rather than as the half-open pair `2026-08-12/2026-08-13`.
+
 * `Agenda.claim/4` books one resource over one interval and refuses what it cannot honour, naming the span that is not open or is already claimed.
 
 * `Agenda.record/4` is its unchecked twin, writing down what happened without asking whether it was available. A schedule is a request and must be validated; a timesheet is a record, and refusing to write down a worked Saturday would leave the system unable to represent overtime. Both write the same shape to the same ledger, so a recorded hour blocks a later booking of it.

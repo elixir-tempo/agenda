@@ -79,7 +79,7 @@ defmodule Agenda.Reconciliation do
           claimed: IntervalSet.t(),
           unaccounted: IntervalSet.t(),
           overclaimed: IntervalSet.t(),
-          by_tag: %{optional(Allocation.tag() | nil) => Tempo.Duration.t()},
+          by_tag: %{optional(Allocation.tag() | nil) => IntervalSet.t()},
           breaches: [breach()]
         }
 
@@ -110,8 +110,9 @@ defmodule Agenda.Reconciliation do
     and have no materialisation without one.
 
   * `:excluding` is time the resource did not owe — public holidays, a
-    shutdown — as an `t:Tempo.IntervalSet.t/0`, a Tempo value, or a
-    string. Subtracted from the expectation before any claim is
+    shutdown — as an `t:Tempo.IntervalSet.t/0`, any Tempo value that
+    denotes a span (a bare day, `~o"2026-08-12"`, is the natural way to
+    write a holiday), a string, or a list of any of those. Subtracted from the expectation before any claim is
     compared against it. The default is none.
 
   * `:expected` states the owed time outright, as an
@@ -150,6 +151,7 @@ defmodule Agenda.Reconciliation do
          {:ok, expected} <- Tempo.difference(owed, excluding),
          allocations = allocations(ledger, resource, window),
          {:ok, claimed} <- claimed(allocations, window),
+         {:ok, by_tag} <- by_tag(allocations, window),
          {:ok, unaccounted} <- Tempo.difference(expected, claimed),
          {:ok, overclaimed} <- Tempo.difference(claimed, expected) do
       {:ok,
@@ -160,7 +162,7 @@ defmodule Agenda.Reconciliation do
          claimed: claimed,
          unaccounted: unaccounted,
          overclaimed: overclaimed,
-         by_tag: by_tag(allocations),
+         by_tag: by_tag,
          breaches: breaches(resource, allocations)
        }}
     end
@@ -181,11 +183,29 @@ defmodule Agenda.Reconciliation do
   defp set(%IntervalSet{} = given, window), do: clip(given, window)
 
   defp set(given, window) do
-    with {:ok, normalised} <- Availability.normalise(given) do
-      normalised
-      |> List.wrap()
-      |> IntervalSet.new()
-      |> then(&with({:ok, s} <- &1, do: clip(s, window)))
+    with {:ok, as_set} <- spans(given) do
+      clip(as_set, window)
+    end
+  end
+
+  # One value or many, each materialised to the spans it denotes. A
+  # holiday is naturally written as the day it falls on — `~o"2026-08-12"`
+  # — and requiring the caller to spell that as `2026-08-12/2026-08-13`
+  # is asking them to do the library's half-open arithmetic by hand.
+  defp spans(values) do
+    values
+    |> List.wrap()
+    |> Enum.reduce_while({:ok, []}, fn value, {:ok, acc} ->
+      with {:ok, normalised} <- Availability.normalise(value),
+           {:ok, set} <- bounds(normalised) do
+        {:cont, {:ok, acc ++ IntervalSet.members(set)}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, intervals} -> IntervalSet.new(intervals)
+      {:error, reason} -> {:error, reason}
     end
   end
 
@@ -234,12 +254,21 @@ defmodule Agenda.Reconciliation do
     end
   end
 
-  defp by_tag(allocations) do
+  # An interval set per tag rather than a duration, so the field is the
+  # same kind of thing as `expected`, `claimed` and the rest — and so a
+  # caller can ask *which* hours went to a project, which is the
+  # question an invoice line is made of. `Tempo.duration/1` recovers the
+  # total; nothing recovers the hours from a total.
+  defp by_tag(allocations, window) do
     allocations
     |> Enum.group_by(& &1.tag)
-    |> Map.new(fn {tag, held} ->
-      {_count, duration} = Limit.sum(held)
-      {tag, duration}
+    |> Enum.reduce_while({:ok, %{}}, fn {tag, held}, {:ok, acc} ->
+      with {:ok, set} <- held |> Enum.map(& &1.interval) |> IntervalSet.new(),
+           {:ok, clipped} <- clip(set, window) do
+        {:cont, {:ok, Map.put(acc, tag, clipped)}}
+      else
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
     end)
   end
 
