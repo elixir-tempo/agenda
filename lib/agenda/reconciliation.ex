@@ -190,10 +190,31 @@ defmodule Agenda.Reconciliation do
   end
 
   defp clip(%IntervalSet{} = set, window) do
-    with {:ok, bounds} <- IntervalSet.new([window]) do
+    with {:ok, bounds} <- bounds(window) do
       Tempo.intersection(set, bounds)
     end
   end
+
+  # A window may arrive as any Tempo value that denotes a span, not
+  # only as an interval — `~o"2026Y3Q"`, or an ISO 8601-2 quarter
+  # designator resolved in a fiscal calendar. Materialising it here is
+  # what lets a caller name a period the way their calendar names it
+  # rather than having to spell out its endpoints.
+  defp bounds(%IntervalSet{} = set), do: {:ok, set}
+
+  defp bounds(%Interval{} = interval), do: IntervalSet.new([interval])
+
+  defp bounds(%Tempo{} = tempo) do
+    case Tempo.to_interval(tempo) do
+      {:ok, %Interval{} = interval} -> IntervalSet.new([interval])
+      {:ok, %IntervalSet{} = set} -> {:ok, set}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Anything else — an imported VAVAILABILITY handle, a bare duration —
+  # denotes no span, so it cannot bound a reconciliation.
+  defp bounds(other), do: {:error, {:unusable_window, other}}
 
   defp allocations(ledger, resource, window) do
     ledger

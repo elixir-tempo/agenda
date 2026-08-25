@@ -6,6 +6,7 @@ defmodule Agenda.ReconciliationTest do
   alias Agenda.Arrangement
   alias Agenda.Limit
   alias Agenda.Reconciliation
+  alias Calendrical.FiscalYear
   alias Tempo.Duration
   alias Tempo.IntervalSet
 
@@ -303,6 +304,38 @@ defmodule Agenda.ReconciliationTest do
                Agenda.reconcile(ledger_for(dana), dana, within: @week, excluding: distant)
 
       assert total(report.expected) == 40.0
+    end
+  end
+
+  describe "the window may be any Tempo value that denotes a span" do
+    test "a quarter designator, not only an interval" do
+      dana = dana()
+
+      assert {:ok, from_designator} = Agenda.reconcile(Agenda.ledger(), dana, within: ~o"2026Y2Q")
+      assert {:ok, from_interval} = Agenda.reconcile(Agenda.ledger(), dana, within: @week)
+
+      # June is inside Q2, so the designator sees at least the week.
+      assert total(from_designator.expected) >= total(from_interval.expected)
+    end
+
+    test "a fiscal quarter names a period its own calendar defines" do
+      # ISO 8601-2 month codes 33..36 are Q1..Q4, expanded against the
+      # calendar's own year — so Q1 of Australian FY2027 is July to
+      # September 2026, not January to March.
+      {:ok, calendar} = FiscalYear.calendar_for(:AU)
+      quarter = Tempo.from_iso8601!("2027Y33M", calendar)
+
+      {:ok, dana} = Agenda.open(Agenda.resource("Dana"), business_hours(15..19))
+
+      assert {:ok, report} = Agenda.reconcile(Agenda.ledger(), dana, within: quarter)
+
+      # The June week of open hours falls outside FY2027 Q1 entirely.
+      assert total(report.expected) == 0.0
+
+      # And the quarter agrees with the Gregorian window it stands for.
+      {:ok, fiscal} = Tempo.select(quarter, Tempo.workdays(:AU))
+      {:ok, literal} = Tempo.select(~o"2026-07-01/2026-10-01", Tempo.workdays(:AU))
+      assert IntervalSet.count(fiscal) == IntervalSet.count(literal)
     end
   end
 

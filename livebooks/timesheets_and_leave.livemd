@@ -49,13 +49,47 @@ Note what `Tempo.workdays(:AU)` did there: weekends are territory-specific and t
 
 Note also what the second `select` did **not** need: no loop over days, no coalescing of hour granules, no subtracting lunch afterwards. Two windows a day, said once. Because Tempo's bounds are half-open throughout, nine-to-five is written as nine to five — and a shift that runs past midnight (`~o"T21/T05"`) or a statutory day that is not hour-aligned (`~o"T09/PT7H36M"`, the Australian 7.6-hour day) are the same call.
 
+## The quarter, from the calendar that defines it
+
+`~o"2026-07-01/2026-10-01"` is a literal. It is correct only because somebody looked up when the Australian financial year starts, and it silently encodes that fact where no reader can check it. The period should come from the calendar that defines it.
+
+**ISO 8601-2 has a quarter designator**, and it is a month number above twelve: codes 33–36 are Q1–Q4 (37–39 are quadrimesters, 40–41 semestrals). The expansion asks the calendar how many months its year has, so the designator means *"the first quarter of this calendar's year"* rather than *"January to March"*:
+
+```elixir
+{:ok, calendar} = Calendrical.FiscalYear.calendar_for(:AU)
+
+quarter = Tempo.from_iso8601!("2027Y33M", calendar)
+```
+
+> *"The first quarter of Australian financial year 2027."*
+
+One string, and the fiscal year's own shape decides which months those are. It agrees exactly with the literal it replaces:
+
+```elixir
+{:ok, fiscal_workdays} = Tempo.select(quarter, Tempo.workdays(:AU))
+{:ok, literal_workdays} = Tempo.select(~o"2026-07-01/2026-10-01", Tempo.workdays(:AU))
+
+%{fiscal: Tempo.IntervalSet.count(fiscal_workdays), literal: Tempo.IntervalSet.count(literal_workdays)}
+```
+
+### The same period, said through Calendrical
+
+Calendrical reaches it from the other direction — ask the calendar module for the period and get the days back:
+
+```
+calendar.quarter(2027, 1)
+#=> Date.range(~D[2027-01-01 Calendrical.FiscalYear.AU], ~D[2027-03-30 Calendrical.FiscalYear.AU])
+```
+
+That form is the better one when the period is computed rather than written — *"the quarter containing today"*, or a loop over four of them. It needs one conversion Tempo does not yet have: `Date.Range` is **inclusive** and Tempo intervals are **half-open**, so taking `range.last` directly drops the final day of the quarter and quietly turns 66 working days into 65. `Tempo.from_elixir/2` gaining a `Date.Range` clause is planned; until then the designator above needs no bridge at all.
+
+One limitation worth knowing: the calendar has to be passed to `Tempo.from_iso8601/2` rather than named inside the sigil. `~o"…"` resolves a calendar from an IXDTF `[u-ca=NAME]` suffix, and those are CLDR calendar identifiers — there is no name for a fiscal calendar module, so `~o"2027Y33M"` alone is Gregorian Q1 2027.
+
 ## The consultant is a resource with a contract
 
 A person and a meeting room are the same kind of thing here; only the attributes differ. The working pattern is availability, and the contract is a limit.
 
 ```elixir
-quarter = ~o"2026-07-01/2026-10-01"
-
 {:ok, dana} =
   Agenda.resource("Dana",
     skills: [:elixir, :postgres],
@@ -259,10 +293,9 @@ Dana worked every hour she owed — `unaccounted` and `overclaimed` are both zer
 
 ## The financial year
 
-The common implementation keeps Gregorian dates and adds six months wherever a report says "FY". Tempo's answer is that a financial year is a **calendar**, so fiscal and Gregorian values sit on one timeline.
+The quarter above came from a fiscal calendar without ceremony. This is why: the common implementation keeps Gregorian dates and adds six months wherever a report says "FY", where Tempo's answer is that a financial year is a **calendar**, so fiscal and Gregorian values sit on one timeline.
 
 ```elixir
-{:ok, calendar} = Calendrical.FiscalYear.calendar_for(:AU)
 {:ok, fy26} = Tempo.from_iso8601("2026", calendar)
 {:ok, months} = Tempo.to_interval(fy26)
 
