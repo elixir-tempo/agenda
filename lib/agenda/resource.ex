@@ -21,15 +21,21 @@ defmodule Agenda.Resource do
     `seats: 1, concurrency: 20`. Conflating the two is what lets a hall
     accept two simultaneous lectures.
 
-  * **`limits`** — how often it may be claimed over a *period*, as
+  * **`limits`** — how much it may be claimed over a *period*, as
     `[day: 1, week: 5]`. Concurrency asks how many claims may overlap
-    at an instant; a limit asks how many may fall inside a stretch of
+    at an instant; a limit asks how much falls inside a stretch of
     calendar, however far apart. A nurse who may work one shift a day
     and five a week is `concurrency: 1, limits: [day: 1, week: 5]` —
     the concurrency stops two at once, the limits make it a contract.
 
+    A limit may measure **time** instead of claims, and may set a
+    floor as well as a ceiling — `limits: [day: ~o"PT7H36M", week:
+    [at_least: ~o"PT38H"]]`. See `Agenda.Limit`, which also explains
+    why only ceilings constrain the search.
+
   """
 
+  alias Agenda.Limit
   alias Agenda.Place
 
   @typedoc "A named, allocatable thing."
@@ -39,7 +45,7 @@ defmodule Agenda.Resource do
           within: Place.t() | nil,
           requires: %{optional(atom()) => term()},
           concurrency: pos_integer(),
-          limits: keyword(),
+          limits: [Limit.t()],
           avoids: term(),
           prefers: term(),
           open: Tempo.Interval.t() | Tempo.IntervalSet.t() | nil,
@@ -93,12 +99,15 @@ defmodule Agenda.Resource do
   * `:concurrency` is how many sessions may hold this resource
     simultaneously. The default is `1`.
 
-  * `:limits` caps how often the resource may be claimed *over a
-    period*, as `[day: 1, week: 5]` — at most one shift a day and five
-    a week. Recognised periods are `:day`, `:week` and `:month`. This
-    is not concurrency: concurrency is how many claims may overlap at
-    one instant, a limit is how many may fall inside a stretch of
-    calendar however far apart they are. The default is none.
+  * `:limits` budgets the resource *over a period*, as
+    `[day: 1, week: 5]` — at most one shift a day and five a week.
+    Recognised periods are `:day`, `:week` and `:month`. A value may be
+    a count, a duration (`~o"PT7H36M"`), or a keyword list carrying
+    `:at_most` and `:at_least`. This is not concurrency: concurrency is
+    how many claims may overlap at one instant, a limit is how much
+    falls inside a stretch of calendar however far apart. Parsed on
+    construction, so a malformed limit raises here rather than being
+    silently unenforced. The default is none. See `Agenda.Limit`.
 
   * `:avoids` is when the resource would *rather not* be used — a
     Tempo value, an ISO 8601 string, or a recurrence. Unlike `:open`
@@ -148,7 +157,7 @@ defmodule Agenda.Resource do
       within: Keyword.get(reserved, :within),
       requires: reserved |> Keyword.get(:requires, []) |> Map.new(),
       concurrency: Keyword.get(reserved, :concurrency, 1),
-      limits: Keyword.get(reserved, :limits, []),
+      limits: reserved |> Keyword.get(:limits, []) |> Limit.parse!(),
       avoids: Keyword.get(reserved, :avoids),
       prefers: Keyword.get(reserved, :prefers),
       open: Keyword.get(reserved, :open),

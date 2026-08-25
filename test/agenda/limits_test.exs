@@ -1,9 +1,13 @@
 defmodule Agenda.LimitsTest do
   use ExUnit.Case, async: true
 
+  import Tempo.Sigils
+
   alias Agenda.Arrangement
+  alias Agenda.Limit
   alias Agenda.Programme
   alias Agenda.Session
+  alias Tempo.Duration
   alias Tempo.IntervalSet
 
   # A fortnight of mornings, so a week boundary falls inside the window.
@@ -44,6 +48,49 @@ defmodule Agenda.LimitsTest do
     arrangements
     |> Enum.map(& &1.interval.from.time[:day])
     |> Enum.sort()
+  end
+
+  describe "a limit may measure time rather than claims" do
+    test "a duration ceiling caps hours, not shifts" do
+      # Eight-hour shifts against a sixteen-hour week: two fit, a third
+      # does not, and nothing said "two".
+      ann = nurse("Ann", week: ~o"PT16H")
+
+      assert {:partial, layout} = Agenda.arrange(roster(10), [ann], unplaced: :allow)
+
+      {_count, worked} = Limit.total(Enum.map(layout.placed, & &1.interval))
+      assert {:ok, hours} = Duration.to_unit(worked, :hour)
+      assert hours <= 32.0
+    end
+
+    test "a ceiling too small for one shift places nothing" do
+      ann = nurse("Ann", day: ~o"PT4H")
+
+      assert {:partial, layout} = Agenda.arrange(roster(3), [ann], unplaced: :allow)
+      assert layout.placed == []
+    end
+
+    test "a ceiling that exactly fits one shift admits it" do
+      # An eight-hour ceiling and an eight-hour shift: inclusive, so
+      # one a day fits and all three place.
+      ann = nurse("Ann", day: ~o"PT8H")
+
+      assert {:ok, arrangements} = Agenda.arrange(roster(3), [ann], unplaced: :allow)
+      assert length(arrangements) == 3
+      assert days(arrangements) == Enum.uniq(days(arrangements))
+    end
+
+    test "a floor never prunes the search" do
+      # A floor no layout could reach must still cost nothing, because
+      # a partial layout is supposed to be under its floor. Compare
+      # against the same roster with no limit at all.
+      ann = nurse("Ann", week: [at_least: ~o"PT500H"])
+      unlimited = nurse("Bea", [])
+
+      assert {:ok, floored} = Agenda.arrange(roster(3), [ann], unplaced: :allow)
+      assert {:ok, baseline} = Agenda.arrange(roster(3), [unlimited], unplaced: :allow)
+      assert length(floored) == length(baseline)
+    end
   end
 
   describe "a limit is not concurrency" do

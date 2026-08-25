@@ -22,6 +22,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Added
 
+* Reconciliation. `Agenda.reconcile/3` compares what a resource claimed against what it owed over a period, returning `unaccounted` and `overclaimed` as interval sets rather than quantities — the missing Tuesday afternoon, not "5 hours short". Holidays are passed in through `:excluding` as ordinary interval sets, since this library does not resolve them.
+
+* A claim tag. `Agenda.allocate/3` takes `:tag`, recording what time was for as `{:project, "ACME"}` or `{:leave, :annual}`, so work and absence share one ledger and one conflict check.
+
+* Limits may measure duration, not only claims — `limits: [day: ~o"PT7H36M"]` — and may set a floor as well as a ceiling. Only ceilings constrain the search; a floor is a completion condition and is checked by `Agenda.reconcile/3`. See `Agenda.Limit`.
+
 * Independent work now runs concurrently, across `System.schedulers_online/0` processes by default. Candidate enumeration parallelises for every programme and the disjoint subproblems parallelise when there are any, taking 240 sessions over six days from 4.6 seconds to 400 milliseconds and 1,200 over twenty days to under three. Set `:concurrency` per call or `config :agenda, concurrency:` for the application; results are collected in order, so the layout is the same at any setting.
 
 * Sessions that cannot constrain each other are now solved as separate problems. A shared resource, track or precedence is what relates two sessions; without one they are independent, so a conference whose days share no room splits into one subproblem per day. This is exact — no layout is lost and `minimal?` still means proven — and it is skipped where preferences are declared, since those score a layout as a whole.

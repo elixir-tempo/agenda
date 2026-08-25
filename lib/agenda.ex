@@ -62,6 +62,7 @@ defmodule Agenda do
   alias Agenda.Planner
   alias Agenda.Preference
   alias Agenda.Programme
+  alias Agenda.Reconciliation
   alias Agenda.Refine
   alias Agenda.Requirement
   alias Agenda.Resource
@@ -386,7 +387,7 @@ defmodule Agenda do
   defdelegate ledger, to: Ledger, as: :new
 
   @doc """
-  Record an arrangement. Delegates to `Agenda.Ledger.allocate/2`.
+  Record an arrangement. Delegates to `Agenda.Ledger.allocate/3`.
 
   ### Examples
 
@@ -400,9 +401,21 @@ defmodule Agenda do
       iex> Agenda.count(ledger)
       1
 
+  Tagging what the time was for:
+
+      iex> import Tempo.Sigils
+      iex> arrangement = %Agenda.Arrangement{
+      ...>   session: "Discovery",
+      ...>   interval: ~o"2026-06-16T09:00:00/2026-06-16T17:00:00",
+      ...>   allocations: %{consultant: [Agenda.resource("Dana")]}
+      ...> }
+      iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
+      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      [project: "ACME"]
+
   """
-  @spec allocate(Ledger.t(), Arrangement.t()) :: {:ok, Ledger.t()}
-  defdelegate allocate(ledger, arrangement), to: Ledger
+  @spec allocate(Ledger.t(), Arrangement.t(), keyword()) :: {:ok, Ledger.t()}
+  defdelegate allocate(ledger, arrangement, options \\ []), to: Ledger
 
   @doc """
   Free everything a session holds. Delegates to
@@ -471,6 +484,38 @@ defmodule Agenda do
   """
   @spec expire(Ledger.t(), Availability.pattern()) :: {:ok, Ledger.t()} | {:error, term()}
   defdelegate expire(ledger, now), to: Ledger
+
+  @doc """
+  Whether a resource's claims account for the time it owed. Delegates
+  to `Agenda.Reconciliation.reconcile/3`.
+
+  The schedule and the timesheet are the same ledger read forwards and
+  backwards, so reconciling is a set difference rather than a sum:
+  `unaccounted` names *which* time is missing, not merely how much.
+
+  Holidays are not this library's business — pass them in through
+  `:excluding` as an ordinary interval set, from wherever they are
+  resolved.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} =
+      ...>   Agenda.open(Agenda.resource("Dana"), ~o"2026-06-16T09:00:00/2026-06-16T17:00:00")
+      iex> arrangement = %Agenda.Arrangement{
+      ...>   session: "Acme",
+      ...>   interval: ~o"2026-06-16T09:00:00/2026-06-16T12:00:00",
+      ...>   allocations: %{consultant: [dana]}
+      ...> }
+      iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
+      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
+      iex> Agenda.Reconciliation.explain(report)
+      ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+
+  """
+  @spec reconcile(Ledger.t(), Resource.t(), keyword()) ::
+          {:ok, Reconciliation.t()} | {:error, term()}
+  defdelegate reconcile(ledger, resource, options), to: Reconciliation
 
   @doc """
   Every allocation that is still only a hold. Delegates to

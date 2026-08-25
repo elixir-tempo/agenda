@@ -130,9 +130,12 @@ Three constraints that turn meeting scheduling into task and shift scheduling. E
 
 ```elixir
 Agenda.resource("Dana", limits: [day: 3, week: 12])
+Agenda.resource("Dana", limits: [day: ~o"PT7H36M", week: [at_least: ~o"PT38H"]])
 ```
 
 This is **not** concurrency. Concurrency is how many claims may overlap at one instant; a limit is how many fall inside a stretch of calendar, however far apart. And limits count what the ledger already holds — availability can be derived, but no availability calculation can express *"at most twelve this week"*.
+
+A limit measures either claims or *time*, and may set a floor as well as a ceiling. Only ceilings constrain the search, and the asymmetry is real rather than an omission: a ceiling prunes, because nothing placed later brings a total back down, while a partial layout is *supposed* to be under its floor. A floor is a completion condition, so it is [`reconcile/3`](https://hexdocs.pm/agenda/Agenda.html#reconcile/3) that checks it.
 
 **Wishes.** What someone would rather, as against what is possible:
 
@@ -142,6 +145,30 @@ Agenda.resource("Priya", avoids: friday_afternoons)
 ```
 
 `avoids` makes a placement worse; `open/2` makes it impossible. Spelling a preference as unavailability takes the option away from everyone and fails the week rather than booking reluctantly when there is no alternative.
+
+## Does the week add up?
+
+A schedule is the ledger read as *intent*; a timesheet is the same ledger read as *record*. `reconcile/3` compares the two over a period:
+
+```elixir
+{:ok, report} = Agenda.reconcile(ledger, dana, within: quarter, excluding: holidays)
+
+Agenda.Reconciliation.explain(report)
+#=> ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+```
+
+**The answer is a set, not a total.** Summing hours and comparing to a number passes on data that is wrong: a consultant who misses a Tuesday and works the following Saturday totals exactly the same as one who did neither. `unaccounted` and `overclaimed` are interval sets, so they say *which* time is missing — which is what a person can act on.
+
+Work and leave are the same structure, separated by a tag on the claim:
+
+```elixir
+{:ok, ledger} = Agenda.allocate(ledger, arrangement, tag: {:project, "ACME-2026-01"})
+{:ok, ledger} = Agenda.allocate(ledger, arrangement, tag: {:leave, :annual})
+```
+
+One ledger means a day cannot be two things — billing a client while on leave is the overlap the ledger already refuses, not a rule somebody has to remember to write.
+
+**Holidays are not this library's business.** They vary by jurisdiction down to the local government area — Queensland appoints show holidays per district — and accurate data for that is a maintenance problem with a far wider audience than scheduling. So they arrive as an ordinary interval set through `:excluding`, from a feed via `from_ical/1` or from wherever you resolve them. The subtraction order does one useful thing for free: holidays leave the expectation *before* claims are compared against it, so **a public holiday inside a period of leave cannot consume that leave**.
 
 ## Holding a room while someone finds their card
 
@@ -207,7 +234,7 @@ Requires the optional `ical` dependency.
 
 ## Status
 
-**Early development, but no longer only a model.** Implemented: resources, attributes, the place tree and derived travel, requirements and the predicate vocabulary, induced requirements, explanations, availability, single-session planning, the allocation ledger, holds, recurring series, tracks, whole-programme arrangement, partial arrangement, pinning, precedence, load limits, soft constraints including per-resource wishes, minimal conflict sets, RFC 7953 import, and the fixpoint solver bridge.
+**Early development, but no longer only a model.** Implemented: resources, attributes, the place tree and derived travel, requirements and the predicate vocabulary, induced requirements, explanations, availability, single-session planning, the allocation ledger, tagged claims, holds, recurring series, tracks, whole-programme arrangement, partial arrangement, pinning, precedence, load limits measured in claims or in time with floors and ceilings, reconciliation over a period, soft constraints including per-resource wishes, minimal conflict sets, RFC 7953 import, and the fixpoint solver bridge.
 
 Meeting and conference scheduling is the focus. Task and shift scheduling are expressible — precedence makes a task graph, limits make a contract, wishes make a roster people will accept — and exact at small scale, or handed to a solver at large.
 

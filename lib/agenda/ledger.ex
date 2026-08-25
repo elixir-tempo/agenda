@@ -86,6 +86,13 @@ defmodule Agenda.Ledger do
 
   * `arrangement` is a `t:Agenda.Arrangement.t/0`.
 
+  ### Options
+
+  * `:tag` is what the claim was for, as a `t:Agenda.Allocation.tag/0`
+    — `{:project, "ACME-2026-01"}`, `{:leave, :annual}`. Recorded on
+    every allocation the arrangement implies, and grouped on by
+    `Agenda.reconcile/3`. The default is `nil`.
+
   ### Returns
 
   * `{:ok, ledger}`.
@@ -103,10 +110,23 @@ defmodule Agenda.Ledger do
       iex> Agenda.Ledger.count(ledger)
       1
 
+  Recording what the time was for:
+
+      iex> import Tempo.Sigils
+      iex> arrangement = %Agenda.Arrangement{
+      ...>   session: "Annual leave",
+      ...>   interval: ~o"2026-09-14T09:00:00/2026-09-14T17:00:00",
+      ...>   allocations: %{consultant: [Agenda.resource("Dana")]}
+      ...> }
+      iex> {:ok, ledger} =
+      ...>   Agenda.Ledger.allocate(Agenda.Ledger.new(), arrangement, tag: {:leave, :annual})
+      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      [leave: :annual]
+
   """
-  @spec allocate(t(), Arrangement.t()) :: {:ok, t()}
-  def allocate(%__MODULE__{} = ledger, %Arrangement{} = arrangement) do
-    allocations = Allocation.from_arrangement(arrangement)
+  @spec allocate(t(), Arrangement.t(), keyword()) :: {:ok, t()}
+  def allocate(%__MODULE__{} = ledger, %Arrangement{} = arrangement, options \\ []) do
+    allocations = Allocation.from_arrangement(arrangement, options)
     {:ok, %{ledger | sessions: Map.put(ledger.sessions, arrangement.session, allocations)}}
   end
 
@@ -136,6 +156,10 @@ defmodule Agenda.Ledger do
   * `:until` is when the hold lapses — a Tempo value or an ISO 8601
     string. Required.
 
+  * `:tag` is what the claim was for, as a `t:Agenda.Allocation.tag/0`.
+    A hold occupies a resource exactly as a booking does, so it carries
+    the same tag. The default is `nil`.
+
   ### Returns
 
   * `{:ok, ledger}`; or
@@ -162,7 +186,7 @@ defmodule Agenda.Ledger do
     with {:ok, until} <- Availability.normalise(Keyword.fetch!(options, :until)) do
       allocations =
         arrangement
-        |> Allocation.from_arrangement()
+        |> Allocation.from_arrangement(options)
         |> Enum.map(&%{&1 | held_until: until})
 
       {:ok, %{ledger | sessions: Map.put(ledger.sessions, arrangement.session, allocations)}}

@@ -131,6 +131,7 @@ defmodule Agenda.Arranger do
   alias Agenda.Conflict
   alias Agenda.Infeasible
   alias Agenda.Layout
+  alias Agenda.Limit
   alias Agenda.Planner
   alias Agenda.Precedence
   alias Agenda.Preference
@@ -1532,60 +1533,44 @@ defmodule Agenda.Arranger do
   # if the ledger is consulted here.
   defp within_limits?(candidate, placed, options) do
     Enum.all?(Arrangement.resources(candidate), fn resource ->
-      Enum.all?(resource.limits, fn {period, limit} ->
-        claims(resource, candidate, placed, period, options) < limit
+      Enum.all?(resource.limits, fn %Limit{} = limit ->
+        {count, duration} = claims(resource, candidate, placed, limit.period, options)
+        Limit.permits?(limit, count, duration)
       end)
     end)
   end
 
+  # Every claim on `resource` that shares the candidate's bucket, the
+  # candidate included — so the answer is what the period *would* hold
+  # if this placement were made, which is the question a ceiling asks.
+  #
+  # A floor asks a different question and is deliberately absent here:
+  # a partial layout is supposed to be under its floor, so rejecting it
+  # would reject every layout before the last placement. `Limit.permits?/3`
+  # ignores floors, and `Agenda.reconcile/3` is where they are checked.
   defp claims(resource, candidate, placed, period, options) do
-    bucket = bucket(candidate.interval.from, period)
+    bucket = Limit.bucket(candidate.interval.from, period)
 
     already =
-      Enum.count(placed, fn {arrangement, _symmetry} ->
+      placed
+      |> Enum.filter(fn {arrangement, _symmetry} ->
         Enum.any?(Arrangement.resources(arrangement), &(&1.name == resource.name)) and
-          bucket(arrangement.interval.from, period) == bucket
+          Limit.bucket(arrangement.interval.from, period) == bucket
       end)
+      |> Enum.map(fn {arrangement, _symmetry} -> arrangement.interval end)
 
     booked =
       options
       |> Keyword.get(:busy, %{})
       |> Map.get(resource.name, [])
       |> List.wrap()
-      |> Enum.count(&(bucket(interval_start(&1), period) == bucket))
+      |> Enum.filter(&(Limit.bucket(interval_start(&1), period) == bucket))
 
-    already + booked
+    Limit.total([candidate.interval | already] ++ booked)
   end
 
   defp interval_start(%Interval{from: from}), do: from
   defp interval_start(other), do: other
-
-  # Which day, week or month a moment falls in. A week is bucketed by
-  # the date its Monday falls on, so the boundary is the calendar's
-  # rather than an arbitrary seven-day window from the first claim.
-  defp bucket(%Tempo{} = moment, period) do
-    with year when is_integer(year) <- moment.time[:year],
-         month when is_integer(month) <- moment.time[:month],
-         day when is_integer(day) <- moment.time[:day] do
-      calendar_bucket(year, month, day, period)
-    else
-      _no_date -> :undated
-    end
-  end
-
-  defp bucket(_other, _period), do: :undated
-
-  defp calendar_bucket(year, month, day, :day), do: {year, month, day}
-  defp calendar_bucket(year, month, _day, :month), do: {year, month}
-
-  defp calendar_bucket(year, month, day, :week) do
-    case Date.new(year, month, day) do
-      {:ok, date} -> date |> Date.beginning_of_week() |> Date.to_erl()
-      {:error, _reason} -> :undated
-    end
-  end
-
-  defp calendar_bucket(_year, _month, _day, _unknown_period), do: :undated
 
   defp track_ok?(a, b, programme, options) do
     case {Programme.track_of(programme, a.session), Programme.track_of(programme, b.session)} do

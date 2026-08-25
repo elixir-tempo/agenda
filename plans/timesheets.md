@@ -2,6 +2,8 @@
 
 **Audience:** Kip Cole and Josh Price. This is a proposal to talk about, not a design to sign off. Everything that is Alembic's call is marked as a question rather than answered.
 
+**Note on circulation:** this document quotes Alembic's internal discussion and describes their commercial context. It should stay internal until Alembic are happy for it to travel — in particular it should not ship in a public release of `agenda`, nor survive the repository being made public. The Hex package is unaffected: `mix.exs` does not include `plans/` in its `files:` list.
+
 **Basis:** Josh's three notes of 2026-08-25 on timesheets, multi-jurisdiction leave, and OR-based allocation. `agenda` at `c3c6157`, `ex_tempo` 1.3.1, `calendrical` as vendored in `agenda`'s lockfile. Code blocks written with `iex>` prompts were executed against those versions and show real output; blocks without them are proposed API that does not exist yet.
 
 ## The three questions
@@ -87,46 +89,60 @@ Note what the second step did on its own: the 5 October holiday is outside the w
 
 In the algebra above it cannot occur, because of the order of subtraction: holidays leave the working-day set *before* leave is applied, so a leave request only ever consumes days that were owed in the first place. The rule is not enforced; it is unrepresentable. That is the strongest argument for doing reconciliation as sets rather than as counters, and it is worth showing Josh's team explicitly, because the counter-based version of this code is where the bug lives.
 
-## Jurisdiction is a tree, and micro-regional is just a deeper node
+## Holidays are somebody else's problem, and the seam is an `IntervalSet`
 
-Josh's 🤯 is the right reaction to Queensland show days, and the reassuring part is that they are not a special case needing special code. They are evidence that the thing being modelled has more levels than most systems give it.
+**Decision (Kip, 2026-08-25): the jurisdiction tree and holiday resolution stay outside this family entirely.** Holidays are resolved externally and handed to `agenda` as a `t:Tempo.IntervalSet.t/0`, or as an `.ics` feed that becomes one. The reasoning is that the problem has much broader usage than scheduling, and that accurate sub-national holiday data is hard to find and harder to keep current — which makes it a library with its own release cadence and its own maintainers, not a corner of a scheduling engine.
 
-Under the *Holidays Act 1983* (Qld), a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday and Toowoomba's, Cairns's and Townsville's fall on entirely different dates. A flat `state: :qld` attribute cannot express that, and neither can a flat `region:` — because the levels nest, and how deep you must go before you find an authoritative answer varies by holiday. Australia Day is national. Labour Day is per state, on different dates in different states. Show day is per district. Easter Sunday is a holiday in some states and not others.
+This is the same line Tempo already draws. The workdays guide states it plainly: which territory's holidays and which year's calendar are choices the library cannot make for you, so Tempo ships the weekend logic and none of the holiday data.
 
-That is a containment hierarchy with **inheritance and override at every level**, which is exactly the structure `Agenda.Place` already implements for travel time. Borrowing its shape — `holidays:` is proposed here, not built:
+### The seam already exists, and needs no new code
+
+This is the part worth checking rather than assuming, and it holds. `Agenda.Availability.open/2` accepts an `IntervalSet` as one of its patterns, and `free/2`'s `:busy` option accepts *"a Tempo value, a string, an `IntervalSet`, or a list of them"*. So an externally-resolved holiday set drops straight in:
 
 ```elixir
-australia = Agenda.place("Australia", holidays: national)
-qld       = Agenda.place("Queensland", within: australia, holidays: qld_statewide)
-brisbane  = Agenda.place("Brisbane", within: qld, holidays: brisbane_show_day)
+iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), business_hours)
+iex> {:ok, free} = Agenda.free(dana, within: ~o"2026-08-10/2026-08-15")
+iex> Tempo.IntervalSet.count(free)
+5
+
+iex> {:ok, holidays} = Tempo.IntervalSet.new([~o"2026-08-12/2026-08-13"])
+iex> {:ok, free} = Agenda.free(dana, within: ~o"2026-08-10/2026-08-15", busy: holidays)
+iex> Tempo.IntervalSet.count(free)
+4
 ```
 
-Resolution is *"the union of every holiday set declared on the path from this node to the root"*, with a node able to suppress an inherited entry. Micro-regional then needs no new concept — it is one more `within:`. A district that has not been modelled resolves to its state's answer, which is the correct behaviour and, notably, is correct *silently* in a way that a missing key in a flat map is not.
+> *"Five working days that week; four once Brisbane's show day is subtracted."*
 
-The one thing to be careful of: `Agenda.Place` is currently a **travel** tree — campus, building, floor — and a legal jurisdiction is not the same tree. Level 3 of the Brisbane office is a place; Queensland is a jurisdiction. They coincide often enough to be tempting and diverge exactly where it hurts: a consultant living in Cairns and employed out of the Brisbane office. Whether these are one tree with two kinds of node or two trees that a resource points into separately is the first real design question below.
+Wednesday 12 August is simply gone from the free set, and nothing in `agenda` learned what a public holiday is. `Tempo.ICal.from_ical/1` covers the other input path, returning an `IntervalSet` with each entry's `summary` and other metadata preserved — so a CalDAV or officeholidays.com feed reaches the same seam without an intermediate format.
 
-### Which jurisdiction, when the consultant is interstate
+The practical consequence for the reconciliation algebra earlier in this document: `holidays` is a parameter, not a computation. Everything in that section stands unchanged, with the set arriving from outside.
 
-This is where a consulting business differs from an employer with one office, and it is the question that decides the schema.
+### The decision makes the interstate case easier, not harder
 
-A Sydney-employed consultant is on a client site in Brisbane during the Ekka. Two different things are true at once:
+The awkward case for consulting is a Sydney-employed consultant on a client site in Brisbane during the Ekka. Two things are true at once:
 
-* **The client's building is shut.** That is an availability fact about a *site resource*, and `agenda` already models it — the site is a resource with open hours, and no session can be placed there.
-* **The consultant still owes a normal working day.** Their entitlement follows their own place of employment, not wherever they happen to be standing.
+* **The client's building is shut** — an availability fact about a *site resource*.
+* **The consultant still owes a normal working day** — their entitlement follows their own place of employment, not wherever they are standing.
 
-So the site's holiday calendar and the person's holiday calendar are **different axes that must not be merged**, and the consultant's day reconciles against Sydney while their booking fails against Brisbane. A system with one `location` per engagement can express neither cleanly. This is the same lesson `agenda` already learned about the customer site being a resource rather than an attribute, arriving from a different direction.
+Had holidays been resolved inside `agenda` from a jurisdiction tree, these two would have had to be untangled from a single hierarchy, and the tree would have needed to distinguish "closes this building" from "excuses this person". With holidays arriving as data, they are just **two different `IntervalSet`s attached to two different resources** — the site's and the person's — which is the correct model and requires no mechanism at all. The awkward case disappears rather than being handled.
 
-### Two things that break the "holidays are a calendar rule" assumption
+That also removes the first design question this document originally posed. Jurisdiction and place are not one tree or two inside `agenda`; jurisdiction is not in `agenda`.
 
-Worth raising with Josh early, because both argue against precomputing a holiday table and then trusting it:
+### What the external library will have to get right
 
-* **Some holidays have no calendrical rule at all.** Victoria's AFL Grand Final Friday is declared each year against a sporting fixture. No recurrence expression will ever produce it; it has to come from a feed or a human. Tempo can express *"the third Monday in January"* as a native ISO 8601 recurrence — `R/../P1Y/FL1M3I1KN` — and that covers a great many holidays, but the family must not assume it covers all of them.
+Recorded here because the analysis is already done and whoever builds it will need it — not as a proposal for this family.
 
-* **Some are sectoral rather than regional.** The NSW Bank Holiday on the first Monday in August applies to banks and parts of the finance industry, not to everyone in the state. So the resolution key is not purely geographic. If Alembic ever takes on a client in banking, the tree above needs a second discriminator, and it is much cheaper to leave room for it now than to retrofit it.
+The structure is a containment hierarchy with **inheritance and override at every level**, and the depth at which an authoritative answer appears varies by holiday. Australia Day is national. Labour Day is per state, on different dates in different states. Easter Sunday is a public holiday in some states and not others. And under the *Holidays Act 1983* (Qld) a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday while Toowoomba's, Cairns's and Townsville's fall on entirely different dates. Josh's 🤯 is the right reaction, but micro-regional is not a special case — it is one more level of the same nesting, and a flat `state:` or `region:` key cannot express it because there is no fixed depth to flatten to.
 
-Both point the same way: **holiday calendars are versioned data with an effective date, not a pure function.** Holidays get proclaimed late, and one-off national days of mourning have been declared with weeks of notice. A reconciliation that ran clean in September must be able to be re-run in November and produce a different, also-correct answer — which means a closed period needs to record *which* calendar version it was closed against.
+Three properties that will bite whoever takes it on, and that argue the maintenance burden is real:
 
-Tempo deliberately ships no holiday data — the guide states plainly that holidays are a domain concern — and consumes iCalendar feeds instead through `Tempo.ICal.from_ical/1`, preserving each entry's metadata. That is the right seam. **What does not exist anywhere in the family today is the resolver**: the tree, the inheritance, the override, the effective date. That is the genuinely new component, and it is small.
+* **Some holidays have no calendrical rule at all.** Victoria's AFL Grand Final Friday is declared each year against a sporting fixture. No recurrence expression will ever produce it. Tempo can express *"the third Monday in January"* natively as `R/../P1Y/FL1M3I1KN`, which covers a great many holidays — but not this class, which has to come from a feed or a human.
+
+* **Some are sectoral rather than regional.** The NSW Bank Holiday on the first Monday in August applies to banks and parts of the finance industry, not to everyone in the state. The resolution key is therefore not purely geographic.
+
+* **The data is effective-dated, not a pure function.** Holidays get proclaimed late, and one-off national days of mourning have been declared with weeks of notice. A reconciliation that ran clean in September must be re-runnable in November and produce a different, also-correct answer.
+
+That last property is the one with a consequence *inside* Josh's system regardless of who supplies the data: **a closed period must record which calendar version it was closed against**, or restatement is not reproducible. That is question 3 below.
 
 ## Expected hours: the contract, and the two kinds of year
 
@@ -186,6 +202,7 @@ Note the direction, too. A scheduling limit is a **ceiling**; a timesheet expect
 | --- | --- | --- |
 | Working days for a territory, weekend-aware | `Tempo.workdays/1`, `working_days_in/2` | Built |
 | Holiday sets from iCalendar feeds, metadata preserved | `Tempo.ICal.from_ical/1` | Built |
+| Holidays accepted as data, no jurisdiction knowledge | `open/2` pattern, `free/2` `:busy` | Built |
 | Fixed-rule holidays as native recurrences | ISO 8601 recurrence expressions | Built |
 | Set algebra that names the days, not just the count | `Tempo.members_outside/2` and family | Built |
 | Fiscal calendars per territory | `Calendrical.FiscalYear` | Built |
@@ -194,14 +211,13 @@ Note the direction, too. A scheduling limit is a **ceiling**; a timesheet expect
 | Availability patterns with recurrence | `Agenda.open/2` | Built |
 | Skills matching with an explanation | `Agenda.Requirement`, `Agenda.explain/2` | Built |
 | Minimal conflict sets — *why* it is impossible | `Agenda.conflict/3` | Built |
-| **Jurisdiction tree with holiday inheritance and override** | — | **New** |
-| **Effective-dated, versioned holiday calendars** | — | **New** |
-| **A claim tag: project, leave type, or holiday** | `Agenda.Allocation` + one field | **Small change** |
-| **Duration-measured limits, with floors as well as ceilings** | `Agenda.Resource` `:limits` | **Extension** |
-| **Leave entitlement, accrual, and balances** | — | **New, and not scheduling** |
-| **Reconciliation report over a period** | — | **New, composed of the above** |
+| **A claim tag: project, leave type, or holiday** | `Agenda.Allocation` `:tag` | **Built** |
+| **Duration-measured limits, with floors as well as ceilings** | `Agenda.Limit` | **Built** |
+| **Reconciliation report over a period** | `Agenda.reconcile/3` | **Built** |
+| Jurisdiction tree, effective-dated holiday calendars | — | **Out of scope — separate library** |
+| Leave entitlement, accrual, and balances | — | Out of scope — payroll, not scheduling |
 
-The last two rows are where the scope should stop. Everything above them is calendar and scheduling work that this family either does or nearly does; leave *balances* are payroll, with accrual rules, carry-over caps, cash-out, and leave loading, and none of that is expressible as interval algebra. It should live in Alembic's application, not in a Tempo-family library.
+The three bolded rows are built, tested and documented in `agenda`. The two below them are where the scope stops: holiday resolution for the reasons given above, and leave *balances* because accrual rules, carry-over caps, cash-out and leave loading are payroll, none of it expressible as interval algebra. Both belong outside this family.
 
 ## Where OR earns its place, and where it does not
 
@@ -236,13 +252,13 @@ Spelling a preference as unavailability takes the option away permanently and fa
 
 ## Where this should live
 
-Not in `agenda`. Timesheets are a record of the past, entitlement is payroll, and neither belongs in a library whose subject is choosing a placement. But not in Alembic's application either, for the parts that are pure calendar work.
+Entitlement is payroll and holiday data is its own domain, so neither belongs here. What does belong in `agenda` is the part that is already about claims on a resource's time: tagging what a claim was *for*, budgeting a resource's time by duration, and reporting the difference between the two.
 
 The split that seems right:
 
 * **`ex_tempo`** — nothing new required. It already has workdays, the recurrence grammar, the set algebra, and the iCalendar reader.
-* **`agenda`** — two additive changes: a tag on `Agenda.Allocation`, and duration-measured `:limits` with floors. Both are useful to every existing user, neither mentions timesheets.
-* **A new sibling** — the jurisdiction tree, effective-dated holiday resolution, the working-time contract, and the reconciliation report. Perhaps 1,500 lines, most of it the resolver. Depends on `agenda`, the same direction `timetable` does.
+* **`agenda`** — three additions, built: `Agenda.Allocation`'s `:tag`, `Agenda.Limit` (duration measures, floors and ceilings), and `Agenda.reconcile/3`. All three are useful to every existing user, and none of them mentions timesheets or knows what a holiday is.
+* **A separate holiday library** — the jurisdiction tree, effective-dated calendars, and the data behind them. Outside this family entirely, with its own maintainers and cadence, feeding `agenda` an `IntervalSet`.
 * **Alembic's application** — leave balances, accrual, approval workflow, billing rates, invoicing. All the things that are not time.
 
 ### One naming hazard
@@ -253,12 +269,11 @@ The split that seems right:
 
 Marked as questions because each is Alembic's call, and the answers change the schema rather than the code around it.
 
-1. **Are jurisdiction and place one tree or two?** A legal jurisdiction and a building both nest, and they coincide often enough to be tempting to merge. The consultant who lives in Cairns and is employed out of Brisbane is the case that decides it.
-2. **Is a timesheet entry placed or unplaced?** *"Six hours on Acme on Tuesday"* is a quantity in a bucket; *"09:00–15:00 on Acme"* is an interval. `agenda` deals in intervals, and only the second detects that a consultant was double-booked. Which one do consultants actually enter, and is the wall-clock detail worth asking for?
-3. **What granularity is billed?** Six-minute units are conventional in professional services and interact with the 7.6-hour day in ways worth deciding once, in decimal, up front.
-4. **Can a closed period be reopened?** If a holiday is proclaimed late or a timesheet is corrected after invoicing, does reconciliation re-run and restate, or is the closed period immutable with an adjustment in the current one? This decides whether calendar versions must be recorded against closed periods.
-5. **Half-days and part-days.** A half-day of personal leave plus a half-day billed is common and is the smallest case that breaks a day-granular model.
-6. **Does anyone work across time zones?** Perth to Sydney is two hours, three in summer, and a day boundary is a real thing to get wrong. Tempo handles it correctly given a real IANA database configured — Elixir's default is UTC-only and makes DST arithmetic silently wrong rather than failing.
+1. **Is a timesheet entry placed or unplaced?** *"Six hours on Acme on Tuesday"* is a quantity in a bucket; *"09:00–15:00 on Acme"* is an interval. `agenda` deals in intervals, and only the second detects that a consultant was double-booked. Which one do consultants actually enter, and is the wall-clock detail worth asking for?
+2. **What granularity is billed?** Six-minute units are conventional in professional services and interact with the 7.6-hour day in ways worth deciding once, in decimal, up front.
+3. **Can a closed period be reopened?** If a holiday is proclaimed late or a timesheet is corrected after invoicing, does reconciliation re-run and restate, or is the closed period immutable with an adjustment in the current one? This decides whether calendar versions must be recorded against closed periods.
+4. **Half-days and part-days.** A half-day of personal leave plus a half-day billed is common and is the smallest case that breaks a day-granular model.
+5. **Does anyone work across time zones?** Perth to Sydney is two hours, three in summer, and a day boundary is a real thing to get wrong. Tempo handles it correctly given a real IANA database configured — Elixir's default is UTC-only and makes DST arithmetic silently wrong rather than failing.
 
 ## Suggested next step
 

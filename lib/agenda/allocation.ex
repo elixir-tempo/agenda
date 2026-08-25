@@ -13,6 +13,27 @@ defmodule Agenda.Allocation do
   roster for a time, and allocating it records one of these per
   resource.
 
+  ## The tag
+
+  `tag` records **what the claim was for**, as a `{kind, subject}`
+  pair. It is the field that lets one ledger hold work and absence in
+  the same structure:
+
+      {:project, "ACME-2026-01"}
+      {:leave, :annual}
+      {:holiday, "Brisbane show day"}
+
+  Nothing here interprets a tag — `agenda` does not know what a project
+  or a leave type is, and does not decide which kinds exist. What it
+  gains is that a person's time can be reconciled without a second
+  schema: every claim on a resource is in one place, and the tag says
+  which bucket it belongs to. `Agenda.reconcile/3` groups by it.
+
+  The consequence worth naming: a day cannot be two things. A
+  consultant on annual leave cannot also be billed to a project,
+  because both would be claims on the same resource over the same
+  span, and that is the overlap the ledger already refuses.
+
   """
 
   alias Agenda.Arrangement
@@ -25,6 +46,9 @@ defmodule Agenda.Allocation do
   it lives here rather than in a persistence layer: availability is
   derived on every call, so a hold nobody can see is a hold nobody
   subtracts. `nil` means the claim is firm.
+
+  `tag` records what the claim was for. `nil` means untagged, which is
+  every allocation made before a caller asks for one.
   """
   @type t :: %__MODULE__{
           session: String.t(),
@@ -32,10 +56,21 @@ defmodule Agenda.Allocation do
           resource: String.t(),
           interval: Tempo.Interval.t(),
           series: String.t() | nil,
-          held_until: Tempo.t() | nil
+          held_until: Tempo.t() | nil,
+          tag: tag() | nil
         }
 
-  defstruct [:session, :role, :resource, :interval, :series, :held_until]
+  @typedoc """
+  What a claim was for, as `{kind, subject}`.
+
+  The kinds are the caller's, not this library's. `{:project, "ACME"}`,
+  `{:leave, :annual}` and `{:holiday, "Show day"}` are the three this
+  library's documentation uses, because they are the three a timesheet
+  needs, but nothing rejects another.
+  """
+  @type tag :: {atom(), term()}
+
+  defstruct [:session, :role, :resource, :interval, :series, :held_until, :tag]
 
   @doc """
   The allocations an arrangement implies — one per resource, across
@@ -44,6 +79,13 @@ defmodule Agenda.Allocation do
   ### Arguments
 
   * `arrangement` is a `t:Agenda.Arrangement.t/0`.
+
+  ### Options
+
+  * `:tag` is what the claim was for, as a `t:tag/0` — `{:project,
+    "ACME-2026-01"}` or `{:leave, :annual}`. Every allocation the
+    arrangement implies carries it, because they are one booking. The
+    default is `nil`.
 
   ### Returns
 
@@ -63,9 +105,24 @@ defmodule Agenda.Allocation do
       iex> {allocation.session, allocation.role, allocation.resource}
       {"Review", :room, "Boardroom"}
 
+  Tagging what the claim was for:
+
+      iex> import Tempo.Sigils
+      iex> arrangement = %Agenda.Arrangement{
+      ...>   session: "Discovery",
+      ...>   interval: ~o"2026-06-16T09:00:00/2026-06-16T17:00:00",
+      ...>   allocations: %{consultant: [Agenda.resource("Dana")]}
+      ...> }
+      iex> [allocation] =
+      ...>   Agenda.Allocation.from_arrangement(arrangement, tag: {:project, "ACME-2026-01"})
+      iex> allocation.tag
+      {:project, "ACME-2026-01"}
+
   """
-  @spec from_arrangement(Arrangement.t()) :: [t()]
-  def from_arrangement(%Arrangement{} = arrangement) do
+  @spec from_arrangement(Arrangement.t(), keyword()) :: [t()]
+  def from_arrangement(%Arrangement{} = arrangement, options \\ []) do
+    tag = Keyword.get(options, :tag)
+
     arrangement.allocations
     |> Enum.flat_map(fn {role, resources} ->
       Enum.map(resources, fn resource ->
@@ -74,7 +131,8 @@ defmodule Agenda.Allocation do
           role: role,
           resource: resource.name,
           interval: arrangement.interval,
-          series: arrangement.series
+          series: arrangement.series,
+          tag: tag
         }
       end)
     end)
