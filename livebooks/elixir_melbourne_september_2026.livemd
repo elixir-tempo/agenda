@@ -45,6 +45,28 @@ Learn these and the rest of the library follows.
 * **Arrangement** — one candidate way to hold it: a time and a resource per role
 * **Allocation** — one resource bound to one session; the **ledger** is the set of them
 
+## Words we keep apart
+
+The nouns are easy. The vocabulary is the part that carries the design, because each of these pairs is one word in most schedulers and two here — and every one of them is a bug when they get merged.
+
+* **Concurrency** is how many claims may overlap at an *instant*. A **limit** is how much falls inside a *stretch of calendar*, however far apart. A 200-seat hall is `concurrency: 1`; a nurse's contract is `limits: [week: 5]`.
+* **`needs`** describes and lets the planner choose. **`roster`** names and accepts no substitute. A room is usually described; a speaker is always named.
+* **Open** is when a resource could be used. **Busy** is what already holds it. **Free** is `open − busy`, derived on every call — never stored, so it cannot go stale.
+* An **arrangement** is a *proposal*: one time, one resource per role. An **allocation** is the *record* of one resource actually bound. The ledger holds allocations; the search returns arrangements.
+* **Claim** books and refuses what it cannot honour. **Record** writes down what happened and checks nothing. A schedule is a request; a timesheet is a fact.
+* A **place** contains; an **attribute** merely labels. `location: :sydney` answers *"is it in Sydney?"*; a place tree answers *"can a delegate get there in the break?"* — and says `{:error, :unknown}` rather than guessing.
+* A **session** is one thing to be held. A **track** is a family of sessions constrained against *each other* — a shared audience, so no two may run at once.
+
+## Words we refused
+
+Every one of these was the obvious first choice, and each is written down in the moduledoc that rejected it.
+
+* **Session**, not *meeting* (a court hearing and a conference talk are neither), not *event* (`Tempo.Event` is taken, and it collides with event sourcing), not *booking* (which names the request in AshScheduling, not the thing requested).
+* **Programme**, not *schedule* — triple-booked already: `Tempo.Schedule` is critical-path planning, `AshScheduling.Schedule` is a bookable resource, and colloquially it is this output.
+* **Track**, not *stream* — Elixir's `Stream` owns that name and a conference stream would shadow it at every call site.
+
+Naming is the cheapest constraint in the library. Every pair on the previous slide would compile perfectly well as a single word, and each would take a real distinction with it.
+
 ## The conference
 
 Two days at the Renaissance Orlando at SeaWorld, three parallel rooms, and a fourth room used for registration, coffee, lunch and the reception rather than for talks.
