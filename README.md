@@ -64,6 +64,14 @@ Agenda.travel_time(boardroom, main_stage, between: [{{"Boardroom", "Main Stage"}
 
 This is what a flat `location: :sydney` attribute cannot do. It can answer *"is this room in Sydney?"*, but not *"can a delegate get from here to there in the ten-minute break?"* — and only the second question decides whether a programme is workable.
 
+## Livebooks
+
+Interactive and runnable — every cell executes live in [Livebook](https://livebook.dev):
+
+* [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Felixir_melbourne_september_2026.livemd) **Scheduling ElixirConf** — the real ElixirConf US 2025 programme laid out from scratch: 42 talks, three rooms, two days, and the constraint invented data misses.
+
+* [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Ftimesheets_and_leave.livemd) **Timesheets and leave** — recording work and absence against one ledger, and reconciling a period against the hours that were owed.
+
 ## Guides
 
 New to Tempo or to this library? Start with **[Getting started](https://hexdocs.pm/agenda/getting-started.html)** — the one Tempo idea you need, the five nouns, and the whole describe-plan-allocate-release loop in five minutes.
