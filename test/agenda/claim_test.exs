@@ -138,42 +138,81 @@ defmodule Agenda.ClaimTest do
     end
   end
 
-  describe "claim and allocate share one ledger" do
-    test "a recorded hour blocks a later booking of the same hour" do
-      resource = dana()
-      span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
-
-      recorded = %Agenda.Arrangement{
-        session: "timesheet",
-        interval: span,
-        allocations: %{consultant: [resource]}
-      }
-
-      assert {:ok, ledger} = Agenda.allocate(Agenda.ledger(), recorded, tag: {:project, "ACME"})
-      assert {:error, reason} = Agenda.claim(ledger, resource, span)
-      assert reason =~ "already claimed"
-    end
-
-    test "allocate still records time the contract does not cover" do
+  describe "record/4 writes down what claim/4 would refuse" do
+    test "a day outside the contract is recorded" do
       # The world is not obliged to match the contract: someone did work
       # that Saturday, and refusing to write it down would leave the
       # system unable to represent overtime.
       resource = dana()
+      saturday = ~o"2026-08-15T09:00:00/2026-08-15T12:00:00"
 
-      overtime = %Agenda.Arrangement{
-        session: "saturday",
-        interval: ~o"2026-08-15T09:00:00/2026-08-15T12:00:00",
-        allocations: %{consultant: [resource]}
-      }
+      assert {:error, _refused} = Agenda.claim(Agenda.ledger(), resource, saturday)
 
-      assert {:ok, ledger} = Agenda.allocate(Agenda.ledger(), overtime, tag: {:project, "ACME"})
+      assert {:ok, ledger} =
+               Agenda.record(Agenda.ledger(), resource, saturday, tag: {:project, "ACME"})
+
       assert Agenda.count(ledger) == 1
+    end
 
-      # And reconciliation is what reports the disagreement.
-      assert {:ok, report} =
-               Agenda.reconcile(ledger, resource, within: ~o"2026-08-15/2026-08-16")
+    test "and reconciliation is what reports the disagreement" do
+      resource = dana()
 
+      assert {:ok, ledger} =
+               Agenda.record(
+                 Agenda.ledger(),
+                 resource,
+                 ~o"2026-08-15T09:00:00/2026-08-15T12:00:00",
+                 tag: {:project, "ACME"}
+               )
+
+      assert {:ok, report} = Agenda.reconcile(ledger, resource, within: ~o"2026-08-15/2026-08-16")
       refute Reconciliation.balanced?(report)
+    end
+
+    test "an hour already claimed is recorded too — record checks nothing" do
+      resource = dana()
+      span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
+
+      assert {:ok, ledger} = Agenda.record(Agenda.ledger(), resource, span, session: "first")
+      assert {:ok, ledger} = Agenda.record(ledger, resource, span, session: "second")
+      assert Agenda.count(ledger) == 2
+    end
+
+    test "an unreadable interval is still an error" do
+      assert {:error, _reason} = Agenda.record(Agenda.ledger(), dana(), "not an interval")
+    end
+  end
+
+  describe "the pair are symmetric" do
+    test "same options, same shape in the ledger" do
+      resource = dana()
+      span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
+      options = [role: :consultant, tag: {:project, "ACME"}, session: "monday"]
+
+      assert {:ok, booked} = Agenda.claim(Agenda.ledger(), resource, span, options)
+      assert {:ok, recorded} = Agenda.record(Agenda.ledger(), resource, span, options)
+
+      assert Ledger.to_list(booked) == Ledger.to_list(recorded)
+    end
+
+    test "a recorded hour blocks a later booking of the same hour" do
+      resource = dana()
+      span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
+
+      assert {:ok, ledger} = Agenda.record(Agenda.ledger(), resource, span, session: "timesheet")
+      assert {:error, reason} = Agenda.claim(ledger, resource, span, session: "booking")
+      assert reason =~ "already claimed"
+    end
+
+    test "and a booked hour blocks nothing that record wants to write" do
+      # Deliberate: the ledger is the shared truth, but recording is a
+      # statement of fact and does not ask permission.
+      resource = dana()
+      span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
+
+      assert {:ok, ledger} = Agenda.claim(Agenda.ledger(), resource, span, session: "booking")
+      assert {:ok, ledger} = Agenda.record(ledger, resource, span, session: "timesheet")
+      assert Agenda.count(ledger) == 2
     end
   end
 end

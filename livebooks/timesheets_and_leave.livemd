@@ -147,25 +147,18 @@ dana.limits
 This is the load-bearing decision, and it is Josh's: a timesheet line and a leave line are the same structure, separated by what the time was *for*.
 
 ```elixir
-enter = fn ledger, interval, tag ->
-  arrangement = %Agenda.Arrangement{
-    session: Tempo.to_iso8601(interval),
-    interval: interval,
-    allocations: %{consultant: [dana]}
-  }
-
-  {:ok, ledger} = Agenda.allocate(ledger, arrangement, tag: tag)
-  ledger
-end
-
 # A day's timesheet is the shift projected onto that day — the same
 # `shift` the contract was built from, so the two cannot disagree.
-record = fn ledger, day, tag ->
+record_day = fn ledger, day, tag ->
   {:ok, blocks} = Tempo.select(day, shift)
 
-  blocks
-  |> Tempo.IntervalSet.to_list()
-  |> Enum.reduce(ledger, &enter.(&2, &1, tag))
+  # `to_list/1` rather than enumerating `blocks` directly: an
+  # IntervalSet enumerates the *instants* it contains, so `Enum` over
+  # this one would walk 25,200 seconds instead of two blocks.
+  Enum.reduce(Tempo.IntervalSet.to_list(blocks), ledger, fn block, acc ->
+    {:ok, acc} = Agenda.record(acc, dana, block, role: :consultant, tag: tag)
+    acc
+  end)
 end
 
 # The four working days of the Ekka week — the show holiday is the 12th.
@@ -180,11 +173,11 @@ annual = {:leave, :annual}
 
 > *"Record the shift on that day, against that project."*
 
-`record/3` is the same `Tempo.select/2` the contract used, pointed at one day instead of a quarter — so a day's entry is the shift *by construction*, and no date is ever assembled from a string.
+`record_day/3` is the same `Tempo.select/2` the contract used, pointed at one day instead of a quarter — so a day's entry is the shift *by construction*, and no date is ever assembled from a string.
 
 ### Recording is not booking
 
-`record/3` uses `Agenda.allocate/3`, which writes down whatever it is given. Its counterpart `Agenda.claim/4` **books**, and checks — it refuses an hour the consultant does not work, and an hour already spoken for, naming the offending span:
+`record_day/3` uses `Agenda.record/4`, which writes down whatever it is given. Its counterpart `Agenda.claim/4` **books**, and checks — it refuses an hour the consultant does not work, and an hour already spoken for, naming the offending span:
 
 ```elixir
 %{
@@ -208,11 +201,11 @@ week = ~o"2026-08-10/2026-08-15"
 
 ledger =
   Agenda.ledger()
-  |> record.(~o"2026-08-10", acme)
-  |> record.(~o"2026-08-11", acme)
-  |> record.(~o"2026-08-12", beta)
-  |> record.(~o"2026-08-13", beta)
-  |> record.(~o"2026-08-14", annual)
+  |> record_day.(~o"2026-08-10", acme)
+  |> record_day.(~o"2026-08-11", acme)
+  |> record_day.(~o"2026-08-12", beta)
+  |> record_day.(~o"2026-08-13", beta)
+  |> record_day.(~o"2026-08-14", annual)
 
 {:ok, report} = Agenda.reconcile(ledger, dana, within: week)
 
@@ -262,7 +255,7 @@ Dana takes the whole of that week off. Only four days are owed, so only four are
 
 ```elixir
 on_leave =
-  Enum.reduce(ekka_week, Agenda.ledger(), &record.(&2, &1, annual))
+  Enum.reduce(ekka_week, Agenda.ledger(), &record_day.(&2, &1, annual))
 
 {:ok, leave_report} = Agenda.reconcile(on_leave, dana, within: week, excluding: show_day)
 {:ok, drawn} = Tempo.Duration.to_unit(leave_report.by_tag[annual], :hour)
@@ -285,8 +278,8 @@ Dana misses the Monday and works the Saturday. Same hours. Different week.
 ```elixir
 wrong =
   [~o"2026-08-11", ~o"2026-08-13", ~o"2026-08-14"]
-  |> Enum.reduce(Agenda.ledger(), &record.(&2, &1, acme))
-  |> record.(~o"2026-08-15", acme)
+  |> Enum.reduce(Agenda.ledger(), &record_day.(&2, &1, acme))
+  |> record_day.(~o"2026-08-15", acme)
 
 {:ok, wrong_report} =
   Agenda.reconcile(wrong, dana, within: ~o"2026-08-10/2026-08-16", excluding: show_day)
@@ -310,7 +303,11 @@ Reconciliation.explain(wrong_report)
 A ten-hour Monday, against a seven-hour ceiling:
 
 ```elixir
-long_day = enter.(Agenda.ledger(), ~o"2026-08-10T09:00:00/2026-08-10T19:00:00", acme)
+{:ok, long_day} =
+  Agenda.record(Agenda.ledger(), dana, ~o"2026-08-10T09:00:00/2026-08-10T19:00:00",
+    role: :consultant,
+    tag: acme
+  )
 {:ok, long_report} = Agenda.reconcile(long_day, dana, within: ~o"2026-08-10/2026-08-11")
 
 Reconciliation.explain(long_report)
@@ -329,7 +326,7 @@ But watch what an **absolute** weekly floor does in a week containing a public h
   Agenda.resource("Dana", limits: [day: ~o"PT7H", week: [at_least: ~o"PT35H"]])
   |> Agenda.open(business_hours.(quarter))
 
-worked = Enum.reduce(ekka_week, Agenda.ledger(), &record.(&2, &1, acme))
+worked = Enum.reduce(ekka_week, Agenda.ledger(), &record_day.(&2, &1, acme))
 
 {:ok, floored} = Agenda.reconcile(worked, contracted, within: week, excluding: show_day)
 

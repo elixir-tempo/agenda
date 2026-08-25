@@ -134,7 +134,7 @@ defmodule Agenda.Ledger do
   @doc """
   Book one resource over one interval, refusing what it cannot honour.
 
-  `allocate/3` records; `claim/4` **books**. The difference is the
+  `record/4` records; `claim/4` **books**. The difference is the
   difference between a timesheet and a schedule, and both are wanted:
 
   * A schedule is a request about the future, so it must be checked. A
@@ -145,7 +145,7 @@ defmodule Agenda.Ledger do
   * A timesheet is a record of what happened, and the world is not
     obliged to match the contract. Somebody *did* work that Saturday.
     Refusing to write it down would leave the system unable to
-    represent overtime, so `allocate/3` still records anything and
+    represent overtime, so `record/4` writes down anything and
     `Agenda.reconcile/3` is what reports the disagreement afterwards.
 
   Both write to the same ledger, so a booking and a recorded hour
@@ -209,19 +209,86 @@ defmodule Agenda.Ledger do
   def claim(%__MODULE__{} = ledger, %Resource{} = resource, interval, options \\ []) do
     with {:ok, interval} <- Availability.normalise(interval),
          :ok <- claimable(ledger, resource, interval) do
-      role = Keyword.get(options, :role, :resource)
-      session = Keyword.get(options, :session, Tempo.to_iso8601(interval))
-
-      allocate(
-        ledger,
-        %Arrangement{
-          session: session,
-          interval: interval,
-          allocations: %{role => [resource]}
-        },
-        options
-      )
+      allocate(ledger, holding(resource, interval, options), options)
     end
+  end
+
+  @doc """
+  Record one resource over one interval, checking nothing.
+
+  The unchecked half of the pair `claim/4` completes. Same arguments,
+  same options, same ledger — and no opinion about whether the time
+  was available.
+
+  That is not a weaker `claim/4`; it answers a different question. A
+  schedule is a request about the future and must be checked before it
+  is accepted. A timesheet is a record of what already happened, and
+  the world is not obliged to match the contract: somebody worked that
+  Saturday whether or not their contract says they work Saturdays, and
+  a system that refuses to write it down cannot represent overtime.
+
+  So `claim/4` refuses at the door and `record/4` writes it down —
+  leaving `Agenda.reconcile/3` to report the disagreement afterwards,
+  which is the only place that can weigh it against a whole period.
+
+  ### Arguments
+
+  * `ledger` is a `t:t/0`.
+
+  * `resource` is the `t:Agenda.Resource.t/0` whose time is recorded.
+
+  * `interval` is when — a Tempo value or an ISO 8601 string.
+
+  ### Options
+
+  As `claim/4`: `:tag`, `:role` and `:session`.
+
+  ### Returns
+
+  * `{:ok, ledger}`; or
+
+  * `{:error, reason}` when `interval` cannot be read as a span. Never
+    for a reason of availability — that is `claim/4`'s business.
+
+  ### Examples
+
+  Time outside the contract is recorded rather than refused:
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
+      iex> {:error, _refused} = Agenda.Ledger.claim(Agenda.Ledger.new(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00")
+      iex> {:ok, ledger} = Agenda.Ledger.record(Agenda.Ledger.new(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00")
+      iex> Agenda.Ledger.count(ledger)
+      1
+
+  And it is still a claim on the resource, so a booking cannot land on
+  top of it:
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
+      iex> {:ok, ledger} = Agenda.Ledger.record(Agenda.Ledger.new(), dana, ~o"2026-08-10T09:00:00/2026-08-10T12:00:00")
+      iex> {:error, reason} = Agenda.Ledger.claim(ledger, dana, ~o"2026-08-10T10:00:00/2026-08-10T11:00:00")
+      iex> reason
+      "Dana is already claimed for 2026Y8M10DT10H0M0S/2026Y8M10DT11H0M0S"
+
+  """
+  @spec record(t(), Resource.t(), Availability.pattern(), keyword()) ::
+          {:ok, t()} | {:error, term()}
+  def record(%__MODULE__{} = ledger, %Resource{} = resource, interval, options \\ []) do
+    with {:ok, interval} <- Availability.normalise(interval) do
+      allocate(ledger, holding(resource, interval, options), options)
+    end
+  end
+
+  # One resource in one role over one span. Shared so that a booking
+  # and a recorded hour are the same shape in the ledger — which is
+  # what lets the one block the other.
+  defp holding(resource, interval, options) do
+    %Arrangement{
+      session: Keyword.get(options, :session, Tempo.to_iso8601(interval)),
+      interval: interval,
+      allocations: %{Keyword.get(options, :role, :resource) => [resource]}
+    }
   end
 
   # Two questions, asked in the order that produces the more useful

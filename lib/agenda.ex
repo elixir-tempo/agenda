@@ -421,7 +421,7 @@ defmodule Agenda do
   Book one resource over one interval, refusing what it cannot honour.
   Delegates to `Agenda.Ledger.claim/4`.
 
-  `allocate/3` records what happened; `claim/4` books what is to
+  `record/4` writes down what happened; `claim/4` books what is to
   happen, and checks. See `Agenda.Ledger.claim/4` for why a timesheet
   wants the first and a schedule wants the second.
 
@@ -442,6 +442,27 @@ defmodule Agenda do
   @spec claim(Ledger.t(), Resource.t(), Availability.pattern(), keyword()) ::
           {:ok, Ledger.t()} | {:error, term()}
   defdelegate claim(ledger, resource, interval, options \\ []), to: Ledger
+
+  @doc """
+  Record one resource over one interval, checking nothing. Delegates
+  to `Agenda.Ledger.record/4`.
+
+  The unchecked half of the pair `claim/4` completes: a schedule is a
+  request and must be validated, a timesheet is a record and the world
+  is not obliged to match the contract. See `Agenda.Ledger.record/4`.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
+      iex> {:ok, ledger} = Agenda.record(Agenda.ledger(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00", tag: {:project, "ACME"})
+      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      [project: "ACME"]
+
+  """
+  @spec record(Ledger.t(), Resource.t(), Availability.pattern(), keyword()) ::
+          {:ok, Ledger.t()} | {:error, term()}
+  defdelegate record(ledger, resource, interval, options \\ []), to: Ledger
 
   @doc """
   Free everything a session holds. Delegates to
