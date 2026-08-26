@@ -285,7 +285,7 @@ defmodule Agenda.Arranger do
       {candidates, unplaceable} = candidates_per_session(programme, pool, pinned, options)
 
       candidates
-      |> Enum.sort_by(fn {_session, _symmetry, placements} -> length(placements) end)
+      |> Enum.sort_by(&search_order(&1, programme))
       |> decompose(programme, pinned, unplaceable, options)
     end
   end
@@ -543,6 +543,22 @@ defmodule Agenda.Arranger do
         Map.update(acc, resource.name, [arrangement.interval], &(&1 ++ [arrangement.interval]))
       end)
     end)
+  end
+
+  # Most-constrained-first, by domain size — a session with three
+  # placements is settled before one with three hundred, because
+  # discovering it cannot fit is cheaper near the root.
+  #
+  # Domain size alone is not the whole story once a precedence is
+  # involved. A precedence says nothing until *both* its sessions are
+  # placed: whichever comes first is unconstrained, so the search fixes
+  # it anywhere, and only on reaching the partner — perhaps forty
+  # sessions later — discovers the pair cannot work and unwinds the
+  # whole subtree. Placing both ends early, and next to each other,
+  # makes the constraint bite at the top of the tree where it prunes
+  # instead of at the bottom where it only rejects.
+  defp search_order({session, _symmetry, placements}, %Programme{} = programme) do
+    {(ordered?(session, programme) && 0) || 1, length(placements)}
   end
 
   # --- candidate placements, one session at a time ----------------

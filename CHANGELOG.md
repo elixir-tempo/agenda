@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Fixed
 
+* One precedence no longer defeats a large programme. Both ends of the pair are searched first, where the constraint prunes rather than only rejecting at the leaves — a thirty-session layout went from unsolvable to 133 ms.
+
 * `buffer_before` and `buffer_after` now hold between two sessions the search places together, not only against bookings that already existed. A room needing ten minutes to reset could previously be handed back-to-back talks by `Agenda.Arranger.arrange/3`, which is the one thing the option exists to prevent. Candidate start times account for the turnaround too, so four forty-minute talks in such a room fall at 9:00, 9:50, 10:40 and 11:30 rather than losing a whole slot to the gap.
 
 * `Agenda.Planner.plan/3` no longer reports a malformed resource as "no window is long enough with everyone free". An error computing a resource's availability — an unparseable buffer, a bad `:busy` value — was discarded and read as an absence of free time, sending the caller to look at their calendar instead of at their code. Absence of availability is still `{:ok, []}`; a configuration that will not compute is now returned as the error it is.

@@ -8,6 +8,7 @@ defmodule Agenda.PrecedenceTest do
   alias Agenda.Session
   alias Tempo.Compare
   alias Tempo.Duration
+  alias Tempo.IntervalSet
 
   doctest Agenda.Precedence
 
@@ -221,6 +222,89 @@ defmodule Agenda.PrecedenceTest do
       assert {_p, :in_order} = Precedence.between(precedences, "Survey", "Quote")
       assert {_p, :reversed} = Precedence.between(precedences, "Quote", "Survey")
       assert Precedence.between(precedences, "Survey", "Other") == nil
+    end
+  end
+
+  describe "precedence at scale" do
+    # A precedence says nothing until *both* its sessions are placed.
+    # Ordered by domain size alone, the pair could sit anywhere in the
+    # search: whichever came first was fixed arbitrarily, and the
+    # conflict only surfaced on reaching the partner, unwinding
+    # everything between. On a tight programme that turned a layout
+    # found in a tenth of a second into one never found at all.
+    #
+    # Both ends are now searched first, where the constraint prunes
+    # rather than merely rejects.
+    #
+    # The shape matters: the sessions must be *distinguishable* (each
+    # rostering its own speaker, so symmetry breaking cannot collapse
+    # them) and the rooms tight enough that a bad early placement is
+    # expensive to undo. An easier programme succeeds either way and
+    # would not catch a regression here.
+    defp crowded_programme do
+      open =
+        IntervalSet.new!([
+          Tempo.from_iso8601!("2027-04-05T09:00/T12:00"),
+          Tempo.from_iso8601!("2027-04-05T13:00/T16:00")
+        ])
+
+      rooms =
+        Enum.map(1..3, fn i ->
+          {:ok, room} = Agenda.resource("Room #{i}", seats: 100) |> Agenda.open(open)
+          room
+        end)
+
+      speakers =
+        Enum.map(1..30, fn i ->
+          {:ok, speaker} = Agenda.resource("Speaker #{i}", role: :speaker) |> Agenda.open(open)
+          speaker
+        end)
+
+      sessions =
+        Enum.map(1..30, fn i ->
+          "S#{i}"
+          |> Agenda.session(lasting: (rem(i, 4) == 0 && "PT40M") || "PT20M")
+          |> Session.needs(:room, seats: 100)
+          |> Session.roster(:speaker, [Enum.at(speakers, i - 1)])
+        end)
+
+      programme =
+        Enum.reduce(
+          sessions,
+          Agenda.programme("Crowded", across: "2027-04-05/2027-04-06"),
+          &Programme.add_session(&2, &1)
+        )
+
+      {programme, rooms ++ speakers}
+    end
+
+    test "the programme lays out without a precedence" do
+      {programme, pool} = crowded_programme()
+
+      assert {:ok, arrangements} = Agenda.arrange(programme, pool)
+      assert length(arrangements) == 30
+    end
+
+    test "adding one precedence does not defeat it" do
+      {programme, pool} = crowded_programme()
+      {:ok, programme} = Programme.precede(programme, "S27", "S28", gap: "PT30M")
+
+      assert {:ok, arrangements} = Agenda.arrange(programme, pool)
+      assert length(arrangements) == 30
+
+      assert at_or_after?(starts(arrangements, "S28"), ends(arrangements, "S27"))
+    end
+
+    test "an exactly adjacent successor is placed the moment the first ends" do
+      {programme, pool} = crowded_programme()
+      {:ok, programme} = Programme.precede(programme, "S27", "S28", within: "PT0S")
+
+      assert {:ok, arrangements} = Agenda.arrange(programme, pool)
+
+      assert Compare.compare_endpoints(
+               starts(arrangements, "S28"),
+               ends(arrangements, "S27")
+             ) == :same
     end
   end
 end

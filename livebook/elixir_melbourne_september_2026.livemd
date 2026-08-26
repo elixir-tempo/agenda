@@ -54,17 +54,17 @@ The third one is the killer. Once availability is *stored* rather than *derived*
 
 ## The five nouns
 
-Agenda uses the following definitions:
+Five nouns, and the last three are a sequence: you describe a **session**, `plan/3` returns every **arrangement** that would satisfy it, and accepting one writes **allocations**. One want, many candidates, one booking.
 
 * **Resource** — a named thing that can be allocated: a room, a person, a projector
-* **Place** — a tree of containers, so travel time is *derived* rather than configured
-* **Session** — what is being scheduled: how long, inside what window, needing what
-* **Arrangement** — one candidate way to hold it: a time and a resource per role
-* **Allocation** — one resource bound to one session; the **ledger** is the set of them
+* **Place** — a container of resources and other places, so travel time is *derived* rather than configured
+* **Session** — *one thing you want held*: how long, inside what window, what it needs
+* **Arrangement** — *one of the many ways that session could be held*: a time, plus a resource for each thing it needs
+* **Allocation** — *what accepting one arrangement leaves behind*: a resource booked to a session
 
-## One word, one meaning
+## How they constrain each other
 
-The words below look interchangeable and are not. Each carries exactly one meaning, and running two of them together is where scheduling bugs come from — so Agenda keeps them apart.
+The five nouns say what *exists*; these say what *limits what*. Each line holds two words that most schedulers merge into one, and every merge is a bug — so Agenda keeps them apart.
 
 * A resource is **open** when it could be used, **busy** where something holds it, **free** where open remains — *Biscayne: open all morning, busy for the panel, free either side*.
 * A resource's **concurrency** is how many sessions may hold it at one moment; its **limit** is how many across a stretch of calendar — *one talk at a time, but at most two a day*.
@@ -75,7 +75,7 @@ The words below look interchangeable and are not. Each carries exactly one meani
 
 Two days at the Renaissance Orlando at SeaWorld, three parallel rooms, and a fourth room used for registration, coffee, lunch and the reception rather than for talks.
 
-| | |
+| What | ElixirConf US 2025 |
 | --- | --- |
 | Days | Thursday 28 – Friday 29 August 2025 |
 | Talk rooms | Peninsula 4-7, Canaveral, Biscayne |
@@ -100,12 +100,12 @@ alias Agenda.Arrangement
 
 talk_hours =
   Tempo.IntervalSet.new!([
-    ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
-    ~o"2025-08-28T13:45:00/2025-08-28T15:05:00",
-    ~o"2025-08-28T15:35:00/2025-08-28T16:05:00",
-    ~o"2025-08-29T10:40:00/2025-08-29T12:40:00",
-    ~o"2025-08-29T13:40:00/2025-08-29T15:20:00",
-    ~o"2025-08-29T15:50:00/2025-08-29T16:20:00"
+    ~o"2025-08-28T10:45/T12:45",
+    ~o"2025-08-28T13:45/T15:05",
+    ~o"2025-08-28T15:35/T16:05",
+    ~o"2025-08-29T10:40/T12:40",
+    ~o"2025-08-29T13:40/T15:20",
+    ~o"2025-08-29T15:50/T16:20"
   ])
 
 Tempo.IntervalSet.count(talk_hours)
@@ -122,14 +122,14 @@ venue = Agenda.place("Renaissance Orlando at SeaWorld")
 
 plenary_hours =
   Tempo.IntervalSet.new!([
-    ~o"2025-08-28T09:00:00/2025-08-28T10:15:00",
-    ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
-    ~o"2025-08-28T13:45:00/2025-08-28T15:05:00",
-    ~o"2025-08-28T15:35:00/2025-08-28T17:50:00",
-    ~o"2025-08-29T09:00:00/2025-08-29T10:10:00",
-    ~o"2025-08-29T10:40:00/2025-08-29T12:40:00",
-    ~o"2025-08-29T13:40:00/2025-08-29T15:20:00",
-    ~o"2025-08-29T15:50:00/2025-08-29T17:30:00"
+    ~o"2025-08-28T09:00/T10:15",
+    ~o"2025-08-28T10:45/T12:45",
+    ~o"2025-08-28T13:45/T15:05",
+    ~o"2025-08-28T15:35/T17:50",
+    ~o"2025-08-29T09:00/T10:10",
+    ~o"2025-08-29T10:40/T12:40",
+    ~o"2025-08-29T13:40/T15:20",
+    ~o"2025-08-29T15:50/T17:30"
   ])
 
 room = fn name, seats, hours ->
@@ -159,7 +159,7 @@ This is the one idea in the talk. Not an attribute of a talk, not a string in a 
 I did not plan this example around the constraint. I loaded the real programme and the constraint was already in it.
 
 * Allison Randal keynoted Thursday 09:15 — and joined the 10:45 panel
-* Anna Sherman was on that panel, and spoke again on Friday
+* Anna Sherman was on that panel, and gave a talk of her own as well
 * Four people shared the panel between them
 * A scheduler treating a speaker as a label cannot see any of this
 
@@ -202,7 +202,9 @@ A trap worth knowing, because it silently costs you the exact constraint this ta
 
 ## The programme
 
-Forty-two talks, each naming its duration, its day, the kind of room it needs and the people who must be there.
+Forty-two talks, each naming its duration, the kind of room it needs and the people who must be there — and nothing about when. Agenda has the two days from the programme and the open hours from the rooms; which talk lands on which day is its problem, not the data's.
+
+That makes the layout **repeatable but not predetermined**. The same input gives the same answer every time, but nothing in it says a given talk belongs on Thursday — add a room, reorder the list, or change the library, and it may land on Friday instead. Any one placement below is *an* answer, not *the* answer.
 
 `needs/3` **describes** and lets the planner choose — any room seating 250 will do. `roster/3` **names** and accepts no substitutes — these four people. Both bind the same way once the search starts, which is what lets a room and a person clash for the same reason.
 
@@ -210,61 +212,56 @@ Forty-two talks, each naming its duration, its day, the kind of room it needs an
 
 ```elixir
 talks = [
-  {"The Architecture Behind Deploying Livebook Apps", 40, :thu, ["Hugo Baraúna"]},
-  {"From Complexity to Clarity", 40, :thu, ["Misael Perez Chamorro"]},
-  {"Building Careers, Balancing Life", 40, :thu,
+  {"The Architecture Behind Deploying Livebook Apps", 40, ["Hugo Baraúna"]},
+  {"From Complexity to Clarity", 40, ["Misael Perez Chamorro"]},
+  {"Building Careers, Balancing Life", 40,
    ["Savannah Manning", "Anna Sherman", "Allison Randal", "Lorena Mireles"]},
-  {"Extending Elixir with WebAssembly Components", 40, :thu, ["Chris Nelson"]},
-  {"Starting a business on Phoenix LiveView", 40, :thu, ["Aaron Votre"]},
-  {"Engineering Network Protocol Clients", 40, :thu, ["Carlos Souza"]},
-  {"From Notebook to Production", 20, :thu, ["Emmanuel Pinault"]},
-  {"Practical Mentorship for a Stronger Community", 20, :thu, ["Jordan Miller"]},
-  {"Test-Driven Elixir", 20, :thu, ["Britton Broderick"]},
-  {"You can build an AI agent", 20, :thu, ["Dennis Beatty"]},
-  {"Mise en Place for Ecto", 20, :thu, ["Nicholas Henry"]},
-  {"Leaving a BEAM cluster unattended for 2 years", 20, :thu, ["Yuri Oliveira"]},
-  {"Elixir's Configuration Layers", 20, :thu, ["Stephanie Lane"]},
-  {"Beyond Safe Migrations", 20, :thu, ["Joe Harrow"]},
-  {"Introducing Elixir Observer", 20, :thu, ["Juan Azambuja"]},
-  {"How LiveDebugger makes your life easier", 20, :thu, ["Krzysztof Nalepa"]},
-  {"Telemetry-Driven Development", 20, :thu, ["Noah Betzen"]},
-  {"Stranger Domains", 20, :thu, ["Nathan Hessler"]},
-  {"Building Websites with Tableau", 20, :thu, ["Mitchell Hanberg"]},
-  {"Writing Your Own Req Plugin", 20, :thu, ["Jacob Swanner"]},
-  {"UXIDs in Elixir/Ecto", 20, :thu, ["Adam Kirk"]},
-  {"Full-Stack AI with Elixir", 40, :fri, ["George Guimarães"]},
-  {"Hey Ash, Let's Chat!", 40, :fri, ["Jinkyou Son"]},
-  {"The Alchemy of Security", 40, :fri, ["Matt Ludwigs"]},
-  {"Cat and Mouse: Adversarial Web Scraping", 40, :fri, ["Tyler Young"]},
-  {"From Freakout to Fix", 40, :fri, ["Jonatan Männchen"]},
-  {"Failing to Introduce Elixir", 40, :fri, ["John Darrington"]},
-  {"Elixir is All You Need", 20, :fri, ["Christian Koch", "Jeremy Searls"]},
-  {"Embracing the Monolith", 20, :fri, ["Igor Spiridonov"]},
-  {"Building an Exception Tracker", 20, :fri, ["Gonzalo Rodriguez"]},
-  {"Tips & Tricks for Building an App With LiveView", 40, :fri, ["Michael St Clair"]},
-  {"Vibe Coding with Elixir", 40, :fri, ["Micah Woods"]},
-  {"@auth and Beyond", 40, :fri, ["Ivy Markwell"]},
-  {"Laying the Groundwork", 20, :fri, ["Kate Rezentes"]},
-  {"Handoff - distributed DAGs for Nx", 20, :fri, ["Paulo Valente"]},
-  {"AI Agents - Elixir is all you need", 20, :fri, ["Daniel Kentfield"]},
-  {"How to be an Elixir champion", 20, :fri, ["Dan Janowski"]},
-  {"IEx's Hidden Superpowers", 20, :fri, ["Brett Beatty"]},
-  {"Are you mocking me?", 20, :fri, ["German Velasco"]},
-  {"Phoenix and Ecto Taught Me Backend Engineering", 20, :fri, ["Doug VonMoser"]},
-  {"Let's talk a bit about bits and bytes", 20, :fri, ["Geoffrey Lessel"]},
-  {"From Bulbasaur to Venusaur", 20, :fri, ["Anna Sherman"]}
+  {"Extending Elixir with WebAssembly Components", 40, ["Chris Nelson"]},
+  {"Starting a business on Phoenix LiveView", 40, ["Aaron Votre"]},
+  {"Engineering Network Protocol Clients", 40, ["Carlos Souza"]},
+  {"From Notebook to Production", 20, ["Emmanuel Pinault"]},
+  {"Practical Mentorship for a Stronger Community", 20, ["Jordan Miller"]},
+  {"Test-Driven Elixir", 20, ["Britton Broderick"]},
+  {"You can build an AI agent", 20, ["Dennis Beatty"]},
+  {"Mise en Place for Ecto", 20, ["Nicholas Henry"]},
+  {"Leaving a BEAM cluster unattended for 2 years", 20, ["Yuri Oliveira"]},
+  {"Elixir's Configuration Layers", 20, ["Stephanie Lane"]},
+  {"Beyond Safe Migrations", 20, ["Joe Harrow"]},
+  {"Introducing Elixir Observer", 20, ["Juan Azambuja"]},
+  {"How LiveDebugger makes your life easier", 20, ["Krzysztof Nalepa"]},
+  {"Telemetry-Driven Development", 20, ["Noah Betzen"]},
+  {"Stranger Domains", 20, ["Nathan Hessler"]},
+  {"Building Websites with Tableau", 20, ["Mitchell Hanberg"]},
+  {"Writing Your Own Req Plugin", 20, ["Jacob Swanner"]},
+  {"UXIDs in Elixir/Ecto", 20, ["Adam Kirk"]},
+  {"Full-Stack AI with Elixir", 40, ["George Guimarães"]},
+  {"Hey Ash, Let's Chat!", 40, ["Jinkyou Son"]},
+  {"The Alchemy of Security", 40, ["Matt Ludwigs"]},
+  {"Cat and Mouse: Adversarial Web Scraping", 40, ["Tyler Young"]},
+  {"From Freakout to Fix", 40, ["Jonatan Männchen"]},
+  {"Failing to Introduce Elixir", 40, ["John Darrington"]},
+  {"Elixir is All You Need", 20, ["Christian Koch", "Jeremy Searls"]},
+  {"Embracing the Monolith", 20, ["Igor Spiridonov"]},
+  {"Building an Exception Tracker", 20, ["Gonzalo Rodriguez"]},
+  {"Tips & Tricks for Building an App With LiveView", 40, ["Michael St Clair"]},
+  {"Vibe Coding with Elixir", 40, ["Micah Woods"]},
+  {"@auth and Beyond", 40, ["Ivy Markwell"]},
+  {"Laying the Groundwork", 20, ["Kate Rezentes"]},
+  {"Handoff - distributed DAGs for Nx", 20, ["Paulo Valente"]},
+  {"AI Agents - Elixir is all you need", 20, ["Daniel Kentfield"]},
+  {"How to be an Elixir champion", 20, ["Dan Janowski"]},
+  {"IEx's Hidden Superpowers", 20, ["Brett Beatty"]},
+  {"Are you mocking me?", 20, ["German Velasco"]},
+  {"Phoenix and Ecto Taught Me Backend Engineering", 20, ["Doug VonMoser"]},
+  {"Let's talk a bit about bits and bytes", 20, ["Geoffrey Lessel"]},
+  {"From Bulbasaur to Venusaur", 20, ["Anna Sherman"]}
 ]
-
-window = fn
-  :thu -> ~o"2025-08-28/2025-08-29"
-  :fri -> ~o"2025-08-29/2025-08-30"
-end
 
 named = fn names -> Enum.flat_map(names, &List.wrap(Map.get(by_name, &1))) end
 
 sessions =
-  Enum.map(talks, fn {title, minutes, day, presenters} ->
-    Agenda.session(title, lasting: Tempo.Duration.new!(minute: minutes), between: window.(day))
+  Enum.map(talks, fn {title, minutes, presenters} ->
+    Agenda.session(title, lasting: Tempo.Duration.new!(minute: minutes))
     |> Agenda.Session.needs(:room, seats: at_least(250))
     |> Agenda.Session.roster(:speaker, named.(presenters))
   end)
@@ -282,11 +279,11 @@ A pin is not a special kind of value. It is an ordinary arrangement, so you buil
 
 ```elixir
 keynotes = [
-  {"Keynote: Open Source Resilience", 60, ~o"2025-08-28T09:15:00/2025-08-28T10:15:00",
+  {"Keynote: Open Source Resilience", 60, ~o"2025-08-28T09:15/T10:15",
    ["Allison Randal"]},
-  {"Elixir Update & Q&A", 40, ~o"2025-08-28T16:05:00/2025-08-28T16:45:00", []},
-  {"Keynote: Elixir's AI Future", 60, ~o"2025-08-29T09:10:00/2025-08-29T10:10:00", []},
-  {"Keynote: A New Case for Elixir", 60, ~o"2025-08-29T16:20:00/2025-08-29T17:20:00", []}
+  {"Elixir Update & Q&A", 40, ~o"2025-08-28T16:05/T16:45", []},
+  {"Keynote: Elixir's AI Future", 60, ~o"2025-08-29T09:10/T10:10", []},
+  {"Keynote: A New Case for Elixir", 60, ~o"2025-08-29T16:20/T17:20", []}
 ]
 
 plenaries =
@@ -320,7 +317,7 @@ Forty-two talks and four plenaries, against three rooms and forty-five speakers.
 programme =
   Enum.reduce(
     sessions ++ plenaries,
-    Agenda.programme("ElixirConf US 2025"),
+    Agenda.programme("ElixirConf US 2025") |> Agenda.Programme.across(~o"2025-08-28/2025-08-30"),
     &Agenda.Programme.add_session(&2, &1)
   )
 
@@ -337,29 +334,12 @@ pool = rooms ++ speakers
 <!-- slide: code -->
 
 ```elixir
-# A time asked for as a time, rather than sliced out of a formatted
-# string — then rendered by Localize, which takes a named width rather
-# than a format string and follows the locale.
-time = fn tempo ->
-  with {:ok, naive} <- Tempo.to_naive_date_time(tempo),
-       {:ok, formatted} <- Localize.Time.to_string(naive, format: :short) do
-    formatted
-  end
-end
-
-moment = fn tempo ->
-  with {:ok, naive} <- Tempo.to_naive_date_time(tempo),
-       {:ok, formatted} <- Localize.DateTime.to_string(naive, time_format: :short) do
-    formatted
-  end
-end
-
 arrangements
 |> Enum.filter(&Tempo.within?(&1.interval, ~o"2025-08-28"))
 |> Enum.sort(Arrangement)
 |> Enum.take(7)
 |> Enum.map_join("\n", fn a ->
-  "#{String.pad_trailing(time.(a.interval.from), 9)} #{String.pad_trailing(Arrangement.resource(a, :room).name, 14)} #{a.session}"
+  "#{String.pad_trailing(Tempo.to_string(a.interval.from, format: :hm), 9)} #{String.pad_trailing(Arrangement.resource(a, :room).name, 14)} #{a.session}"
 end)
 |> IO.puts()
 ```
@@ -376,7 +356,7 @@ for who <- ["Allison Randal", "Anna Sherman"] do
   |> Enum.filter(fn a -> Enum.any?(Arrangement.resources(a), &(&1.name == who)) end)
   |> Enum.sort(Arrangement)
   |> Enum.map_join("\n", fn a ->
-    "  #{moment.(a.interval.from)}  #{Arrangement.resource(a, :room).name}  #{a.session}"
+    "  #{Tempo.to_string(a.interval.from)}  #{Arrangement.resource(a, :room).name}  #{a.session}"
   end)
   |> then(&IO.puts("#{who}\n#{&1}\n"))
 end
@@ -396,7 +376,7 @@ Force the panel into the keynote slot and the programme stops being satisfiable.
 clash =
   Agenda.session("Building Careers, Balancing Life",
     lasting: ~o"PT40M",
-    between: ~o"2025-08-28T09:15:00/2025-08-28T09:55:00"
+    between: ~o"2025-08-28T09:15/T09:55"
   )
   |> Agenda.Session.needs(:room, seats: at_least(250))
   |> Agenda.Session.roster(
@@ -408,7 +388,10 @@ forced =
   (sessions ++ plenaries)
   |> Enum.reject(&(&1.name == "Building Careers, Balancing Life"))
   |> Kernel.++([clash])
-  |> Enum.reduce(Agenda.programme("ElixirConf US 2025"), &Agenda.Programme.add_session(&2, &1))
+  |> Enum.reduce(
+    Agenda.programme("ElixirConf US 2025") |> Agenda.Programme.across(~o"2025-08-28/2025-08-30"),
+    &Agenda.Programme.add_session(&2, &1)
+  )
 
 case Agenda.arrange(forced, pool, pinned: pinned) do
   {:error, reason} -> Agenda.explain(reason)
@@ -434,13 +417,13 @@ Agenda placed talks at 10:45, 11:25, 12:05. The real conference used 10:45, 11:3
 ```elixir
 {:ok, hall} =
   Agenda.resource("Hall", seats: 250, buffer_after: ~o"PT10M")
-  |> Agenda.open(~o"2025-08-28T09:00:00/2025-08-28T13:00:00")
+  |> Agenda.open(~o"2025-08-28T09:00/T13:00")
 
 four_talks =
   Enum.reduce(1..4, Agenda.programme("Turnaround"), fn i, programme ->
     Agenda.Programme.add_session(
       programme,
-      Agenda.session("T#{i}", lasting: ~o"PT40M", between: ~o"2025-08-28/2025-08-29")
+      Agenda.session("T#{i}", lasting: ~o"PT40M", between: ~o"2025-08-28")
       |> Agenda.Session.needs(:room, seats: 250)
     )
   end)
@@ -449,7 +432,7 @@ four_talks =
 
 spaced
 |> Enum.sort(Arrangement)
-|> Enum.map_join("   ", fn a -> time.(a.interval.from) end)
+|> Enum.map_join("   ", fn a -> Tempo.to_string(a.interval.from, format: :hm) end)
 ```
 
 ## Model the gap, or carve it out
@@ -463,14 +446,14 @@ Turnaround is real time the room is unavailable, so it holds against a booking t
 
 ## Scale
 
-Shape matters more than size. Sessions that cannot interact are solved separately and concurrently; sessions competing for the same rooms are the real cost.
+Shape matters more than size. 1,200 sessions across twenty days take about twice as long as 200 competing for a single day — six times the work for twice the time, because sessions that cannot interact are solved separately and concurrently.
 
 | Programme | Time |
 | --- | --- |
-| ElixirConf: 46 sessions, 3 rooms, 2 days | ~30 ms |
-| 240 sessions over 6 days | ~400 ms |
-| 1,200 sessions over 20 days | ~2.8 s |
-| 200 sessions competing for **one** day | ~5 s |
+| ElixirConf: 46 sessions, 3 rooms, 2 days | ~175 ms |
+| 240 sessions over 6 days | ~385 ms |
+| 1,200 sessions over 20 days | ~2.5 s |
+| 200 sessions competing for **one** day | ~1.2 s |
 
 ## Two days is not two problems
 
