@@ -96,7 +96,10 @@ defmodule Agenda.MixProject do
 
   defp deps do
     [
-      {:ex_tempo, "~> 1.4"},
+      # Tracking `main` while Tempo and Agenda are developed together.
+      # Restore `{:ex_tempo, "~> 1.4"}` before publishing: Hex refuses a
+      # package declaring a git dependency.
+      {:ex_tempo, github: "elixir-tempo/tempo"},
       {:ical, "~> 3.2", optional: true},
       # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
       # is only compiled when it is present.

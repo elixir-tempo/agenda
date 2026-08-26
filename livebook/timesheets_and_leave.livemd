@@ -85,7 +85,7 @@ That is a `Date.Range`, and `Tempo.from_elixir/2` converts one into an interval:
 ```elixir
 {:ok, from_range} = Tempo.from_elixir(fiscal_q1)
 
-%{designator: Tempo.to_iso8601(quarter), from_range: Tempo.to_iso8601(from_range)}
+%{designator: quarter, from_range: from_range}
 ```
 
 The two notations describe the same stretch of time, and each has its moment. The designator is one string and reads as the period's name, so it wins when the period is *written*. The Calendrical form wins when the period is *computed* — "the quarter containing today", or a loop over four of them — because the calendar module is doing the arithmetic.
@@ -106,14 +106,22 @@ A range that does not describe a contiguous span — stepped, or descending — 
 
 The calendar has to be passed to `Tempo.from_iso8601/2` rather than named inside the sigil. `~o"…"` resolves a calendar from an IXDTF `[u-ca=NAME]` suffix, and those are CLDR calendar identifiers — there is no name for a fiscal calendar module, so `~o"2027Y33M"` alone is Gregorian Q1 2027.
 
-A value also keeps the calendar it was derived in, all the way through to the report, and mixing fiscal and Gregorian labels in one sentence reads badly. So the worked example below uses the Gregorian window — the same 66 days, as the count confirms:
+A value also keeps the calendar it was derived in, all the way through to the report. Open hours built from the fiscal quarter render as `2027Y2M10D` — fiscal year 2027, month 2 — where a timesheet entry typed as `"2026-08-10T09:00:00"` renders as `2026Y8M10D`. Both name the same Monday, and mixing them in one sentence is the *"FY26 versus 2026"* confusion again, one layer down.
+
+`Tempo.to_calendar/2` settles it: convert the quarter's endpoints once, and everything downstream is labelled the way a reader expects while still being **derived from the calendar that defines the period** rather than typed out as a literal.
 
 ```elixir
-window = ~o"2026-07-01/2026-10-01"
+{:ok, opens} = Tempo.to_calendar(Tempo.Interval.from(from_range), Calendrical.Gregorian)
+{:ok, closes} = Tempo.to_calendar(Tempo.Interval.to(from_range), Calendrical.Gregorian)
+{:ok, window} = Tempo.Interval.new(opens, closes)
 
 {:ok, same_days} = Tempo.select(window, Tempo.workdays(:AU))
-Tempo.IntervalSet.count(same_days)
+%{window: window, workdays: Tempo.IntervalSet.count(same_days)}
 ```
+
+> *"The first quarter of Australian FY2027 is the first of July to the first of October 2026 — sixty-six working days."*
+
+`to_calendar/2` is day-resolution and takes one value, not an interval, which is exactly enough here: a quarter's boundaries are days. It could not convert the open hours themselves, and does not need to — converting the window is what makes everything built from it Gregorian.
 
 ## The consultant is a resource with a contract
 
@@ -224,7 +232,6 @@ Every value in the report is an interval set, `by_tag` included — so it answer
 report.by_tag
 |> Map.fetch!(acme)
 |> Tempo.IntervalSet.members()
-|> Enum.map(&Tempo.to_iso8601/1)
 ```
 
 ## Holidays are somebody else's problem
@@ -356,10 +363,10 @@ The quarter above came from a fiscal calendar without ceremony. This is why: the
 {:ok, fy26} = Tempo.from_iso8601("2026", calendar)
 {:ok, months} = Tempo.to_interval(fy26)
 
-{Enum.count(months), months |> Enum.at(0) |> Tempo.to_iso8601()}
+{Enum.count(months), Enum.at(months, 0)}
 ```
 
-`"2026Y1M"` is a *fiscal* label, not a Gregorian date, and this is the trap worth running rather than reasoning about:
+Twelve fiscal months, the first of them `2026Y1M`. Note what inspect shows and a formatted string would not: the calendar. That `Calendrical.FiscalYear.AU` is the whole point — `2026Y1M` is a *fiscal* label, not a Gregorian date, and here is the trap worth running rather than reasoning about:
 
 ```elixir
 Tempo.relation(Tempo.from_iso8601!("2026-01-01", calendar), ~o"2025-07-01")
