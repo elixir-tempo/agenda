@@ -25,7 +25,7 @@ defmodule Agenda.Series do
       iex> standup = Agenda.session("Stand-up", lasting: "PT15M")
       iex> {:ok, [first | _]} = Agenda.every(standup, "R3/2027-03-02T09:00:00/P1W")
       iex> {first.series, first.window}
-      {"Stand-up", ~o"2027Y3M2DT9H0M0S/2027Y3M9DT9H0M0S"}
+      {"Stand-up", ~o"2027Y3M2DT9H0M0S/9DT9H0M0S"}
 
   > *"The stand-up repeats weekly three times; the first occurrence may
   > fall anywhere in the week beginning the 2nd of March."*

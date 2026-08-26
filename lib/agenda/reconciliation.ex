@@ -138,7 +138,7 @@ defmodule Agenda.Reconciliation do
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
       iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
       iex> Tempo.IntervalSet.members(report.unaccounted)
-      [~o"2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+      [~o"2026Y6M16DT12H0M0S/T17H0M0S"]
 
   > *"Three of the eight hours are accounted for; the afternoon is not."*
 
@@ -359,7 +359,7 @@ defmodule Agenda.Reconciliation do
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
       iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
       iex> Agenda.Reconciliation.explain(report)
-      ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+      ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/T17H0M0S"]
 
   """
   @spec explain(t()) :: [String.t()]

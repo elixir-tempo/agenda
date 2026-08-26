@@ -41,7 +41,7 @@ length(options)
 #=> 8
 
 Agenda.explain(hd(options))
-#=> "2027Y3M1DT9H0M0S/2027Y3M1DT10H0M0S — attendees: Priya, Tom, room: Boardroom"
+#=> "2027Y3M1DT9H0M0S/T10H0M0S — attendees: Priya, Tom, room: Boardroom"
 ```
 
 > *"The review needs a room seating at least ten with video conferencing, plus Priya and Tom; there are eight ways to hold it, the earliest at nine in the boardroom."*
@@ -102,7 +102,7 @@ length(options)
 #=> 4
 
 Agenda.explain(hd(options))
-#=> "2027Y3M1DT9H0M0S/2027Y3M1DT11H0M0S — equipment: Projector cart, room: Training Room"
+#=> "2027Y3M1DT9H0M0S/T11H0M0S — equipment: Projector cart, room: Training Room"
 ```
 
 > *"The workshop needs a room for fifteen and a projector; four two-hour windows work, the first at nine in the training room with the cart."*
@@ -119,7 +119,7 @@ length(remaining)
 #=> 7
 
 Agenda.explain(hd(remaining))
-#=> "2027Y3M1DT10H0M0S/2027Y3M1DT11H0M0S — attendees: Priya, Tom, room: Boardroom"
+#=> "2027Y3M1DT10H0M0S/T11H0M0S — attendees: Priya, Tom, room: Boardroom"
 ```
 
 > *"Once the nine o'clock slot is taken, seven remain and the earliest is ten."*

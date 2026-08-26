@@ -98,7 +98,7 @@ defmodule Agenda.ReconciliationTest do
       assert total(report.unaccounted) == 5.0
 
       assert report.unaccounted |> IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1) ==
-               ["2026Y6M15DT12H0M0S/2026Y6M15DT17H0M0S"]
+               ["2026Y6M15DT12H0M0S/T17H0M0S"]
     end
 
     test "a balancing total is still caught when the days are wrong" do
@@ -260,7 +260,7 @@ defmodule Agenda.ReconciliationTest do
 
       assert %IntervalSet{} = billed = report.by_tag[{:project, "ACME"}]
       assert [interval] = IntervalSet.members(billed)
-      assert Tempo.to_iso8601(interval) == "2026Y6M15DT9H0M0S/2026Y6M15DT17H0M0S"
+      assert Tempo.to_iso8601(interval) == "2026Y6M15DT9H0M0S/T17H0M0S"
     end
 
     test "untagged claims group under nil rather than being dropped" do

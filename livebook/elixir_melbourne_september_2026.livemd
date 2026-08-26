@@ -20,12 +20,27 @@ Mix.install([
 
 <!-- slide: date 3 September 2026 -->
 
-Everything in this talk runs. The data is the real ElixirConf US 2025 programme, taken from the published schedule, and every number on these slides came out of the notebook rather than out of my head.
+Everything in this talk runs. The data is the real ElixirConf US 2025 programme, taken from the published schedule, and every number on these slides is calculated by the notebook.
 
 * Tempo answers *when is this free?*
 * Agenda answers *what should I book, and where?*
 * Built on Tempo, which treats every date and time as an interval
 * Today: the real ElixirConf US 2025 programme, laid out from scratch
+
+## Locale
+
+Every date and time on these slides is rendered by Localize from a *named width* — `:short`, `:medium` — rather than a format string, so the output follows the locale rather than a pattern someone typed. Change it here and the whole deck follows.
+
+`en-AU` is not bundled with Localize, so this also lets it fetch the locale on demand. Run this cell once before presenting and it is cached; without the download the deck falls back to `en` and renders American dates.
+
+<!-- slide: code -->
+
+```elixir
+Application.put_env(:localize, :allow_runtime_locale_download, true)
+
+{:ok, locale} = Localize.put_locale("en-AU")
+to_string(locale)
+```
 
 ## What we keep rebuilding
 
@@ -39,7 +54,7 @@ The third one is the killer. Once availability is *stored* rather than *derived*
 
 ## The five nouns
 
-Learn these and the rest of the library follows.
+Agenda uses the following definitions:
 
 * **Resource** — a named thing that can be allocated: a room, a person, a projector
 * **Place** — a tree of containers, so travel time is *derived* rather than configured
@@ -47,27 +62,14 @@ Learn these and the rest of the library follows.
 * **Arrangement** — one candidate way to hold it: a time and a resource per role
 * **Allocation** — one resource bound to one session; the **ledger** is the set of them
 
-## Words we keep apart
+## One word, one meaning
 
-The nouns are easy. The vocabulary is the part that carries the design, because each of these pairs is one word in most schedulers and two here — and every one of them is a bug when they get merged.
+The words below look interchangeable and are not. Each carries exactly one meaning, and running two of them together is where scheduling bugs come from — so Agenda keeps them apart.
 
-* **Concurrency** is how many claims may overlap at an *instant*. A **limit** is how much falls inside a *stretch of calendar*, however far apart. A 200-seat hall is `concurrency: 1`; a nurse's contract is `limits: [week: 5]`.
-* **`needs`** describes and lets the planner choose. **`roster`** names and accepts no substitute. A room is usually described; a speaker is always named.
-* **Open** is when a resource could be used. **Busy** is what already holds it. **Free** is `open − busy`, derived on every call — never stored, so it cannot go stale.
-* An **arrangement** is a *proposal*: one time, one resource per role. An **allocation** is the *record* of one resource actually bound. The ledger holds allocations; the search returns arrangements.
-* **Claim** books and refuses what it cannot honour. **Record** writes down what happened and checks nothing. A schedule is a request; a timesheet is a fact.
-* A **place** contains; an **attribute** merely labels. `location: :sydney` answers *"is it in Sydney?"*; a place tree answers *"can a delegate get there in the break?"* — and says `{:error, :unknown}` rather than guessing.
-* A **session** is one thing to be held. A **track** is a family of sessions constrained against *each other* — a shared audience, so no two may run at once.
-
-## Words we refused
-
-Every one of these was the obvious first choice, and each is written down in the moduledoc that rejected it.
-
-* **Session**, not *meeting* (a court hearing and a conference talk are neither), not *event* (`Tempo.Event` is taken, and it collides with event sourcing), not *booking* (which names the request in AshScheduling, not the thing requested).
-* **Programme**, not *schedule* — triple-booked already: `Tempo.Schedule` is critical-path planning, `AshScheduling.Schedule` is a bookable resource, and colloquially it is this output.
-* **Track**, not *stream* — Elixir's `Stream` owns that name and a conference stream would shadow it at every call site.
-
-Naming is the cheapest constraint in the library. Every pair on the previous slide would compile perfectly well as a single word, and each would take a real distinction with it.
+* A resource is **open** when it could be used, **busy** where something holds it, **free** where open remains — *Biscayne: open all morning, busy for the panel, free either side*.
+* A resource's **concurrency** is how many sessions may hold it at one moment; its **limit** is how many across a stretch of calendar — *one talk at a time, but at most two a day*.
+* A session's **needs** *describe* a resource for Agenda to choose — *any room seating 250*; its **roster** *names* one exactly — *Anna Sherman, nobody else*.
+* A **session** is one thing to be held; a **track** is sessions sharing an audience, so no two may run at once — *one talk, versus everything one delegate plans to attend*.
 
 ## The conference
 
@@ -96,8 +98,8 @@ import Tempo.Sigils
 
 alias Agenda.Arrangement
 
-{:ok, talk_hours} =
-  Tempo.IntervalSet.new([
+talk_hours =
+  Tempo.IntervalSet.new!([
     ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
     ~o"2025-08-28T13:45:00/2025-08-28T15:05:00",
     ~o"2025-08-28T15:35:00/2025-08-28T16:05:00",
@@ -118,8 +120,8 @@ Peninsula 4-7 is also the plenary room, so it opens earlier and closes later tha
 ```elixir
 venue = Agenda.place("Renaissance Orlando at SeaWorld")
 
-{:ok, plenary_hours} =
-  Tempo.IntervalSet.new([
+plenary_hours =
+  Tempo.IntervalSet.new!([
     ~o"2025-08-28T09:00:00/2025-08-28T10:15:00",
     ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
     ~o"2025-08-28T13:45:00/2025-08-28T15:05:00",
@@ -161,9 +163,9 @@ I did not plan this example around the constraint. I loaded the real programme a
 * Four people shared the panel between them
 * A scheduler treating a speaker as a label cannot see any of this
 
-## Describing a talk
+## Forty-five speakers
 
-`needs/3` describes and lets the planner choose; `roster/3` names and accepts no substitutes. Both bind the same way once the search starts.
+One resource each, open for the hours of the conference. Nothing about them is speaker-specific: `role: :speaker` is an ordinary attribute of the kind you would put on a room, and `by_name` is only a lookup so that a talk can name the people who must be in it.
 
 <!-- slide: code -->
 
@@ -197,11 +199,12 @@ A trap worth knowing, because it silently costs you the exact constraint this ta
 * `roster(:speaker, [a, b, c])` binds all three
 * `roster(:speaker, [a])` three times keeps only the last
 * No error, no warning — the panel simply loses three of its four people
-* I lost twenty minutes to this while building the example
 
 ## The programme
 
 Forty-two talks, each naming its duration, its day, the kind of room it needs and the people who must be there.
+
+`needs/3` **describes** and lets the planner choose — any room seating 250 will do. `roster/3` **names** and accepts no substitutes — these four people. Both bind the same way once the search starts, which is what lets a room and a person clash for the same reason.
 
 <!-- slide: code -->
 
@@ -335,10 +338,20 @@ pool = rooms ++ speakers
 
 ```elixir
 # A time asked for as a time, rather than sliced out of a formatted
-# string.
-stamp = fn tempo, format ->
-  {:ok, naive} = Tempo.to_naive_date_time(tempo)
-  Calendar.strftime(naive, format)
+# string — then rendered by Localize, which takes a named width rather
+# than a format string and follows the locale.
+time = fn tempo ->
+  with {:ok, naive} <- Tempo.to_naive_date_time(tempo),
+       {:ok, formatted} <- Localize.Time.to_string(naive, format: :short) do
+    formatted
+  end
+end
+
+moment = fn tempo ->
+  with {:ok, naive} <- Tempo.to_naive_date_time(tempo),
+       {:ok, formatted} <- Localize.DateTime.to_string(naive, time_format: :short) do
+    formatted
+  end
 end
 
 arrangements
@@ -346,14 +359,14 @@ arrangements
 |> Enum.sort(Arrangement)
 |> Enum.take(7)
 |> Enum.map_join("\n", fn a ->
-  "#{stamp.(a.interval.from, "%H:%M")}  #{String.pad_trailing(Arrangement.resource(a, :room).name, 14)} #{a.session}"
+  "#{String.pad_trailing(time.(a.interval.from), 9)} #{String.pad_trailing(Arrangement.resource(a, :room).name, 14)} #{a.session}"
 end)
 |> IO.puts()
 ```
 
 ## The constraint held
 
-Nobody wrote a rule saying Allison Randal cannot be on a panel during her own keynote. It follows from her being a resource with a concurrency of one — and it would have followed identically for a room, a projector or a customer site.
+There is no rule saying Allison Randal cannot be on a panel during her own keynote. It follows from her being a resource with a concurrency of one — and it would have followed identically for a room, a projector or a customer site.
 
 <!-- slide: code -->
 
@@ -363,7 +376,7 @@ for who <- ["Allison Randal", "Anna Sherman"] do
   |> Enum.filter(fn a -> Enum.any?(Arrangement.resources(a), &(&1.name == who)) end)
   |> Enum.sort(Arrangement)
   |> Enum.map_join("\n", fn a ->
-    "  #{stamp.(a.interval.from, "%a %d %b %H:%M")}  #{Arrangement.resource(a, :room).name}  #{a.session}"
+    "  #{moment.(a.interval.from)}  #{Arrangement.resource(a, :room).name}  #{a.session}"
   end)
   |> then(&IO.puts("#{who}\n#{&1}\n"))
 end
@@ -436,7 +449,7 @@ four_talks =
 
 spaced
 |> Enum.sort(Arrangement)
-|> Enum.map_join("   ", fn a -> stamp.(a.interval.from, "%H:%M") end)
+|> Enum.map_join("   ", fn a -> time.(a.interval.from) end)
 ```
 
 ## Model the gap, or carve it out

@@ -77,7 +77,7 @@ length(options)
 #=> 2
 
 Agenda.explain(hd(options))
-#=> "2027Y3M1DT9H0M0S/2027Y3M1DT12H0M0S — consultant: Dana, site: Acme HQ"
+#=> "2027Y3M1DT9H0M0S/T12H0M0S — consultant: Dana, site: Acme HQ"
 ```
 
 > *"The three-hour audit can run two ways; the first is Dana at Acme, starting at nine."*
@@ -156,8 +156,8 @@ week =
 {:ok, itinerary} = Agenda.arrange(week, [dana, acme, beta])
 
 Enum.map(itinerary, &Agenda.explain/1)
-#=> ["2027Y3M1DT9H0M0S/2027Y3M1DT10H0M0S — consultant: Dana, site: Acme HQ",
-#=>  "2027Y3M1DT11H0M0S/2027Y3M1DT12H0M0S — consultant: Dana, site: Beta Corp"]
+#=> ["2027Y3M1DT9H0M0S/T10H0M0S — consultant: Dana, site: Acme HQ",
+#=>  "2027Y3M1DT11H0M0S/T12H0M0S — consultant: Dana, site: Beta Corp"]
 ```
 
 > *"Dana is at Acme at nine and Beta at eleven — two hours apart for a five-minute trip, so the day works."*
@@ -189,8 +189,8 @@ engagement =
 
 {:ok, ordered} = Agenda.arrange(engagement, [dana, acme])
 Enum.map(ordered, &Agenda.explain/1)
-#=> ["2027Y3M1DT9H0M0S/2027Y3M1DT10H0M0S — consultant: Dana",
-#=>  "2027Y3M1DT11H0M0S/2027Y3M1DT12H0M0S — consultant: Dana"]
+#=> ["2027Y3M1DT9H0M0S/T10H0M0S — consultant: Dana",
+#=>  "2027Y3M1DT11H0M0S/T12H0M0S — consultant: Dana"]
 ```
 
 > *"The installation follows the survey, with at least an hour in between to write it up."*

@@ -24,8 +24,8 @@ defmodule Agenda.BufferTest do
   describe "turnaround blocks more than the claim itself" do
     test "with no buffers only the claim is unavailable" do
       assert free(room([]), "2027-03-02T12:00:00/2027-03-02T12:30:00") == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT12H0M0S",
-               "2027Y3M2DT12H30M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T12H0M0S",
+               "2027Y3M2DT12H30M0S/T17H0M0S"
              ]
     end
 
@@ -36,8 +36,8 @@ defmodule Agenda.BufferTest do
                room(buffer_after: ~o"PT15M"),
                "2027-03-02T12:00:00/2027-03-02T12:30:00"
              ) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT12H0M0S",
-               "2027Y3M2DT12H45M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T12H0M0S",
+               "2027Y3M2DT12H45M0S/T17H0M0S"
              ]
     end
 
@@ -46,8 +46,8 @@ defmodule Agenda.BufferTest do
                room(buffer_before: ~o"PT10M"),
                "2027-03-02T12:00:00/2027-03-02T12:30:00"
              ) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT11H50M0S",
-               "2027Y3M2DT12H30M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T11H50M0S",
+               "2027Y3M2DT12H30M0S/T17H0M0S"
              ]
     end
 
@@ -56,8 +56,8 @@ defmodule Agenda.BufferTest do
                room(buffer_before: ~o"PT10M", buffer_after: ~o"PT15M"),
                "2027-03-02T12:00:00/2027-03-02T12:30:00"
              ) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT11H50M0S",
-               "2027Y3M2DT12H45M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T11H50M0S",
+               "2027Y3M2DT12H45M0S/T17H0M0S"
              ]
     end
 
@@ -70,9 +70,9 @@ defmodule Agenda.BufferTest do
       ]
 
       assert free(room(buffer_before: ~o"PT15M", buffer_after: ~o"PT15M"), busy) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT11H45M0S",
-               "2027Y3M2DT12H45M0S/2027Y3M2DT13H45M0S",
-               "2027Y3M2DT14H45M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T11H45M0S",
+               "2027Y3M2DT12H45M0S/T13H45M0S",
+               "2027Y3M2DT14H45M0S/T17H0M0S"
              ]
     end
 
@@ -83,14 +83,14 @@ defmodule Agenda.BufferTest do
       ]
 
       assert free(room(buffer_after: ~o"PT30M"), busy) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT12H0M0S",
-               "2027Y3M2DT14H0M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T12H0M0S",
+               "2027Y3M2DT14H0M0S/T17H0M0S"
              ]
     end
 
     test "a resource with no claims is unaffected by its buffers" do
       assert free(room(buffer_before: ~o"PT1H", buffer_after: ~o"PT1H"), []) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T17H0M0S"
              ]
     end
   end
@@ -108,8 +108,8 @@ defmodule Agenda.BufferTest do
       ]
 
       assert free(desk, busy) == [
-               "2027Y3M2DT9H0M0S/2027Y3M2DT12H0M0S",
-               "2027Y3M2DT13H0M0S/2027Y3M2DT17H0M0S"
+               "2027Y3M2DT9H0M0S/T12H0M0S",
+               "2027Y3M2DT13H0M0S/T17H0M0S"
              ]
     end
   end

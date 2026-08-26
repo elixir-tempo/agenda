@@ -74,14 +74,14 @@ defmodule Agenda.ClaimTest do
                Agenda.claim(Agenda.ledger(), dana(), ~o"2026-08-10T16:00:00/2026-08-10T19:00:00")
 
       # 16:00-17:00 is open; only 17:00-19:00 is refused.
-      assert reason == "Dana is not open for 2026Y8M10DT17H0M0S/2026Y8M10DT19H0M0S"
+      assert reason == "Dana is not open for 2026Y8M10DT17H0M0S/T19H0M0S"
     end
 
     test "the lunch break is not open time" do
       assert {:error, reason} =
                Agenda.claim(Agenda.ledger(), dana(), ~o"2026-08-10T09:00:00/2026-08-10T14:00:00")
 
-      assert reason == "Dana is not open for 2026Y8M10DT12H0M0S/2026Y8M10DT13H0M0S"
+      assert reason == "Dana is not open for 2026Y8M10DT12H0M0S/T13H0M0S"
     end
 
     test "an hour already claimed" do
@@ -99,7 +99,7 @@ defmodule Agenda.ClaimTest do
       assert {:error, reason} =
                Agenda.claim(ledger, resource, ~o"2026-08-10T11:00:00/2026-08-10T11:30:00")
 
-      assert reason == "Dana is already claimed for 2026Y8M10DT11H0M0S/2026Y8M10DT11H30M0S"
+      assert reason == "Dana is already claimed for 2026Y8M10DT11H0M0S/T30M0S"
     end
 
     test "not-open is reported ahead of already-claimed" do

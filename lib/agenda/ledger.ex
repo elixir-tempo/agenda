@@ -193,7 +193,7 @@ defmodule Agenda.Ledger do
       iex> {:ok, ledger} = Agenda.Ledger.claim(Agenda.Ledger.new(), dana, ~o"2026-08-10T09:00:00/2026-08-10T12:00:00")
       iex> {:error, reason} = Agenda.Ledger.claim(ledger, dana, ~o"2026-08-10T11:00:00/2026-08-10T13:00:00")
       iex> reason
-      "Dana is already claimed for 2026Y8M10DT11H0M0S/2026Y8M10DT12H0M0S"
+      "Dana is already claimed for 2026Y8M10DT11H0M0S/T12H0M0S"
 
   And so is time the resource does not work:
 
@@ -201,7 +201,7 @@ defmodule Agenda.Ledger do
       iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
       iex> {:error, reason} = Agenda.Ledger.claim(Agenda.Ledger.new(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00")
       iex> reason
-      "Dana is not open for 2026Y8M15DT9H0M0S/2026Y8M15DT12H0M0S"
+      "Dana is not open for 2026Y8M15DT9H0M0S/T12H0M0S"
 
   """
   @spec claim(t(), Resource.t(), Availability.pattern(), keyword()) ::
@@ -269,7 +269,7 @@ defmodule Agenda.Ledger do
       iex> {:ok, ledger} = Agenda.Ledger.record(Agenda.Ledger.new(), dana, ~o"2026-08-10T09:00:00/2026-08-10T12:00:00")
       iex> {:error, reason} = Agenda.Ledger.claim(ledger, dana, ~o"2026-08-10T10:00:00/2026-08-10T11:00:00")
       iex> reason
-      "Dana is already claimed for 2026Y8M10DT10H0M0S/2026Y8M10DT11H0M0S"
+      "Dana is already claimed for 2026Y8M10DT10H0M0S/T11H0M0S"
 
   """
   @spec record(t(), Resource.t(), Availability.pattern(), keyword()) ::

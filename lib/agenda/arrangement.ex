@@ -69,7 +69,7 @@ defmodule Agenda.Arrangement do
       ...>   allocations: %{room: [boardroom]}
       ...> }
       iex> Agenda.Arrangement.explain(arrangement)
-      "2026Y6M16DT10H0M0S/2026Y6M16DT11H0M0S — room: Boardroom"
+      "2026Y6M16DT10H0M0S/T11H0M0S — room: Boardroom"
 
   """
   @spec explain(t()) :: String.t()
@@ -197,8 +197,8 @@ defmodule Agenda.Arrangement do
       iex> morning = %Agenda.Arrangement{interval: ~o"2026-06-16T09:00:00/2026-06-16T10:00:00"}
       iex> midday = %Agenda.Arrangement{interval: ~o"2026-06-16T12:00:00/2026-06-16T13:00:00"}
       iex> [midday, morning] |> Enum.sort(Agenda.Arrangement) |> Enum.map(& &1.interval)
-      [~o"2026Y6M16DT9H0M0S/2026Y6M16DT10H0M0S",
-       ~o"2026Y6M16DT12H0M0S/2026Y6M16DT13H0M0S"]
+      [~o"2026Y6M16DT9H0M0S/T10H0M0S",
+       ~o"2026Y6M16DT12H0M0S/T13H0M0S"]
 
   """
   @spec compare(t(), t()) :: :lt | :eq | :gt

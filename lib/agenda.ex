@@ -338,7 +338,7 @@ defmodule Agenda do
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> {:ok, [best | _]} = Agenda.plan(session, [boardroom])
       iex> Agenda.explain(best)
-      "2026Y6M15DT9H0M0S/2026Y6M15DT10H0M0S — room: Boardroom"
+      "2026Y6M15DT9H0M0S/T10H0M0S — room: Boardroom"
 
   """
   @spec plan(Session.t(), [Resource.t()], keyword()) ::
@@ -436,7 +436,7 @@ defmodule Agenda do
       iex> import Tempo.Sigils
       iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
       iex> Agenda.claim(Agenda.ledger(), dana, ~o"2026-08-10T16:00:00/2026-08-10T19:00:00")
-      {:error, "Dana is not open for 2026Y8M10DT17H0M0S/2026Y8M10DT19H0M0S"}
+      {:error, "Dana is not open for 2026Y8M10DT17H0M0S/T19H0M0S"}
 
   """
   @spec claim(Ledger.t(), Resource.t(), Availability.pattern(), keyword()) ::
@@ -557,7 +557,7 @@ defmodule Agenda do
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
       iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
       iex> Agenda.Reconciliation.explain(report)
-      ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+      ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/T17H0M0S"]
 
   """
   @spec reconcile(Ledger.t(), Resource.t(), keyword()) ::
