@@ -195,6 +195,66 @@ defmodule Agenda.LimitTest do
     end
   end
 
+  describe "bucket/2 takes its week from the value's own calendar" do
+    # A Gregorian week runs Monday..Sunday; this one runs Sunday..Saturday.
+    defmodule SundayStart do
+      use Calendrical.Base.Month,
+        month_of_year: 1,
+        min_days_in_first_week: 1,
+        day_of_week: Calendrical.sunday()
+    end
+
+    defp on(date, calendar), do: Tempo.from_iso8601!(date <> "T09:00:00", calendar)
+
+    test "an ISO calendar puts Sunday with the week that preceded it" do
+      friday = on("2026-08-14", Calendrical.Gregorian)
+      sunday = on("2026-08-16", Calendrical.Gregorian)
+      monday = on("2026-08-17", Calendrical.Gregorian)
+
+      assert Limit.bucket(sunday, :week) == Limit.bucket(friday, :week)
+      refute Limit.bucket(sunday, :week) == Limit.bucket(monday, :week)
+    end
+
+    test "a Sunday-start calendar puts it with the week that follows" do
+      # The bug this replaced: the week boundary was hard-coded to
+      # Monday, so a Sunday-start contract counted the wrong seven days
+      # and a Sunday shift was charged to the previous week.
+      friday = on("2026-08-14", SundayStart)
+      sunday = on("2026-08-16", SundayStart)
+      monday = on("2026-08-17", SundayStart)
+
+      assert Limit.bucket(sunday, :week) == Limit.bucket(monday, :week)
+      refute Limit.bucket(sunday, :week) == Limit.bucket(friday, :week)
+    end
+
+    test "days and months do not depend on the week convention" do
+      gregorian = on("2026-08-16", Calendrical.Gregorian)
+      sunday_start = on("2026-08-16", SundayStart)
+
+      assert Limit.bucket(gregorian, :day) == Limit.bucket(sunday_start, :day)
+      assert Limit.bucket(gregorian, :month) == Limit.bucket(sunday_start, :month)
+    end
+
+    test "a calendar Calendrical defines no week_of_year for still buckets" do
+      # `Calendrical.Hebrew.week_of_year/3` answers `{:error, :not_defined}`,
+      # so an earlier version bucketed every Hebrew claim to `:undated` —
+      # which put a whole programme in one bucket and made a weekly limit
+      # behave as a global one. Truncation places it consistently instead.
+      first = Tempo.from_iso8601!("5786-10-23", Calendrical.Hebrew)
+      last = Tempo.from_iso8601!("5786-10-29", Calendrical.Hebrew)
+      next_week = Tempo.from_iso8601!("5786-10-30", Calendrical.Hebrew)
+
+      assert Limit.bucket(first, :week) == Limit.bucket(last, :week)
+      refute Limit.bucket(first, :week) == Limit.bucket(next_week, :week)
+      assert Limit.bucket(next_week, :day) == {5786, 10, 30}
+    end
+
+    test "a value too coarse to place is undated" do
+      assert Limit.bucket(~o"2026", :week) == :undated
+      assert Limit.bucket(~o"2026-08", :day) == :undated
+    end
+  end
+
   describe "Resource integration" do
     test "limits are parsed on construction" do
       resource = Agenda.resource("Dana", limits: [day: ~o"PT7H36M"])

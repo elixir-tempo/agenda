@@ -275,9 +275,19 @@ defmodule Agenda.Limit do
   @doc """
   Which day, week or month a moment falls in.
 
-  A week is bucketed by the date its Monday falls on, so the boundary
-  is the calendar's rather than an arbitrary seven-day window measured
-  from the first claim.
+  A bucket is `{year, month, day}` for every period — the components of
+  the period's first moment, with `day` absent for a month. Uniform by
+  construction, and never compared across periods.
+
+  Each is `Tempo.trunc/2` to that period, reduced to plain components:
+  the day, the day its week begins on, or its month. The boundary is
+  therefore the calendar's own, not an arbitrary window measured from
+  the first claim — and **which calendar is the value's own**. A week
+  runs from whichever day that calendar starts its weeks on, so a value
+  in a Sunday-start calendar buckets its Sundays with the following
+  Monday where an ISO value buckets them with the preceding one.
+  Reading the convention off the value is what keeps a weekly contract
+  counting the seven days its holder actually works.
 
   ### Arguments
 
@@ -301,7 +311,7 @@ defmodule Agenda.Limit do
 
       iex> import Tempo.Sigils
       iex> Agenda.Limit.bucket(~o"2026-06-16T10:00:00", :month)
-      {2026, 6}
+      {2026, 6, nil}
 
       iex> import Tempo.Sigils
       iex> # Tuesday and Thursday of one week share its Monday.
@@ -312,28 +322,28 @@ defmodule Agenda.Limit do
   """
   @spec bucket(Tempo.t() | term(), atom()) :: tuple() | :undated
   def bucket(%Tempo{} = moment, period) do
-    with year when is_integer(year) <- moment.time[:year],
-         month when is_integer(month) <- moment.time[:month],
-         day when is_integer(day) <- moment.time[:day] do
-      calendar_bucket(year, month, day, period)
+    with year when is_integer(year) <- Tempo.year(moment),
+         month when is_integer(month) <- Tempo.month(moment),
+         day when is_integer(day) <- Tempo.day(moment),
+         %Tempo{} = start <- Tempo.trunc(moment, period) do
+      components(start)
     else
-      _no_date -> :undated
+      _cannot_be_placed -> :undated
     end
   end
 
   def bucket(_other, _period), do: :undated
 
-  defp calendar_bucket(year, month, day, :day), do: {year, month, day}
-  defp calendar_bucket(year, month, _day, :month), do: {year, month}
-
-  defp calendar_bucket(year, month, day, :week) do
-    case Date.new(year, month, day) do
-      {:ok, date} -> date |> Date.beginning_of_week() |> Date.to_erl()
-      {:error, _reason} -> :undated
-    end
+  # The start of the period, reduced to its plain components. The
+  # reduction matters: a truncated value carries the zone and extended
+  # metadata of the claim it came from, so `~o"2026Y8M10D"` and
+  # `~o"2026Y8M10D[Australia/Sydney]"` are the same Monday and are
+  # *not* equal. Grouping on the value itself would split one week in
+  # two the moment a resource mixed zoned and unzoned claims, and a
+  # weekly budget would quietly stop counting.
+  defp components(%Tempo{} = start) do
+    {Tempo.year(start), Tempo.month(start), Tempo.day(start)}
   end
-
-  defp calendar_bucket(_year, _month, _day, _unknown_period), do: :undated
 
   @doc """
   `true` when `count` claims totalling `duration` sit within the
