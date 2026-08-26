@@ -163,7 +163,7 @@ Requirements are written with these, and they deliberately mirror Tempo's own du
 
 Two habits worth forming early:
 
-* **`needs/3` describes, `roster/3` names.** Use `needs` when any qualifying resource will do and let the planner choose; use `roster` when the choice is already made — these three people, that customer's office.
+* **`needs/3` describes, `roster/3` names.** Use `needs` when any qualifying resource will do and let the planner choose; use `roster` when the choice is already made — these three people, that customer's office. When the names arrive as strings, `Agenda.Resource.fetch_all/2` turns them into resources all-or-nothing, so a typo fails the call instead of quietly handing `roster` a shorter list.
 
 * **Put a person's access needs on the person.** `Agenda.resource("Priya", requires: [step_free_access: true])` turns "somebody must remember" into "the room is not eligible". The requirement travels with them into every session they join.
 

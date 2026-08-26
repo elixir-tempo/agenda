@@ -58,4 +58,43 @@ defmodule Agenda.ResourceTest do
       assert Resource.separation(context.placeless, context.placeless) == :disjoint
     end
   end
+
+  describe "fetch/2 and fetch_all/2" do
+    setup do
+      %{pool: [Resource.new("Ann"), Resource.new("Bo"), Resource.new("Cee")]}
+    end
+
+    test "fetch finds by name", context do
+      assert {:ok, resource} = Resource.fetch(context.pool, "Bo")
+      assert resource.name == "Bo"
+    end
+
+    test "fetch names the resource it could not find", context do
+      assert Resource.fetch(context.pool, "Bob") == {:error, {:unknown_resource, "Bob"}}
+    end
+
+    test "fetch tolerates an empty pool and an empty name" do
+      assert Resource.fetch([], "Ann") == {:error, {:unknown_resource, "Ann"}}
+      assert Resource.fetch([Resource.new("Ann")], "") == {:error, {:unknown_resource, ""}}
+    end
+
+    test "fetch_all preserves the order asked for, not the pool order", context do
+      assert {:ok, resources} = Resource.fetch_all(context.pool, ["Cee", "Ann"])
+      assert Enum.map(resources, & &1.name) == ["Cee", "Ann"]
+    end
+
+    test "fetch_all repeats a name repeated", context do
+      assert {:ok, resources} = Resource.fetch_all(context.pool, ["Ann", "Ann"])
+      assert Enum.map(resources, & &1.name) == ["Ann", "Ann"]
+    end
+
+    test "fetch_all reports every unknown name, not just the first", context do
+      assert Resource.fetch_all(context.pool, ["Ann", "Bob", "Cee", "Dee"]) ==
+               {:error, {:unknown_resources, ["Bob", "Dee"]}}
+    end
+
+    test "fetch_all of nothing is nothing", context do
+      assert Resource.fetch_all(context.pool, []) == {:ok, []}
+    end
+  end
 end

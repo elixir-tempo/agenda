@@ -210,6 +210,92 @@ defmodule Agenda.Resource do
   def attribute(%__MODULE__{attributes: attributes}, name), do: Map.get(attributes, name)
 
   @doc """
+  The resource in `pool` with this `name`.
+
+  A resource's name is its identity: the arranger, the ledger and the
+  fixpoint bridge all decide "is this the same resource?" by comparing
+  names. Looking one up is therefore an ordinary thing to want, and
+  doing it by hand — `Enum.find/2`, or a map built at the call site —
+  is how a mistyped name becomes a silently missing resource instead
+  of an error.
+
+  ### Arguments
+
+  * `pool` is a list of `t:t/0`.
+
+  * `name` is the resource name to find.
+
+  ### Returns
+
+  * `{:ok, resource}`; or
+
+  * `{:error, {:unknown_resource, name}}`.
+
+  ### Examples
+
+      iex> pool = [Agenda.Resource.new("Boardroom"), Agenda.Resource.new("Annexe")]
+      iex> {:ok, resource} = Agenda.Resource.fetch(pool, "Annexe")
+      iex> resource.name
+      "Annexe"
+
+      iex> pool = [Agenda.Resource.new("Boardroom")]
+      iex> Agenda.Resource.fetch(pool, "Baordroom")
+      {:error, {:unknown_resource, "Baordroom"}}
+
+  """
+  @spec fetch([t()], String.t()) :: {:ok, t()} | {:error, {:unknown_resource, String.t()}}
+  def fetch(pool, name) when is_list(pool) and is_binary(name) do
+    case Enum.find(pool, &(&1.name == name)) do
+      %__MODULE__{} = resource -> {:ok, resource}
+      nil -> {:error, {:unknown_resource, name}}
+    end
+  end
+
+  @doc """
+  Every resource in `pool` named by `names`, in the order given.
+
+  All or nothing: an unknown name fails the call rather than returning
+  a shorter list. A roster that quietly loses a member is the failure
+  this exists to prevent — the session still runs, without the person
+  it named. Every unknown name is reported, not just the first.
+
+  ### Arguments
+
+  * `pool` is a list of `t:t/0`.
+
+  * `names` is a list of resource names.
+
+  ### Returns
+
+  * `{:ok, resources}` in the order the names were given; or
+
+  * `{:error, {:unknown_resources, names}}` listing every name that is
+    not in the pool, in the order given.
+
+  ### Examples
+
+      iex> pool = [Agenda.Resource.new("Ann"), Agenda.Resource.new("Bo")]
+      iex> {:ok, resources} = Agenda.Resource.fetch_all(pool, ["Bo", "Ann"])
+      iex> Enum.map(resources, & &1.name)
+      ["Bo", "Ann"]
+
+      iex> pool = [Agenda.Resource.new("Ann")]
+      iex> Agenda.Resource.fetch_all(pool, ["Ann", "Bo", "Cee"])
+      {:error, {:unknown_resources, ["Bo", "Cee"]}}
+
+  """
+  @spec fetch_all([t()], [String.t()]) ::
+          {:ok, [t()]} | {:error, {:unknown_resources, [String.t()]}}
+  def fetch_all(pool, names) when is_list(pool) and is_list(names) do
+    known = Map.new(pool, &{&1.name, &1})
+
+    case Enum.reject(names, &Map.has_key?(known, &1)) do
+      [] -> {:ok, Enum.map(names, &Map.fetch!(known, &1))}
+      unknown -> {:error, {:unknown_resources, unknown}}
+    end
+  end
+
+  @doc """
   `true` when `resource` sits inside `place`, at any depth.
 
   A resource with no place is inside nothing.

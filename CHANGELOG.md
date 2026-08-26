@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+* `Agenda.Resource.fetch/2` and `fetch_all/2` find resources by name. `fetch_all/2` is all-or-nothing — an unknown name errors rather than silently shortening a roster.
+
 ### Changed
 
 * Requires `ex_tempo ~> 1.3`, the first release carrying the RFC 7953 availability support `from_ical/1` is built on, and `ical ~> 3.2`, the first release that parses `VAVAILABILITY` at all.

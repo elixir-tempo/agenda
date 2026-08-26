@@ -166,7 +166,7 @@ I did not plan this example around the constraint. I loaded the real programme a
 
 ## Forty-five speakers
 
-One resource each, open for the hours of the conference. Nothing about them is speaker-specific: `role: :speaker` is an ordinary attribute of the kind you would put on a room, and `by_name` is only a lookup so that a talk can name the people who must be in it.
+One resource each, open for the hours of the conference. Nothing about them is speaker-specific: `role: :speaker` is an ordinary attribute of the kind you would put on a room. `Agenda.Resource.fetch_all/2` is how a talk names the people who must be in it — all or nothing, so a misspelled name fails the call instead of quietly dropping the speaker.
 
 <!-- slide: code -->
 
@@ -189,7 +189,6 @@ speakers =
     speaker
   end)
 
-by_name = Map.new(speakers, &{&1.name, &1})
 length(speakers)
 ```
 
@@ -258,13 +257,13 @@ talks = [
   {"From Bulbasaur to Venusaur", 20, ["Anna Sherman"]}
 ]
 
-named = fn names -> Enum.flat_map(names, &List.wrap(Map.get(by_name, &1))) end
-
 sessions =
   Enum.map(talks, fn {title, minutes, presenters} ->
+    {:ok, presenting} = Agenda.Resource.fetch_all(speakers, presenters)
+
     Agenda.session(title, lasting: Tempo.Duration.new!(minute: minutes))
     |> Agenda.Session.needs(:room, seats: at_least(250))
-    |> Agenda.Session.roster(:speaker, named.(presenters))
+    |> Agenda.Session.roster(:speaker, presenting)
   end)
 
 length(sessions)
@@ -294,8 +293,12 @@ plenaries =
       |> Agenda.Session.roster(:room, [peninsula])
 
     case presenters do
-      [] -> session
-      names -> Agenda.Session.roster(session, :speaker, named.(names))
+      [] ->
+        session
+
+      names ->
+        {:ok, presenting} = Agenda.Resource.fetch_all(speakers, names)
+        Agenda.Session.roster(session, :speaker, presenting)
     end
   end)
 
@@ -378,16 +381,21 @@ Force the panel into the keynote slot and the programme stops being satisfiable.
 <!-- slide: code -->
 
 ```elixir
+{:ok, panel} =
+  Agenda.Resource.fetch_all(speakers, [
+    "Savannah Manning",
+    "Anna Sherman",
+    "Allison Randal",
+    "Lorena Mireles"
+  ])
+
 clash =
   Agenda.session("Building Careers, Balancing Life",
     lasting: ~o"PT40M",
     between: ~o"2025-08-28T09:15/T09:55"
   )
   |> Agenda.Session.needs(:room, seats: at_least(250))
-  |> Agenda.Session.roster(
-    :speaker,
-    named.(["Savannah Manning", "Anna Sherman", "Allison Randal", "Lorena Mireles"])
-  )
+  |> Agenda.Session.roster(:speaker, panel)
 
 forced =
   (sessions ++ plenaries)
