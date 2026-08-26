@@ -556,11 +556,11 @@ Agenda is a scheduler. Timetabling — a school or university week — is a diff
 * A lesson splits: "five periods a week, at most two a day, one double"
 * Feasibility is easy there; minimising student gaps is the whole job
 * Every teacher and cohort recurs daily, so nothing decomposes
-* That is a sibling library, not a flag on this one
+* `Timetable` could be a sibling library, its definitely no in scope for this one
 
 ## Thank you
 
 * [github.com/elixir-tempo/agenda](https://github.com/elixir-tempo/agenda)
-* [github.com/kipcole9/tempo](https://github.com/kipcole9/tempo) — the interval engine underneath
+* [github.com/elixir-tempo/tempo](https://github.com/elixir-tempo/tempo) — the interval engine underneath
 * Schedule data from the published ElixirConf US 2025 programme
 * Questions?
