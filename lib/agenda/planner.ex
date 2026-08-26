@@ -39,6 +39,7 @@ defmodule Agenda.Planner do
   alias Agenda.Resource
   alias Agenda.Session
   alias Tempo.Compare
+  alias Tempo.Duration
   alias Tempo.IntervalSet
 
   @default_limit 20
@@ -397,24 +398,13 @@ defmodule Agenda.Planner do
     end)
     |> case do
       [] -> nil
-      buffers -> Enum.max_by(buffers, &seconds/1)
+      buffers -> Enum.max(buffers, Duration)
     end
   end
 
   defp widen(duration, nil), do: duration
 
-  defp widen(duration, turnaround) do
-    %Tempo.Duration{time: [second: seconds(duration) + seconds(turnaround)]}
-  end
-
-  # A duration has no fixed length in general — a month depends on which
-  # month — but a turnaround and a session length are both spans of
-  # clock time, so measuring them from a common epoch is exact here.
-  defp seconds(duration) do
-    {:ok, epoch} = Tempo.from_iso8601("2000-01-01T00:00:00")
-
-    Compare.to_utc_seconds(Tempo.shift(epoch, duration)) - Compare.to_utc_seconds(epoch)
-  end
+  defp widen(duration, turnaround), do: Duration.add(duration, turnaround)
 
   # --- stage 5: ranking -------------------------------------------
 

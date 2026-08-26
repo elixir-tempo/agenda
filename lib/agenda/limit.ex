@@ -383,7 +383,7 @@ defmodule Agenda.Limit do
   def permits?(%__MODULE__{at_most: {:count, most}}, count, _duration), do: count <= most
 
   def permits?(%__MODULE__{at_most: {:duration, most}}, _count, duration) do
-    compare(duration, most) in [:lt, :eq]
+    Duration.compare(duration, most) in [:lt, :eq]
   end
 
   @doc """
@@ -521,21 +521,5 @@ defmodule Agenda.Limit do
 
   defp short?(nil, _count, _duration), do: false
   defp short?({:count, least}, count, _duration), do: count < least
-  defp short?({:duration, least}, _count, duration), do: compare(duration, least) == :lt
-
-  # Durations are compared in seconds rather than by their components,
-  # because `PT90M` and `PT1H30M` are the same budget written two ways
-  # and a component-wise comparison would call them different.
-  defp compare(a, b) do
-    with {:ok, left} <- Duration.to_unit(a, :second),
-         {:ok, right} <- Duration.to_unit(b, :second) do
-      cond do
-        left < right -> :lt
-        left > right -> :gt
-        true -> :eq
-      end
-    else
-      _unreadable -> :eq
-    end
-  end
+  defp short?({:duration, least}, _count, duration), do: Duration.compare(duration, least) == :lt
 end

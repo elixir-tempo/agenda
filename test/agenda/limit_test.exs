@@ -235,18 +235,34 @@ defmodule Agenda.LimitTest do
       assert Limit.bucket(gregorian, :month) == Limit.bucket(sunday_start, :month)
     end
 
-    test "a calendar Calendrical defines no week_of_year for still buckets" do
-      # `Calendrical.Hebrew.week_of_year/3` answers `{:error, :not_defined}`,
-      # so an earlier version bucketed every Hebrew claim to `:undated` —
-      # which put a whole programme in one bucket and made a weekly limit
-      # behave as a global one. Truncation places it consistently instead.
-      first = Tempo.from_iso8601!("5786-10-23", Calendrical.Hebrew)
-      last = Tempo.from_iso8601!("5786-10-29", Calendrical.Hebrew)
-      next_week = Tempo.from_iso8601!("5786-10-30", Calendrical.Hebrew)
+    test "a Hebrew week runs Sunday to Saturday, as that calendar does" do
+      # The convention comes from the calendar, so this needs no
+      # territory and no option. Under an ISO week these would split
+      # after Sunday rather than before it.
+      hebrew = fn day -> Tempo.from_iso8601!("5786-10-#{day}", Calendrical.Hebrew) end
 
-      assert Limit.bucket(first, :week) == Limit.bucket(last, :week)
-      refute Limit.bucket(first, :week) == Limit.bucket(next_week, :week)
-      assert Limit.bucket(next_week, :day) == {5786, 10, 30}
+      sunday = hebrew.(22)
+      saturday = hebrew.(28)
+      next_sunday = hebrew.(29)
+      next_monday = hebrew.(30)
+
+      assert Limit.bucket(sunday, :week) == Limit.bucket(saturday, :week)
+      refute Limit.bucket(saturday, :week) == Limit.bucket(next_sunday, :week)
+
+      # The assertion an ISO week would fail: a Sunday belongs with the
+      # Monday that follows it, not the Saturday before.
+      assert Limit.bucket(next_sunday, :week) == Limit.bucket(next_monday, :week)
+    end
+
+    test "and a Gregorian week runs Monday to Sunday in the same span" do
+      gregorian = fn date -> Tempo.from_iso8601!(date) end
+
+      # 2026-06-14 is the Sunday that 5786-10-29 falls on.
+      assert Limit.bucket(gregorian.("2026-06-13"), :week) ==
+               Limit.bucket(gregorian.("2026-06-14"), :week)
+
+      refute Limit.bucket(gregorian.("2026-06-14"), :week) ==
+               Limit.bucket(gregorian.("2026-06-15"), :week)
     end
 
     test "a value too coarse to place is undated" do
