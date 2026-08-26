@@ -212,7 +212,7 @@ ledger =
   balanced?: Reconciliation.balanced?(report),
   expected: hours.(report.expected),
   claimed: hours.(report.claimed),
-  breaches: report.breaches
+  findings: Reconciliation.explain(report)
 }
 ```
 
@@ -271,7 +271,7 @@ on_leave =
 
 %{
   balanced?: Reconciliation.balanced?(leave_report),
-  leave_drawn: hours.(leave_report.by_tag[annual]),
+  leave_drawn: hours.(Map.fetch!(leave_report.by_tag, annual)),
   unaccounted: hours.(leave_report.unaccounted)
 }
 ```
@@ -317,6 +317,7 @@ A ten-hour Monday, against a seven-hour ceiling:
     role: :consultant,
     tag: acme
   )
+
 {:ok, long_report} = Agenda.reconcile(long_day, dana, within: ~o"2026-08-10/2026-08-11")
 
 Reconciliation.explain(long_report)
@@ -374,10 +375,10 @@ Tempo.relation(Tempo.from_iso8601!("2026-01-01", calendar), ~o"2025-07-01")
 
 ```elixir
 {:ok, q1} = Agenda.reconcile(Agenda.ledger(), dana, within: quarter)
-{:ok, workdays} = Tempo.select(quarter, Tempo.workdays(:AU))
+{:ok, quarter_days} = Tempo.select(quarter, Tempo.workdays(:AU))
 
 %{
-  working_days: Tempo.IntervalSet.count(workdays),
+  working_days: Tempo.IntervalSet.count(quarter_days),
   hours_owed: hours.(q1.expected)
 }
 ```
