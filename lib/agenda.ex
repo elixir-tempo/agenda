@@ -334,7 +334,7 @@ defmodule Agenda do
       iex> boardroom = Agenda.resource("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T11:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", between: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> {:ok, [best | _]} = Agenda.plan(session, [boardroom])
       iex> Agenda.explain(best)
@@ -729,7 +729,7 @@ defmodule Agenda do
       iex> room = Agenda.resource("Hall", seats: 100)
       iex> {:ok, room} = Agenda.open(room, "2026-09-15T09:00:00/2026-09-15T10:00:00")
       iex> talk = fn name ->
-      ...>   Agenda.session(name, duration: "PT1H", between: "2026-09-15/2026-09-16")
+      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-16")
       ...>   |> Agenda.Session.needs(:room, seats: 100)
       ...> end
       iex> programme =

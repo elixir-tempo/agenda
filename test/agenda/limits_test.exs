@@ -32,7 +32,7 @@ defmodule Agenda.LimitsTest do
 
   defp shift(name) do
     name
-    |> Agenda.session(duration: "PT8H", between: @fortnight)
+    |> Agenda.session(duration: "PT8H", window: @fortnight)
     |> Session.needs(:staff, qualified: true)
   end
 

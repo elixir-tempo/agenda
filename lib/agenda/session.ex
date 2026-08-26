@@ -46,7 +46,7 @@ defmodule Agenda.Session do
 
   * `:duration` is how long the session runs, a `t:Tempo.Duration.t/0`.
 
-  * `:between` is the window it must fall inside, a
+  * `:window` is the interval it must fall inside, a
     `t:Tempo.Interval.t/0`.
 
   ### Returns
@@ -65,7 +65,7 @@ defmodule Agenda.Session do
     %__MODULE__{
       name: name,
       duration: Keyword.get(options, :duration),
-      window: Keyword.get(options, :between)
+      window: Keyword.get(options, :window)
     }
   end
 
@@ -108,11 +108,15 @@ defmodule Agenda.Session do
   * `role` is the role name, such as `:attendees`.
 
   * `resources` is the list of required
-    `t:Agenda.Resource.t/0`.
+    `t:Agenda.Resource.t/0`. Naming nobody adds no requirement — a
+    role filled by no one constrains nothing, and a requirement that
+    neither names nor describes would otherwise let planning bind any
+    resource at all to the role.
 
   ### Returns
 
-  * the session with the requirement added.
+  * the session with the requirement added, or unchanged if
+    `resources` is empty.
 
   ### Examples
 
@@ -122,8 +126,16 @@ defmodule Agenda.Session do
       iex> Enum.map(session.requirements, & &1.name)
       [:attendees]
 
+      iex> session = Agenda.Session.new("Review")
+      iex> Agenda.Session.roster(session, :attendees, []).requirements
+      []
+
   """
   @spec roster(t(), atom(), [Resource.t()]) :: t()
+  def roster(%__MODULE__{} = session, role, []) when is_atom(role) do
+    session
+  end
+
   def roster(%__MODULE__{} = session, role, resources) when is_atom(role) do
     add(session, Requirement.roster(role, resources))
   end
@@ -133,7 +145,7 @@ defmodule Agenda.Session do
   end
 
   @doc """
-  Set the window the session must fall inside.
+  Set the interval the session must fall inside.
 
   ### Arguments
 
@@ -149,12 +161,12 @@ defmodule Agenda.Session do
 
       iex> import Tempo.Sigils
       iex> session = Agenda.Session.new("Review")
-      iex> Agenda.Session.between(session, ~o"2026-06-15/2026-06-20").window
+      iex> Agenda.Session.window(session, ~o"2026-06-15/2026-06-20").window
       ~o"2026-06-15/2026-06-20"
 
   """
-  @spec between(t(), Availability.pattern()) :: t()
-  def between(%__MODULE__{} = session, window), do: %{session | window: window}
+  @spec window(t(), Availability.pattern()) :: t()
+  def window(%__MODULE__{} = session, window), do: %{session | window: window}
 
   @doc """
   Set how long the session runs.

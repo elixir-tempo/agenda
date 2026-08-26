@@ -43,7 +43,7 @@ defmodule Agenda.PlannerTest do
 
   defp review(context, extra \\ []) do
     "Review"
-    |> Agenda.session(duration: "PT1H", between: "2026-06-15/2026-06-16")
+    |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
     |> Session.needs(:room, Keyword.get(extra, :room, seats: at_least(8)))
     |> Session.roster(:attendees, Keyword.get(extra, :attendees, [context.alice, context.bob]))
   end
@@ -113,7 +113,7 @@ defmodule Agenda.PlannerTest do
     test "a session with no roster still names the chosen room", context do
       session =
         "Solo"
-        |> Agenda.session(duration: "PT1H", between: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
         |> Session.needs(:room, seats: at_least(8))
 
       {:ok, [first | _]} = Planner.plan(session, [context.boardroom])
@@ -135,7 +135,7 @@ defmodule Agenda.PlannerTest do
     test "a session with only named resources still allocates them", context do
       session =
         "Standup"
-        |> Agenda.session(duration: "PT1H", between: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
         |> Session.roster(:attendees, [context.bob])
 
       {:ok, [first | _]} = Planner.plan(session, [])

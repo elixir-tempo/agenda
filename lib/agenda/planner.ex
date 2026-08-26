@@ -83,7 +83,7 @@ defmodule Agenda.Planner do
       iex> boardroom = Agenda.Resource.new("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T12:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", between: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> {:ok, arrangements} = Agenda.Planner.plan(session, [boardroom])
       iex> length(arrangements)
@@ -154,7 +154,7 @@ defmodule Agenda.Planner do
       iex> big = Agenda.resource("Barn", seats: 40, video_conferencing: false)
       iex> {:ok, big} = Agenda.open(big, "2026-06-15T09:00:00/2026-06-15T12:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", between: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
       ...>   |> Agenda.Session.needs(:room, seats: at_least(8), video_conferencing: true)
       iex> Agenda.Planner.conflict(session, [small, big])
       {:ok, [needs: {:room, :seats}, needs: {:room, :video_conferencing}]}

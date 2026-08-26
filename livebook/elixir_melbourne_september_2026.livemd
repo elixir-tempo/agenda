@@ -288,18 +288,17 @@ keynotes = [
 
 plenaries =
   Enum.map(keynotes, fn {title, minutes, slot, presenters} ->
+    duration =
+      Tempo.Duration.new!(minute: minutes)
+
     session =
-      Agenda.session(title, duration: Tempo.Duration.new!(minute: minutes), between: slot)
+      Agenda.session(title, duration: duration, window: slot)
       |> Agenda.Session.roster(:room, [peninsula])
 
-    case presenters do
-      [] ->
-        session
+    {:ok, presenting} =
+      Agenda.Resource.fetch_all(speakers, presenters)
 
-      names ->
-        {:ok, presenting} = Agenda.Resource.fetch_all(speakers, names)
-        Agenda.Session.roster(session, :speaker, presenting)
-    end
+    Agenda.Session.roster(session, :speaker, presenting)
   end)
 
 pinned =
@@ -392,7 +391,7 @@ Force the panel into the keynote slot and the programme stops being satisfiable.
 clash =
   Agenda.session("Building Careers, Balancing Life",
     duration: ~o"PT40M",
-    between: ~o"2025-08-28T09:15/T09:55"
+    window: ~o"2025-08-28T09:15/T09:55"
   )
   |> Agenda.Session.needs(:room, seats: at_least(250))
   |> Agenda.Session.roster(:speaker, panel)
@@ -436,7 +435,7 @@ four_talks =
   Enum.reduce(1..4, Agenda.programme("Turnaround"), fn i, programme ->
     Agenda.Programme.add_session(
       programme,
-      Agenda.session("T#{i}", duration: ~o"PT40M", between: ~o"2025-08-28")
+      Agenda.session("T#{i}", duration: ~o"PT40M", window: ~o"2025-08-28")
       |> Agenda.Session.needs(:room, seats: 250)
     )
   end)

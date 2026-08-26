@@ -49,7 +49,7 @@ A scheduler that treats a speaker as a label on a talk cannot see any of this. A
 A talk therefore names its room by description and its speakers by name:
 
 ```elixir
-Agenda.session("Building Careers, Balancing Life", duration: "PT40M", between: "2025-08-28/2025-08-29")
+Agenda.session("Building Careers, Balancing Life", duration: "PT40M", window: "2025-08-28/2025-08-29")
 |> Agenda.Session.needs(:room, seats: at_least(250))
 |> Agenda.Session.roster(:speaker, [savannah, anna, allison, lorena])
 ```
@@ -66,7 +66,7 @@ Keynotes are published months ahead. They are not decisions left to the schedule
 session =
   Agenda.session("Keynote: Open Source Resilience",
     duration: "PT60M",
-    between: "2025-08-28T09:15:00/2025-08-28T10:15:00")
+    window: "2025-08-28T09:15:00/2025-08-28T10:15:00")
   |> Agenda.Session.roster(:room, [peninsula])
   |> Agenda.Session.roster(:speaker, [allison])
 
@@ -121,7 +121,7 @@ Force the panel into the keynote slot and the programme stops being satisfiable:
 ```elixir
 Agenda.session("Building Careers, Balancing Life",
   duration: "PT40M",
-  between: "2025-08-28T09:15:00/2025-08-28T09:55:00")
+  window: "2025-08-28T09:15:00/2025-08-28T09:55:00")
 ```
 
 ```elixir

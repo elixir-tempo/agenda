@@ -38,12 +38,12 @@ Open hours are a Tempo value, so "nine to five on two specific days" is just a t
 
 ```elixir
 keynote = fn name, window ->
-  Agenda.session(name, duration: ~o"PT1H", between: window)
+  Agenda.session(name, duration: ~o"PT1H", window: window)
   |> Agenda.Session.needs(:room, seats: at_least(500))
 end
 
 talk = fn name, window ->
-  Agenda.session(name, duration: ~o"PT1H", between: window)
+  Agenda.session(name, duration: ~o"PT1H", window: window)
   |> Agenda.Session.needs(:room, seats: at_least(150))
 end
 ```
@@ -111,7 +111,7 @@ Both tracks got the same slot — that is correct and is the whole point of para
 
 ```elixir
 impossible =
-  Agenda.session("Impossible keynote", duration: ~o"PT1H", between: day1_morning)
+  Agenda.session("Impossible keynote", duration: ~o"PT1H", window: day1_morning)
   |> Agenda.Session.needs(:room, seats: at_least(5000))
 
 Agenda.arrange(programme_with_it, [hall, room_a, room_b])

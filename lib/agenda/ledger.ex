@@ -26,7 +26,7 @@ defmodule Agenda.Ledger do
       iex> boardroom = Agenda.resource("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T11:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", between: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> ledger = Agenda.Ledger.new()
       iex> {:ok, [best | _]} = Agenda.plan(session, [boardroom], busy: Agenda.busy(ledger))

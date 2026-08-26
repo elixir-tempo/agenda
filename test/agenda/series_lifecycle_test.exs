@@ -96,7 +96,7 @@ defmodule Agenda.SeriesLifecycleTest do
       ledger = book_all(context.occurrences, context.room)
 
       one_off =
-        Agenda.session("Retro", duration: ~o"PT1H", between: "2027-03-02/2027-03-03")
+        Agenda.session("Retro", duration: ~o"PT1H", window: "2027-03-02/2027-03-03")
         |> Session.needs(:room, seats: 6)
 
       {:ok, [first | _]} = Agenda.plan(one_off, [context.room], busy: Agenda.busy(ledger))

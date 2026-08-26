@@ -271,7 +271,7 @@ defmodule Agenda.PartialTest do
       narrow =
         Agenda.session("Narrow",
           duration: "PT1H",
-          between: "2026-09-15T09:00:00/2026-09-15T10:00:00"
+          window: "2026-09-15T09:00:00/2026-09-15T10:00:00"
         )
         |> Session.needs(:room, seats: 100)
 

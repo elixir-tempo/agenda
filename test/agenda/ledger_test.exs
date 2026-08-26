@@ -236,7 +236,7 @@ defmodule Agenda.LedgerTest do
 
       session =
         "Review"
-        |> Agenda.session(duration: "PT1H", between: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
         |> Session.needs(:room, seats: 8)
 
       %{room: boardroom, session: session}
