@@ -26,7 +26,7 @@ defmodule Agenda.PrecedenceTest do
 
   defp task(name, duration \\ "PT1H") do
     name
-    |> Agenda.session(lasting: duration)
+    |> Agenda.session(duration: duration)
     |> Session.needs(:van, seats: 1)
   end
 
@@ -263,7 +263,7 @@ defmodule Agenda.PrecedenceTest do
       sessions =
         Enum.map(1..30, fn i ->
           "S#{i}"
-          |> Agenda.session(lasting: (rem(i, 4) == 0 && "PT40M") || "PT20M")
+          |> Agenda.session(duration: (rem(i, 4) == 0 && "PT40M") || "PT20M")
           |> Session.needs(:room, seats: 100)
           |> Session.roster(:speaker, [Enum.at(speakers, i - 1)])
         end)

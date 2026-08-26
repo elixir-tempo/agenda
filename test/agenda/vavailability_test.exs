@@ -145,7 +145,7 @@ defmodule Agenda.VAvailabilityTest do
       room = room_open_from(weekdays(), "Clinic")
 
       session =
-        Agenda.session("Review", lasting: "PT1H", between: @june)
+        Agenda.session("Review", duration: "PT1H", between: @june)
         |> Session.needs(:room, seats: 8)
 
       assert {:ok, [best | _rest]} = Agenda.plan(session, [room])

@@ -27,7 +27,7 @@ defmodule Agenda.PinningTest do
 
   defp talk(name) do
     name
-    |> Agenda.session(lasting: "PT1H")
+    |> Agenda.session(duration: "PT1H")
     |> Session.needs(:room, seats: 100)
   end
 

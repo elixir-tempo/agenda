@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
+* `Agenda.session/2`'s `:lasting` option is now `:duration`, and `Agenda.Session.lasting/2` is `Agenda.Session.duration/2` — matching the struct field and the `t:Tempo.Duration.t/0` they take.
+
 * Requires `ex_tempo ~> 1.3`, the first release carrying the RFC 7953 availability support `from_ical/1` is built on, and `ical ~> 3.2`, the first release that parses `VAVAILABILITY` at all.
 
 ### Fixed

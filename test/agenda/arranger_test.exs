@@ -34,7 +34,7 @@ defmodule Agenda.ArrangerTest do
 
   defp talk(name) do
     name
-    |> Agenda.session(lasting: "PT1H")
+    |> Agenda.session(duration: "PT1H")
     |> Session.needs(:room, seats: 100)
   end
 
@@ -296,11 +296,11 @@ defmodule Agenda.ArrangerTest do
         |> Agenda.open("2026-09-15T09:00:00/2026-09-15T12:00:00")
 
       long =
-        Agenda.session("Long", lasting: "PT2H")
+        Agenda.session("Long", duration: "PT2H")
         |> Session.needs(:room, seats: 100)
 
       short =
-        Agenda.session("Short", lasting: "PT1H")
+        Agenda.session("Short", duration: "PT1H")
         |> Session.needs(:room, seats: 100)
 
       programme = conf([Agenda.track("T", of: [long, short])])

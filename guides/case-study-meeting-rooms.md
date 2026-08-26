@@ -31,7 +31,7 @@ Attributes are whatever your building actually has — there is no fixed vocabul
 import Agenda.Predicate
 
 review =
-  Agenda.session("Quarterly review", lasting: ~o"PT1H", between: ~o"2027-03-01/2027-03-02")
+  Agenda.session("Quarterly review", duration: ~o"PT1H", between: ~o"2027-03-01/2027-03-02")
   |> Agenda.Session.needs(:room, seats: at_least(10), video_conferencing: true)
   |> Agenda.Session.roster(:attendees, [priya, tom])
 
@@ -92,7 +92,7 @@ Portable equipment is a resource like any other. It has no seats; it has a proje
   |> Agenda.open(day)
 
 workshop =
-  Agenda.session("Onboarding workshop", lasting: ~o"PT2H", between: ~o"2027-03-01/2027-03-02")
+  Agenda.session("Onboarding workshop", duration: ~o"PT2H", between: ~o"2027-03-01/2027-03-02")
   |> Agenda.Session.needs(:room, seats: at_least(15))
   |> Agenda.Session.needs(:equipment, projector: true)
 

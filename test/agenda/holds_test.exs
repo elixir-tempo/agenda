@@ -11,7 +11,7 @@ defmodule Agenda.HoldsTest do
       |> Agenda.open("2026-06-15T09:00:00/2026-06-15T17:00:00")
 
     session =
-      Agenda.session("Review", lasting: "PT1H", between: "2026-06-15/2026-06-16")
+      Agenda.session("Review", duration: "PT1H", between: "2026-06-15/2026-06-16")
       |> Session.needs(:room, seats: 8)
 
     {:ok, [first | _rest]} = Agenda.plan(session, [boardroom])

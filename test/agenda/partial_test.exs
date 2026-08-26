@@ -35,7 +35,7 @@ defmodule Agenda.PartialTest do
 
   defp talk(name) do
     name
-    |> Agenda.session(lasting: "PT1H")
+    |> Agenda.session(duration: "PT1H")
     |> Session.needs(:room, seats: 100)
   end
 
@@ -121,7 +121,7 @@ defmodule Agenda.PartialTest do
       # The lecture needs 500 seats; nothing in the pool has them. On
       # the default that fails the programme outright.
       lecture =
-        Agenda.session("Lecture", lasting: "PT1H")
+        Agenda.session("Lecture", duration: "PT1H")
         |> Session.needs(:room, seats: 500)
 
       programme = conf([talk("Keynote"), lecture])
@@ -135,7 +135,7 @@ defmodule Agenda.PartialTest do
 
     test "every session being impossible is a layout with nothing placed", context do
       lecture = fn name ->
-        Agenda.session(name, lasting: "PT1H") |> Session.needs(:room, seats: 500)
+        Agenda.session(name, duration: "PT1H") |> Session.needs(:room, seats: 500)
       end
 
       programme = conf([lecture.("One"), lecture.("Two")])
@@ -232,7 +232,7 @@ defmodule Agenda.PartialTest do
   describe "the layout says why" do
     test "an unplaceable session keeps the planner's reason", context do
       lecture =
-        Agenda.session("Lecture", lasting: "PT1H")
+        Agenda.session("Lecture", duration: "PT1H")
         |> Session.needs(:room, seats: 500)
 
       programme = conf([lecture])
@@ -270,7 +270,7 @@ defmodule Agenda.PartialTest do
 
       narrow =
         Agenda.session("Narrow",
-          lasting: "PT1H",
+          duration: "PT1H",
           between: "2026-09-15T09:00:00/2026-09-15T10:00:00"
         )
         |> Session.needs(:room, seats: 100)

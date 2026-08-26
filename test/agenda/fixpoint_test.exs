@@ -50,7 +50,7 @@ defmodule Agenda.FixpointTest do
 
   defp talk(name) do
     name
-    |> Agenda.session(lasting: "PT1H", between: "2026-09-15/2026-09-16")
+    |> Agenda.session(duration: "PT1H", between: "2026-09-15/2026-09-16")
     |> Session.needs(:room, seats: 100)
   end
 
@@ -162,7 +162,7 @@ defmodule Agenda.FixpointTest do
       hour = "2026-09-15T09:00:00/2026-09-15T10:00:00"
 
       pinned_talk = fn name ->
-        Agenda.session(name, lasting: "PT1H", between: hour)
+        Agenda.session(name, duration: "PT1H", between: hour)
         |> Session.needs(:room, seats: 100)
       end
 
@@ -176,7 +176,7 @@ defmodule Agenda.FixpointTest do
 
     test "a session nothing satisfies is reported before the solver runs", context do
       lecture =
-        Agenda.session("Lecture", lasting: "PT1H", between: "2026-09-15/2026-09-16")
+        Agenda.session("Lecture", duration: "PT1H", between: "2026-09-15/2026-09-16")
         |> Session.needs(:room, seats: 500)
 
       assert {:error, reason} = Fixpoint.solve(conf([lecture]), [context.hall])
@@ -304,7 +304,7 @@ defmodule Agenda.FixpointTest do
         fn index, programme ->
           session =
             "S#{index}"
-            |> Agenda.session(lasting: "PT1H", between: "2027-04-05/2027-04-08")
+            |> Agenda.session(duration: "PT1H", between: "2027-04-05/2027-04-08")
             |> Session.needs(:staff, qualified: true)
 
           Programme.add_session(programme, session)

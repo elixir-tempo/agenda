@@ -64,7 +64,7 @@ Describe what you want:
 import Agenda.Predicate
 
 review =
-  Agenda.session("Sprint review", lasting: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
+  Agenda.session("Sprint review", duration: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
   |> Agenda.Session.needs(:room, seats: at_least(4), video_conferencing: true)
 ```
 

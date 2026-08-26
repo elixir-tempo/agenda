@@ -14,7 +14,7 @@ defmodule Agenda.SeriesLifecycleTest do
       |> Agenda.open("R28/2027-03-01T09:00:00/P1D")
 
     standup =
-      Agenda.session("Stand-up", lasting: ~o"PT15M")
+      Agenda.session("Stand-up", duration: ~o"PT15M")
       |> Session.needs(:room, seats: 6)
 
     {:ok, occurrences} = Agenda.every(standup, "R4/2027-03-01T09:00:00/P1W")
@@ -55,7 +55,7 @@ defmodule Agenda.SeriesLifecycleTest do
     end
 
     test "an unreadable pattern is an error, not a crash" do
-      session = Agenda.session("X", lasting: ~o"PT1H")
+      session = Agenda.session("X", duration: ~o"PT1H")
 
       assert Agenda.every(session, "not a recurrence") == {:error, :unreadable_pattern}
     end
@@ -96,7 +96,7 @@ defmodule Agenda.SeriesLifecycleTest do
       ledger = book_all(context.occurrences, context.room)
 
       one_off =
-        Agenda.session("Retro", lasting: ~o"PT1H", between: "2027-03-02/2027-03-03")
+        Agenda.session("Retro", duration: ~o"PT1H", between: "2027-03-02/2027-03-03")
         |> Session.needs(:room, seats: 6)
 
       {:ok, [first | _]} = Agenda.plan(one_off, [context.room], busy: Agenda.busy(ledger))

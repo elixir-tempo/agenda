@@ -16,13 +16,13 @@ defmodule Agenda.Series do
 
   ### Example
 
-      iex> standup = Agenda.session("Stand-up", lasting: "PT15M")
+      iex> standup = Agenda.session("Stand-up", duration: "PT15M")
       iex> {:ok, occurrences} = Agenda.every(standup, "R3/2027-03-02T09:00:00/P1W")
       iex> Enum.map(occurrences, & &1.name)
       ["Stand-up 1", "Stand-up 2", "Stand-up 3"]
 
       iex> import Tempo.Sigils
-      iex> standup = Agenda.session("Stand-up", lasting: "PT15M")
+      iex> standup = Agenda.session("Stand-up", duration: "PT15M")
       iex> {:ok, [first | _]} = Agenda.every(standup, "R3/2027-03-02T09:00:00/P1W")
       iex> {first.series, first.window}
       {"Stand-up", ~o"2027Y3M2DT9H0M0S/9DT9H0M0S"}
@@ -64,12 +64,12 @@ defmodule Agenda.Series do
 
   ### Examples
 
-      iex> clinic = Agenda.session("Clinic", lasting: "PT4H")
+      iex> clinic = Agenda.session("Clinic", duration: "PT4H")
       iex> {:ok, occurrences} = Agenda.Series.expand(clinic, "R2/2027-03-02/P1D")
       iex> length(occurrences)
       2
 
-      iex> clinic = Agenda.session("Clinic", lasting: "PT4H")
+      iex> clinic = Agenda.session("Clinic", duration: "PT4H")
       iex> Agenda.Series.expand(clinic, "not a recurrence")
       {:error, :unreadable_pattern}
 

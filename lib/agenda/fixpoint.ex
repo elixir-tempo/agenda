@@ -152,7 +152,7 @@ if Code.ensure_loaded?(CPSolver) do
         iex> room = Agenda.resource("Hall", seats: 100)
         iex> {:ok, room} = Agenda.open(room, "2026-09-15T09:00:00/2026-09-15T12:00:00")
         iex> talk = fn name ->
-        ...>   Agenda.session(name, lasting: "PT1H", between: "2026-09-15/2026-09-16")
+        ...>   Agenda.session(name, duration: "PT1H", between: "2026-09-15/2026-09-16")
         ...>   |> Agenda.Session.needs(:room, seats: 100)
         ...> end
         iex> programme =

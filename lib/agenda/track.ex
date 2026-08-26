@@ -19,8 +19,8 @@ defmodule Agenda.Track do
   ### Example
 
       iex> import Tempo.Sigils
-      iex> keynote = Agenda.session("Keynote", lasting: ~o"PT1H")
-      iex> deep_dive = Agenda.session("OTP internals", lasting: ~o"PT1H")
+      iex> keynote = Agenda.session("Keynote", duration: ~o"PT1H")
+      iex> deep_dive = Agenda.session("OTP internals", duration: ~o"PT1H")
       iex> track =
       ...>   Agenda.track("Elixir", of: [keynote, deep_dive])
       ...>   |> Agenda.Track.reachable(within: ~o"PT10M")

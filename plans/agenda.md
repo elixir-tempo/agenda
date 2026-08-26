@@ -124,7 +124,7 @@ Travel time is a function of the **lowest common ancestor** of the two resources
 
 ```elixir
 review =
-  Agenda.session("Quarterly review", lasting: ~o"PT1H")
+  Agenda.session("Quarterly review", duration: ~o"PT1H")
   |> Agenda.needs(:room, seats: at_least(8), video_conferencing: true)
   |> Agenda.needs(:attendees, all_of([alice, bob, carol]))
   |> Agenda.between(~o"2026-06-15/2026-06-20")

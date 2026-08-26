@@ -19,7 +19,7 @@ defmodule Agenda.ResourceWishesTest do
 
   defp shift(name) do
     name
-    |> Agenda.session(lasting: "PT1H", between: @day)
+    |> Agenda.session(duration: "PT1H", between: @day)
     |> Session.needs(:staff, qualified: true)
   end
 

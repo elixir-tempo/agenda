@@ -92,7 +92,7 @@ defmodule Agenda.ConcurrencyTest do
   describe "plan/3 honours concurrency" do
     defp hire(pool, busy) do
       session =
-        Agenda.session("Locker hire", lasting: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
+        Agenda.session("Locker hire", duration: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
         |> Session.needs(:room, seats: at_least(1))
 
       {:ok, options} = Agenda.plan(session, pool, busy: busy)
@@ -117,7 +117,7 @@ defmodule Agenda.ConcurrencyTest do
 
   describe "arrange/3 honours concurrency" do
     defp booking(name) do
-      Agenda.session(name, lasting: ~o"PT1H")
+      Agenda.session(name, duration: ~o"PT1H")
       |> Session.needs(:desk, seats: at_least(1))
     end
 

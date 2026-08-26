@@ -44,7 +44,7 @@ defmodule Agenda.Session do
 
   ### Options
 
-  * `:lasting` is how long the session runs, a `t:Tempo.Duration.t/0`.
+  * `:duration` is how long the session runs, a `t:Tempo.Duration.t/0`.
 
   * `:between` is the window it must fall inside, a
     `t:Tempo.Interval.t/0`.
@@ -56,7 +56,7 @@ defmodule Agenda.Session do
   ### Examples
 
       iex> import Tempo.Sigils
-      iex> Agenda.Session.new("Quarterly review", lasting: ~o"PT1H").name
+      iex> Agenda.Session.new("Quarterly review", duration: ~o"PT1H").name
       "Quarterly review"
 
   """
@@ -64,7 +64,7 @@ defmodule Agenda.Session do
   def new(name, options \\ []) when is_binary(name) do
     %__MODULE__{
       name: name,
-      duration: Keyword.get(options, :lasting),
+      duration: Keyword.get(options, :duration),
       window: Keyword.get(options, :between)
     }
   end
@@ -173,12 +173,12 @@ defmodule Agenda.Session do
 
       iex> import Tempo.Sigils
       iex> session = Agenda.Session.new("Review")
-      iex> Agenda.Session.lasting(session, ~o"PT1H").duration
+      iex> Agenda.Session.duration(session, ~o"PT1H").duration
       ~o"PT1H"
 
   """
-  @spec lasting(t(), Availability.pattern()) :: t()
-  def lasting(%__MODULE__{} = session, duration), do: %{session | duration: duration}
+  @spec duration(t(), Availability.pattern()) :: t()
+  def duration(%__MODULE__{} = session, duration), do: %{session | duration: duration}
 
   @doc """
   Add soft preferences — they rank arrangements but never exclude one.

@@ -119,7 +119,7 @@ defmodule Agenda.BufferTest do
       cleaned = room(buffer_after: ~o"PT30M")
 
       session =
-        Agenda.session("Meeting", lasting: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
+        Agenda.session("Meeting", duration: ~o"PT1H", between: ~o"2027-03-02/2027-03-03")
         |> Session.needs(:room, [])
 
       {:ok, options} =

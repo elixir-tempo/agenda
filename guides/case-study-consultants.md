@@ -68,7 +68,7 @@ The engagement needs a qualified consultant, and it happens at a named site:
 
 ```elixir
 audit =
-  Agenda.session("Security audit", lasting: ~o"PT3H", between: ~o"2027-03-01/2027-03-02")
+  Agenda.session("Security audit", duration: ~o"PT3H", between: ~o"2027-03-01/2027-03-02")
   |> Agenda.Session.needs(:consultant, skills: all_of([:elixir, :security]))
   |> Agenda.Session.roster(:site, [acme])
 
@@ -176,7 +176,7 @@ An installation cannot precede the survey that specifies it. That is not a resou
 
 ```elixir
 job = fn name ->
-  Agenda.session(name, lasting: ~o"PT1H", between: ~o"2027-03-01/2027-03-02")
+  Agenda.session(name, duration: ~o"PT1H", between: ~o"2027-03-01/2027-03-02")
   |> Agenda.Session.needs(:consultant, skills: all_of([:elixir]))
 end
 
