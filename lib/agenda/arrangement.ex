@@ -85,6 +85,80 @@ defmodule Agenda.Arrangement do
   end
 
   @doc """
+  The resources filling one role.
+
+  `resources/1` answers *"who and what is booked"*; this answers *"what
+  is in the room slot"*. Without it a caller reaches into
+  `arrangement.allocations` — or worse, hunts through every resource
+  for one carrying a `:seats` attribute, which guesses at something a
+  role already states.
+
+  ### Arguments
+
+  * `arrangement` is a `t:t/0`.
+
+  * `role` is the role to read, as given to `Agenda.needs/2` or
+    `Agenda.Session.roster/3`.
+
+  ### Returns
+
+  * the resources filling `role`, or `[]` when the arrangement has
+    none. An absent role is not an error: a session that never asked
+    for a projector simply has no projector.
+
+  ### Examples
+
+      iex> boardroom = Agenda.Resource.new("Boardroom")
+      iex> alice = Agenda.Resource.new("Alice")
+      iex> arrangement = %Agenda.Arrangement{allocations: %{room: [boardroom], speaker: [alice]}}
+      iex> Enum.map(Agenda.Arrangement.resources(arrangement, :room), & &1.name)
+      ["Boardroom"]
+
+      iex> arrangement = %Agenda.Arrangement{allocations: %{room: []}}
+      iex> Agenda.Arrangement.resources(arrangement, :projector)
+      []
+
+  """
+  @spec resources(t(), atom()) :: [Resource.t()]
+  def resources(%__MODULE__{allocations: allocations}, role) when is_atom(role) do
+    Map.get(allocations, role, [])
+  end
+
+  @doc """
+  The single resource filling one role, or `nil`.
+
+  The common case, because most roles take exactly one: a session has
+  one room even when it has four speakers. Where a role holds several,
+  this is the first and `resources/2` is the honest question.
+
+  ### Arguments
+
+  * `arrangement` is a `t:t/0`.
+
+  * `role` is the role to read.
+
+  ### Returns
+
+  * the resource filling `role`, or `nil` when nothing does.
+
+  ### Examples
+
+      iex> boardroom = Agenda.Resource.new("Boardroom")
+      iex> arrangement = %Agenda.Arrangement{allocations: %{room: [boardroom]}}
+      iex> Agenda.Arrangement.resource(arrangement, :room).name
+      "Boardroom"
+
+      iex> arrangement = %Agenda.Arrangement{allocations: %{room: []}}
+      iex> Agenda.Arrangement.resource(arrangement, :room)
+      nil
+
+  """
+  @spec resource(t(), atom()) :: Resource.t() | nil
+  def resource(%__MODULE__{} = arrangement, role) when is_atom(role) do
+    arrangement |> resources(role) |> List.first()
+  end
+
+  @doc """
   Compare two arrangements chronologically.
 
   Present so that `Enum.sort/2` and `Enum.sort_by/3` accept this module

@@ -94,6 +94,8 @@ Lunch is not a rule to enforce. It is simply time the rooms are not open, and ev
 import Agenda.Predicate
 import Tempo.Sigils
 
+alias Agenda.Arrangement
+
 {:ok, talk_hours} =
   Tempo.IntervalSet.new([
     ~o"2025-08-28T10:45:00/2025-08-28T12:45:00",
@@ -324,7 +326,7 @@ pool = rooms ++ speakers
 {microseconds, {:ok, arrangements}} =
   :timer.tc(fn -> Agenda.arrange(programme, pool, pinned: pinned) end)
 
-{length(arrangements), "#{div(microseconds, 1000)} ms"}
+%{sessions: length(arrangements), milliseconds: div(microseconds, 1000)}
 ```
 
 ## Thursday morning
@@ -332,23 +334,19 @@ pool = rooms ++ speakers
 <!-- slide: code -->
 
 ```elixir
-room_of = fn a ->
-  a |> Agenda.Arrangement.resources() |> Enum.find(&Map.has_key?(&1.attributes, :seats))
-end
-
-# A clock time, asked for as a time rather than sliced out of a
-# formatted string.
-clock = fn tempo ->
+# A time asked for as a time, rather than sliced out of a formatted
+# string.
+stamp = fn tempo, format ->
   {:ok, naive} = Tempo.to_naive_date_time(tempo)
-  Calendar.strftime(naive, "%H:%M")
+  Calendar.strftime(naive, format)
 end
 
 arrangements
-|> Enum.filter(&Tempo.within?(&1.interval.from, ~o"2025-08-28"))
-|> Enum.sort(Agenda.Arrangement)
+|> Enum.filter(&Tempo.within?(&1.interval, ~o"2025-08-28"))
+|> Enum.sort(Arrangement)
 |> Enum.take(7)
 |> Enum.map_join("\n", fn a ->
-  "#{clock.(a.interval.from)}  #{String.pad_trailing(room_of.(a).name, 14)} #{a.session}"
+  "#{stamp.(a.interval.from, "%H:%M")}  #{String.pad_trailing(Arrangement.resource(a, :room).name, 14)} #{a.session}"
 end)
 |> IO.puts()
 ```
@@ -362,11 +360,10 @@ Nobody wrote a rule saying Allison Randal cannot be on a panel during her own ke
 ```elixir
 for who <- ["Allison Randal", "Anna Sherman"] do
   arrangements
-  |> Enum.filter(fn a -> Enum.any?(Agenda.Arrangement.resources(a), &(&1.name == who)) end)
-  |> Enum.sort(Agenda.Arrangement)
+  |> Enum.filter(fn a -> Enum.any?(Arrangement.resources(a), &(&1.name == who)) end)
+  |> Enum.sort(Arrangement)
   |> Enum.map_join("\n", fn a ->
-    {:ok, naive} = Tempo.to_naive_date_time(a.interval.from)
-    "  #{Calendar.strftime(naive, "%a %d %b %H:%M")}  #{room_of.(a).name}  #{a.session}"
+    "  #{stamp.(a.interval.from, "%a %d %b %H:%M")}  #{Arrangement.resource(a, :room).name}  #{a.session}"
   end)
   |> then(&IO.puts("#{who}\n#{&1}\n"))
 end
@@ -438,8 +435,8 @@ four_talks =
 {:ok, spaced} = Agenda.arrange(four_talks, [hall])
 
 spaced
-|> Enum.sort(Agenda.Arrangement)
-|> Enum.map_join("   ", fn a -> clock.(a.interval.from) end)
+|> Enum.sort(Arrangement)
+|> Enum.map_join("   ", fn a -> stamp.(a.interval.from, "%H:%M") end)
 ```
 
 ## Model the gap, or carve it out

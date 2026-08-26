@@ -20,6 +20,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * The fixpoint solver tests no longer flake. `Agenda.Fixpoint.solve/3` returns whatever the search has when its budget expires, so a test asserting a definite answer was really asserting how much CPU the machine spared it — one instance was measured settling anywhere between 3.8 s and 24 s. They now run non-async, the instance that varied sixfold was narrowed to a smaller search space, budgets sit well clear of the worst observed time, and a timeout is retried with more clock rather than failing the build.
 
+* `Agenda.Arrangement.resources/2` and `resource/2` read the resources filling one role. `resources/1` answers "who and what is booked"; these answer "what is in the room slot". Without them a caller reaches into `arrangement.allocations`, or hunts every resource for one carrying a `:seats` attribute — guessing at something a role already states.
+
 * `Agenda.Arrangement.compare/2`, so `Enum.sort(arrangements, Agenda.Arrangement)` works the way it does for `Date`, `Time` and `Tempo`. Sorting a layout by time is the commonest thing anyone does with one, and it previously meant reaching through the arrangement to its interval and often to that interval's start. Ordering is by start then end — a total order, where `Tempo.relation/2` remains the way to reason about overlap.
 
 * `Agenda.reconcile/3`'s `:by_tag` is an interval set per tag rather than a duration, making every field of the report the same kind of thing. It answers *which* hours went to a project — what an invoice line is made of — and `Tempo.duration/1` still recovers the total, where nothing recovers the hours from a total.

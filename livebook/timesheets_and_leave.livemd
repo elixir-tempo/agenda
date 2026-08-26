@@ -111,9 +111,7 @@ A value also keeps the calendar it was derived in, all the way through to the re
 `Tempo.to_calendar/2` settles it: convert the quarter's endpoints once, and everything downstream is labelled the way a reader expects while still being **derived from the calendar that defines the period** rather than typed out as a literal.
 
 ```elixir
-{:ok, opens} = Tempo.to_calendar(Tempo.Interval.from(from_range), Calendrical.Gregorian)
-{:ok, closes} = Tempo.to_calendar(Tempo.Interval.to(from_range), Calendrical.Gregorian)
-{:ok, window} = Tempo.Interval.new(opens, closes)
+{:ok, window} = Tempo.to_calendar(from_range, Calendrical.Gregorian)
 
 {:ok, same_days} = Tempo.select(window, Tempo.workdays(:AU))
 %{window: window, workdays: Tempo.IntervalSet.count(same_days)}
@@ -121,7 +119,7 @@ A value also keeps the calendar it was derived in, all the way through to the re
 
 > *"The first quarter of Australian FY2027 is the first of July to the first of October 2026 — sixty-six working days."*
 
-`to_calendar/2` is day-resolution and takes one value, not an interval, which is exactly enough here: a quarter's boundaries are days. It could not convert the open hours themselves, and does not need to — converting the window is what makes everything built from it Gregorian.
+`to_calendar/2` takes the whole span, converting both endpoints and carrying everything else across. It is day-resolution, so it converts the quarter but not the open hours inside it — which is exactly enough, because converting the window is what makes everything built from it Gregorian.
 
 ## The consultant is a resource with a contract
 
