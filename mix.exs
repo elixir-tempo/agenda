@@ -96,9 +96,10 @@ defmodule Agenda.MixProject do
 
   defp deps do
     [
-      # TODO revert to `{:ex_tempo, "~> 1.5"}` once 1.5.1 is published. The
-      # local checkout carries the ISO 8601-1 §5.5.1 interval fix.
-      {:ex_tempo, path: "../tempo"},
+      # TODO revert to `{:ex_tempo, "~> 1.5"}` once 1.5.1 is published. Git
+      # rather than a path dependency so CI can resolve it; `mix.lock`
+      # pins the commit carrying the ISO 8601-1 §5.5.1 interval fix.
+      {:ex_tempo, "~> 1.5"},
       {:ical, "~> 3.2", optional: true},
       # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
       # is only compiled when it is present.
