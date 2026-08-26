@@ -24,8 +24,8 @@ defmodule Agenda.Track do
       iex> track =
       ...>   Agenda.track("Elixir", of: [keynote, deep_dive])
       ...>   |> Agenda.Track.reachable(within: ~o"PT10M")
-      iex> {length(track.sessions), Tempo.to_iso8601(track.reachable_within)}
-      {2, "PT10M"}
+      iex> {length(track.sessions), track.reachable_within}
+      {2, ~o"PT10M"}
 
   > *"No two talks in the Elixir track may overlap, and a delegate must
   > be able to walk between consecutive ones inside the ten-minute
@@ -97,8 +97,8 @@ defmodule Agenda.Track do
 
       iex> import Tempo.Sigils
       iex> track = Agenda.Track.new("Elixir")
-      iex> Tempo.to_iso8601(Agenda.Track.reachable(track, within: ~o"PT10M").reachable_within)
-      "PT10M"
+      iex> Agenda.Track.reachable(track, within: ~o"PT10M").reachable_within
+      ~o"PT10M"
 
   """
   @spec reachable(t(), keyword()) :: t()

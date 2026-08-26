@@ -122,8 +122,9 @@ defmodule Agenda.Arrangement do
       iex> import Tempo.Sigils
       iex> morning = %Agenda.Arrangement{interval: ~o"2026-06-16T09:00:00/2026-06-16T10:00:00"}
       iex> midday = %Agenda.Arrangement{interval: ~o"2026-06-16T12:00:00/2026-06-16T13:00:00"}
-      iex> [midday, morning] |> Enum.sort(Agenda.Arrangement) |> Enum.map(&Tempo.to_iso8601(&1.interval))
-      ["2026Y6M16DT9H0M0S/2026Y6M16DT10H0M0S", "2026Y6M16DT12H0M0S/2026Y6M16DT13H0M0S"]
+      iex> [midday, morning] |> Enum.sort(Agenda.Arrangement) |> Enum.map(& &1.interval)
+      [~o"2026Y6M16DT9H0M0S/2026Y6M16DT10H0M0S",
+       ~o"2026Y6M16DT12H0M0S/2026Y6M16DT13H0M0S"]
 
   """
   @spec compare(t(), t()) :: :lt | :eq | :gt

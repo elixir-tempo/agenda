@@ -72,10 +72,11 @@ defmodule Agenda.Availability do
 
   ### Examples
 
+      iex> import Tempo.Sigils
       iex> boardroom = Agenda.Resource.new("Boardroom")
       iex> {:ok, boardroom} = Agenda.Availability.open(boardroom, "2026-06-15T09:00:00/2026-06-15T17:00:00")
-      iex> Tempo.to_iso8601(boardroom.open)
-      "2026Y6M15DT9H0M0S/2026Y6M15DT17H0M0S"
+      iex> boardroom.open
+      ~o"2026Y6M15DT9H0M0S/2026Y6M15DT17H0M0S"
 
       iex> boardroom = Agenda.Resource.new("Boardroom")
       iex> Agenda.Availability.open(boardroom, "not a time")
@@ -230,13 +231,15 @@ defmodule Agenda.Availability do
 
   ### Examples
 
+      iex> import Tempo.Sigils
       iex> boardroom = Agenda.Resource.new("Boardroom")
       iex> {:ok, boardroom} = Agenda.Availability.open(boardroom, "2026-06-15T09:00:00/2026-06-15T17:00:00")
       iex> {:ok, free} = Agenda.Availability.free(boardroom,
       ...>   within: "2026-06-15/2026-06-16",
       ...>   busy: "2026-06-15T12:00:00/2026-06-15T13:00:00")
-      iex> free |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-      ["2026Y6M15DT9H0M0S/2026Y6M15DT12H0M0S", "2026Y6M15DT13H0M0S/2026Y6M15DT17H0M0S"]
+      iex> Tempo.IntervalSet.members(free)
+      [~o"2026Y6M15DT9H0M0S/2026Y6M15DT12H0M0S",
+       ~o"2026Y6M15DT13H0M0S/2026Y6M15DT17H0M0S"]
 
   A resource with no open hours is never free:
 

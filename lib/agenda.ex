@@ -658,8 +658,8 @@ defmodule Agenda do
 
       iex> import Tempo.Sigils
       iex> track = Agenda.track("Elixir") |> Agenda.reachable(within: ~o"PT10M")
-      iex> Tempo.to_iso8601(track.reachable_within)
-      "PT10M"
+      iex> track.reachable_within
+      ~o"PT10M"
 
   """
   @spec reachable(Track.t(), keyword()) :: Track.t()

@@ -137,8 +137,8 @@ defmodule Agenda.Reconciliation do
       ...> }
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
       iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
-      iex> report.unaccounted |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-      ["2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+      iex> Tempo.IntervalSet.members(report.unaccounted)
+      [~o"2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
 
   > *"Three of the eight hours are accounted for; the afternoon is not."*
 

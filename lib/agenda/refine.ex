@@ -17,6 +17,7 @@ defmodule Agenda.Refine do
   through untouched. So a refinement reads as one sentence and still
   short-circuits on failure:
 
+      iex> import Tempo.Sigils
       iex> {:ok, boardroom} =
       ...>   Agenda.resource("Boardroom")
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T17:00:00")
@@ -25,8 +26,9 @@ defmodule Agenda.Refine do
       ...>   |> Agenda.free(within: "2027-03-02/2027-03-03", busy: "2027-03-02T12:00:00/2027-03-02T13:00:00")
       ...>   |> Agenda.only_during("2027-03-02T10:00:00/2027-03-02T16:00:00")
       ...>   |> Agenda.lasting_at_least("PT2H")
-      iex> bookable |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-      ["2027Y3M2DT10H0M0S/2027Y3M2DT12H0M0S", "2027Y3M2DT13H0M0S/2027Y3M2DT16H0M0S"]
+      iex> Tempo.IntervalSet.members(bookable)
+      [~o"2027Y3M2DT10H0M0S/2027Y3M2DT12H0M0S",
+       ~o"2027Y3M2DT13H0M0S/2027Y3M2DT16H0M0S"]
 
   > *"The boardroom's free time, only between ten and four, in windows
   > lasting at least two hours."*
@@ -66,6 +68,7 @@ defmodule Agenda.Refine do
 
   ### Examples
 
+      iex> import Tempo.Sigils
       iex> {:ok, room} =
       ...>   Agenda.resource("Room")
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T17:00:00")
@@ -73,8 +76,8 @@ defmodule Agenda.Refine do
       ...>   room
       ...>   |> Agenda.free(within: "2027-03-02/2027-03-03")
       ...>   |> Agenda.only_during("2027-03-02T13:00:00/2027-03-02T16:00:00")
-      iex> clinic |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-      ["2027Y3M2DT13H0M0S/2027Y3M2DT16H0M0S"]
+      iex> Tempo.IntervalSet.members(clinic)
+      [~o"2027Y3M2DT13H0M0S/2027Y3M2DT16H0M0S"]
 
   """
   @spec only_during(refinable(), Availability.pattern()) ::
@@ -110,6 +113,7 @@ defmodule Agenda.Refine do
 
   ### Examples
 
+      iex> import Tempo.Sigils
       iex> {:ok, room} =
       ...>   Agenda.resource("Room")
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T17:00:00")
@@ -120,8 +124,9 @@ defmodule Agenda.Refine do
       ...>        "2027-03-02T09:00:00/2027-03-02T10:00:00",
       ...>        "2027-03-02T15:00:00/2027-03-02T17:00:00"
       ...>      ])
-      iex> staffed |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-      ["2027Y3M2DT9H0M0S/2027Y3M2DT10H0M0S", "2027Y3M2DT15H0M0S/2027Y3M2DT17H0M0S"]
+      iex> Tempo.IntervalSet.members(staffed)
+      [~o"2027Y3M2DT9H0M0S/2027Y3M2DT10H0M0S",
+       ~o"2027Y3M2DT15H0M0S/2027Y3M2DT17H0M0S"]
 
   """
   @spec during_any(refinable(), [Availability.pattern()]) ::
@@ -158,6 +163,7 @@ defmodule Agenda.Refine do
 
   ### Examples
 
+      iex> import Tempo.Sigils
       iex> {:ok, room} =
       ...>   Agenda.resource("Room")
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T12:00:00")
@@ -167,8 +173,8 @@ defmodule Agenda.Refine do
       ...>        busy: ["2027-03-02T09:20:00/2027-03-02T09:30:00",
       ...>               "2027-03-02T10:00:00/2027-03-02T10:30:00"])
       ...>   |> Agenda.lasting_at_least("PT1H")
-      iex> usable |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-      ["2027Y3M2DT10H30M0S/2027Y3M2DT12H0M0S"]
+      iex> Tempo.IntervalSet.members(usable)
+      [~o"2027Y3M2DT10H30M0S/2027Y3M2DT12H0M0S"]
 
   """
   @spec lasting_at_least(refinable(), Availability.pattern()) ::

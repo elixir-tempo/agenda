@@ -142,8 +142,8 @@ You do not have to go through `plan/3`. When you just want the gaps:
     within: "2027-03-02/2027-03-03",
     busy: "2027-03-02T10:00:00/2027-03-02T11:00:00")
 
-free |> Tempo.IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
-#=> ["2027Y3M2DT9H0M0S/2027Y3M2DT10H0M0S", "2027Y3M2DT11H0M0S/2027Y3M2DT12H0M0S"]
+Tempo.IntervalSet.members(free)
+#=> [~o"2027Y3M2DT9H0M0S/2027Y3M2DT10H0M0S", ~o"2027Y3M2DT11H0M0S/2027Y3M2DT12H0M0S"]
 ```
 
 > *"The room is open nine to twelve and busy from ten to eleven, so it is free either side."*
