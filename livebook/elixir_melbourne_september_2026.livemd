@@ -4,7 +4,8 @@
 
 ```elixir
 Mix.install([
-  {:agenda, github: "elixir-tempo/agenda"}
+  {:agenda, github: "elixir-tempo/agenda"},
+  {:kino, "~> 0.19"}
 ])
 ```
 
@@ -338,10 +339,14 @@ arrangements
 |> Enum.filter(&Tempo.within?(&1.interval, ~o"2025-08-28"))
 |> Enum.sort(Arrangement)
 |> Enum.take(7)
-|> Enum.map_join("\n", fn a ->
-  "#{String.pad_trailing(Tempo.to_string(a.interval.from, format: :hm), 9)} #{String.pad_trailing(Arrangement.resource(a, :room).name, 14)} #{a.session}"
+|> Enum.map(fn a ->
+  %{
+    "Time" => Tempo.to_string(a.interval.from, format: :hm),
+    "Room" => Arrangement.resource(a, :room).name,
+    "Talk" => a.session
+  }
 end)
-|> IO.puts()
+|> Kino.DataTable.new(keys: ["Time", "Room", "Talk"], name: "Thursday morning")
 ```
 
 ## The constraint held
@@ -351,17 +356,17 @@ There is no rule saying Allison Randal cannot be on a panel during her own keyno
 <!-- slide: code -->
 
 ```elixir
-for who <- ["Allison Randal", "Anna Sherman"] do
-  arrangements
-  |> Enum.filter(fn a -> Enum.any?(Arrangement.resources(a), &(&1.name == who)) end)
-  |> Enum.sort(Arrangement)
-  |> Enum.map_join("\n", fn a ->
-    "  #{Tempo.to_string(a.interval.from)}  #{Arrangement.resource(a, :room).name}  #{a.session}"
-  end)
-  |> then(&IO.puts("#{who}\n#{&1}\n"))
+for who <- ["Allison Randal", "Anna Sherman"],
+    a <- Enum.sort(arrangements, Arrangement),
+    Enum.any?(Arrangement.resources(a), &(&1.name == who)) do
+  %{
+    "Speaker" => who,
+    "When" => Tempo.to_string(a.interval.from),
+    "Room" => Arrangement.resource(a, :room).name,
+    "Session" => a.session
+  }
 end
-
-:ok
+|> Kino.DataTable.new(keys: ["Speaker", "When", "Room", "Session"], name: "Two sessions each")
 ```
 
 ## When it cannot hold
@@ -432,7 +437,13 @@ four_talks =
 
 spaced
 |> Enum.sort(Arrangement)
-|> Enum.map_join("   ", fn a -> Tempo.to_string(a.interval.from, format: :hm) end)
+|> Enum.map(fn a ->
+  %{
+    "Starts" => Tempo.to_string(a.interval.from, format: :hm),
+    "Ends" => Tempo.to_string(a.interval.to, format: :hm)
+  }
+end)
+|> Kino.DataTable.new(keys: ["Starts", "Ends"], name: "Ten minutes to reset between each")
 ```
 
 ## Model the gap, or carve it out
