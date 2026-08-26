@@ -310,6 +310,21 @@ pinned =
 length(pinned)
 ```
 
+## One session, or all of them
+
+Both verbs have now appeared — `plan/3` produced the keynote pins, and `arrange/3` is about to lay out the whole programme. They answer different questions, which is worth a moment because their output can look identical.
+
+Three one-hour sessions and one room open nine to twelve. `plan/3` returns three placements for **one** session and you pick one of them. `arrange/3` returns three placements for **three** sessions and you take them all. Same three lines, opposite meanings.
+
+| | `plan/3` | `arrange/3` |
+| --- | --- | --- |
+| Takes | one session | a programme of many |
+| Returns | the ways it could be held, ranked | one placement each, all compatible |
+| Is | an enumeration | a search |
+| When it cannot | `{:error, reason}` | also `{:partial, layout}` |
+
+Arranging is built on planning: it asks `plan/3` for each session's candidates, then searches the combinations. Planning never asks whether two sessions can coexist, and that question is the whole of arranging — a room taken by the keynote is gone for the workshop.
+
 ## Laying it out
 
 Forty-two talks and four plenaries, against three rooms and forty-five speakers.
@@ -417,40 +432,91 @@ This is the feature that saves the most time in practice, and it is a design dec
 
 * Not `false`, not "no availability" — the resource, and what was wrong with it
 * Every failing reason, not just the first one found
-* `conflict/3` goes further: the *minimal* set of sessions in tension
-* "Any two of these three fit — choose which one moves"
+* The same call answers the positive case
+
+<!-- slide: code -->
+
+```elixir
+asked = [
+  {"a 700-seat room with a projector", canaveral,
+   Agenda.needs(:room, seats: at_least(700), projector: true)},
+  {"a room seating 250", hd(speakers), Agenda.needs(:room, seats: at_least(250))},
+  {"a room seating 250", canaveral, Agenda.needs(:room, seats: at_least(250))}
+]
+
+asked
+|> Enum.map(fn {description, resource, requirement} ->
+  %{
+    "Asked for" => description,
+    "Offered" => resource.name,
+    "Answer" => Agenda.explain(requirement, resource)
+  }
+end)
+|> Kino.DataTable.new(keys: ["Asked for", "Offered", "Answer"], name: "Why not")
+```
+
+## Which one moves
+
+`conflict/3` goes further than a reason. When a programme will not hold, it returns the *minimal* set of sessions in tension — remove any one member and the rest fit.
+
+Three forty-minute talks, and Canaveral open for the eighty minutes after lunch. Any two of them fit; all three do not, and no single talk is at fault.
+
+<!-- slide: code -->
+
+```elixir
+{:ok, afternoon} =
+  Agenda.resource("Canaveral", seats: 250) |> Agenda.open(~o"2025-08-28T13:45/T15:05")
+
+three = sessions |> Enum.filter(&(&1.duration == ~o"PT40M")) |> Enum.take(3)
+
+one_block =
+  Enum.reduce(
+    three,
+    Agenda.programme("After lunch") |> Agenda.Programme.across(~o"2025-08-28"),
+    &Agenda.Programme.add_session(&2, &1)
+  )
+
+{:ok, in_tension} = Agenda.conflict(one_block, [afternoon] ++ speakers)
+in_tension
+```
 
 ## Changeover
 
-Agenda placed talks at 10:45, 11:25, 12:05. The real conference used 10:45, 11:35, 12:25. The ten minutes is changeover — one speaker unplugging while the next sets up — and Agenda does not invent it, because nothing asked for it.
+Agenda placed talks back to back. The real conference left ten minutes between them — one speaker unplugging while the next sets up — and Agenda did not invent that, because nothing asked for it.
+
+Declared on the room, it holds between every pair the search places. These are four of the conference's own twenty-minute talks, in Peninsula 4-7's Thursday block.
 
 <!-- slide: code -->
 
 ```elixir
 {:ok, hall} =
-  Agenda.resource("Hall", seats: 250, buffer_after: ~o"PT10M")
-  |> Agenda.open(~o"2025-08-28T09:00/T13:00")
+  Agenda.resource("Peninsula 4-7", seats: 250, buffer_after: ~o"PT10M")
+  |> Agenda.open(~o"2025-08-28T10:45/T12:45")
 
-four_talks =
-  Enum.reduce(1..4, Agenda.programme("Turnaround"), fn i, programme ->
-    Agenda.Programme.add_session(
-      programme,
-      Agenda.session("T#{i}", duration: ~o"PT40M", window: ~o"2025-08-28")
-      |> Agenda.Session.needs(:room, seats: 250)
-    )
-  end)
+turnaround =
+  sessions
+  |> Enum.filter(&(&1.duration == ~o"PT20M"))
+  |> Enum.take(4)
+  |> Enum.reduce(
+    Agenda.programme("Turnaround") |> Agenda.Programme.across(~o"2025-08-28"),
+    &Agenda.Programme.add_session(&2, &1)
+  )
 
-{:ok, spaced} = Agenda.arrange(four_talks, [hall])
+{:ok, spaced} = Agenda.arrange(turnaround, [hall] ++ speakers)
 
 spaced
 |> Enum.sort(Arrangement)
 |> Enum.map(fn a ->
   %{
     "Starts" => Tempo.to_string(a.interval.from, format: :hm),
-    "Ends" => Tempo.to_string(a.interval.to, format: :hm)
+    "Ends" => Tempo.to_string(a.interval.to, format: :hm),
+    "Talk" => a.session
   }
 end)
-|> Kino.DataTable.new(keys: ["Starts", "Ends"], name: "Ten minutes to reset between each")
+|> Kino.DataTable.new(
+  keys: ["Starts", "Ends", "Talk"],
+  name: "Ten minutes to reset between each"
+)
 ```
 
 ## Model the gap, or carve it out
