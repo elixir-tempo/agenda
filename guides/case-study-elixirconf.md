@@ -48,6 +48,8 @@ venue = Agenda.place("Renaissance Orlando at SeaWorld")
 peninsula = Agenda.resource("Peninsula 4-7", within: venue, seats: 700) |> Agenda.open!(plenary_hours)
 canaveral = Agenda.resource("Canaveral", within: venue, seats: 250) |> Agenda.open!(talk_hours)
 biscayne  = Agenda.resource("Biscayne", within: venue, seats: 250) |> Agenda.open!(talk_hours)
+
+rooms = [peninsula, canaveral, biscayne]
 ```
 
 ## The constraint invented data misses
@@ -63,6 +65,8 @@ allison = speaker.("Allison Randal")
 anna = speaker.("Anna Sherman")
 savannah = speaker.("Savannah Manning")
 lorena = speaker.("Lorena Mireles")
+
+speakers = [allison, anna, savannah, lorena]
 ```
 
 That single decision is what makes the rest work, and the reason is visible in the real programme. Allison Randal gave Thursday's opening keynote, *Open Source Resilience*, at 09:15 — and also appeared on the *Building Careers, Balancing Life* panel later that morning. Anna Sherman was on that same panel on Thursday and gave *From Bulbasaur to Venusaur* on Friday. Four people shared the panel between them.

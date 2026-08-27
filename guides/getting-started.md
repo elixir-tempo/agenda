@@ -218,6 +218,27 @@ It stays unmaterialised until you ask about a window, so a recurring `AVAILABLE`
 
 ## Three constraints beyond "does it fit"
 
+The examples from here on need a second room and a small programme, so
+that each runs as it stands:
+
+```elixir
+room_2 =
+  Agenda.resource("Room 2", seats: 6, video_conferencing: true)
+  |> Agenda.open!(~o"2027-03-02T09:00:00/2027-03-02T12:00:00")
+
+rooms = [room, room_2]
+
+survey = Agenda.session("Survey", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-03")
+installation = Agenda.session("Installation", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-03")
+
+programme =
+  Agenda.programme("Field work")
+  |> Agenda.Programme.add_session(survey)
+  |> Agenda.Programme.add_session(installation)
+
+friday_afternoons = ~o"2027-03-05T13:00:00/2027-03-05T17:00:00"
+```
+
 Each answers a different question, and picking the wrong one is the commonest modelling mistake:
 
 ```elixir
@@ -238,8 +259,10 @@ A **limit is not concurrency**: concurrency is how many claims may overlap at on
 A booking page needs to take a room tentatively while somebody decides. A hold occupies the resource exactly as a booking does:
 
 ```elixir
-{:ok, ledger} = Agenda.hold(ledger, arrangement, until: "2027-03-01T09:05:00")
-{:ok, ledger} = Agenda.confirm(ledger, "Quarterly review")
+{:ok, [arrangement | _rest]} = Agenda.plan(review, [room])
+
+{:ok, ledger} = Agenda.hold(Agenda.ledger(), arrangement, until: "2027-03-01T09:05:00")
+{:ok, ledger} = Agenda.confirm(ledger, "Sprint review")
 ```
 
 Nothing expires on its own — `Agenda.expire(ledger, now)` takes the moment as an argument rather than reading a clock, so planning the same session twice always gives the same answer. That matters more than the convenience it costs: `busy/2` runs inside `plan/3` and `arrange/3`, and a ledger that shifts underneath them is one you cannot test.
