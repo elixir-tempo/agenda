@@ -90,7 +90,13 @@ defmodule Agenda.MixProject do
       Core: ~r/^Agenda$/,
       "Resources and places": ~r/^Agenda\.(Resource|Place)$/,
       "Requirements and matching": ~r/^Agenda\.(Requirement|Predicate)$/,
-      "Claims and reconciliation": ~r/^Agenda\.(Ledger|Allocation|Limit|Reconciliation)$/
+      "Sessions and programmes":
+        ~r/^Agenda\.(Session|Programme|Track|Series|Precedence|Preference)$/,
+      "Planning and arranging":
+        ~r/^Agenda\.(Planner|Arranger|Arrangement|Layout|Infeasible|Conflict)$/,
+      Availability: ~r/^Agenda\.(Availability|Refine)$/,
+      "Claims and reconciliation": ~r/^Agenda\.(Ledger|Allocation|Limit|Reconciliation)$/,
+      "Solver integration": ~r/^Agenda\.Fixpoint$/
     ]
   end
 
