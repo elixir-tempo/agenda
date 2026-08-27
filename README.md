@@ -217,7 +217,9 @@ What is not promised is soft *optimality*. Proving a weighted optimum needs a bo
 
 ## Handing it to a solver
 
-How far the exact search reaches depends on the shape of a programme rather than its size — sessions that cannot interact are solved separately and concurrently, so 1,200 across twenty days lay out in under three seconds, while 200 all competing for one day take about five. A programme that is one dense component past a few hundred sessions runs out of road. The answer has always been "use a solver, then write the result back through `allocate/2`" — and with the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that sentence is executable:
+How far the exact search reaches depends on the shape of a programme rather than its size — sessions that cannot interact are solved separately and concurrently, so 1,200 spread across twenty days lay out in about a second, while 500 all competing for a single day exhaust the default `:nodes` budget. Density is the variable rather than the total: 200 in one day take about 220 ms and 450 about 1.5 s, and when the budget does run out the first remedy is to raise it — those same 500 place in 2 s given `nodes: 200_000`.
+
+A real constraint solver is a different tool rather than a bigger one. With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency the same programme becomes an ordinary CP model in one call:
 
 ```elixir
 {:ok, arrangements} = Agenda.Fixpoint.solve(programme, rooms)
@@ -226,6 +228,8 @@ How far the exact search reaches depends on the shape of a programme rather than
 Nothing about the model changes. Each session already has a finite list of candidate placements that satisfy its requirements, so the solver's variable is *which candidate* — eligibility, induced requirements, availability and the place tree all stay on this side of the boundary, where they are explained. The solver never learns what a room is. Conflicts come from `Agenda.Arranger.conflict?/4`, the same predicate the built-in search uses, so the two cannot disagree about what a clash is.
 
 It answers the all-or-nothing question only, for exclusive resources. Concurrency above one is refused rather than mis-solved: capacity is not a pairwise property, and fixpoint has no cumulative constraint to express it.
+
+Reach for it when you need a constraint this library cannot express and intend to write it in fixpoint yourself — not because a programme got large. Measured head to head the built-in search is faster at every size, and on a day filled to the hour the bridge stops returning inside twenty seconds from about two dozen sessions, long before `arrange/3` reaches its own limits.
 
 ## Open hours from a calendar
 

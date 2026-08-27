@@ -271,7 +271,7 @@ There is not one, in the range the bridge can reach. Both engines were measured 
 | 32 | 4 | 7 ms | gave up at 20 s |
 | 64 | 8 | 23 ms | gave up at 20 s |
 
-The built-in search keeps going well past the point where the bridge stops answering: two hundred talks across twenty-five rooms in 195 ms, four hundred across fifty in 918 ms, neither of them reaching the node cap.
+The built-in search keeps going well past the point where the bridge stops answering: two hundred talks across twenty-five rooms in about 220 ms, four hundred across fifty in about a second, neither of them reaching the node cap.
 
 The reason is worth understanding, because it is not "one is optimised and the other is not". The solver's hard case is proving that *no* layout exists, and truncating the candidate lists manufactures exactly that case: the same sixteen talks given eight candidates each did not finish in twenty seconds, while giving them sixteen candidates found a layout in 2.5 s. Fewer candidates is a smaller space but a harder question. `arrange/3` never asks that question — it reports against its node cap instead of proving anything, which is why it answers quickly in the cases a solver finds hardest, and why its answer to an impossible programme is `:nodes` rather than a proof.
 
@@ -293,7 +293,7 @@ Agenda.arrange(programme, [hall, room_a, room_b], nodes: 1) |> elem(1) |> Agenda
 #=>  every session — raise :nodes, or narrow the programme"
 ```
 
-Neither cap was reached by any programme measured above, including the four-hundred-talk one; a few hundred sessions is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
+Where the road actually ends is measurable: on a single day filled to the hour, 450 sessions still lay out inside the default budget and 500 exhaust it, and those 500 place in about two seconds given `nodes: 200_000`. Density is what decides it rather than the total — 1,200 sessions spread across twenty days, where most cannot interact, lay out in about a second without going near the cap. A university timetable of thousands of classes is a different matter — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
 
 ## What to take away
 
