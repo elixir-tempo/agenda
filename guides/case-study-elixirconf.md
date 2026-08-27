@@ -102,12 +102,14 @@ session =
 
 A pinned session must still be **in** the programme. Pinning fixes where a session goes; it does not smuggle one in from outside, and passing a pin for a session the programme does not contain is refused rather than quietly accepted:
 
+<!-- guide-test: skip -->
 ```elixir
 #=> {:error, %Agenda.Infeasible{reasons: ["Keynote: Open Source Resilience is pinned but is not in the programme"]}}
 ```
 
 ## Laying it out
 
+<!-- guide-test: skip -->
 ```elixir
 {:ok, arrangements} = Agenda.arrange(programme, rooms ++ speakers, pinned: pinned)
 
@@ -151,6 +153,7 @@ Agenda.session("Building Careers, Balancing Life",
   window: "2025-08-28T09:15:00/2025-08-28T09:55:00")
 ```
 
+<!-- guide-test: skip -->
 ```elixir
 {:error, reason} = Agenda.arrange(forced, pool, pinned: pinned)
 

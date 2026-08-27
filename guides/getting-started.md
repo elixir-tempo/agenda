@@ -4,6 +4,7 @@ Agenda answers *what should I book, and where?* It is built on [Tempo](https://h
 
 ## Installation
 
+<!-- guide-test: skip -->
 ```elixir
 def deps do
   [
