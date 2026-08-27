@@ -12,17 +12,17 @@ cbd      = Agenda.place("CBD", within: sydney)
 north    = Agenda.place("North Sydney", within: sydney)
 regional = Agenda.place("Newcastle")
 
-{:ok, acme} =
+acme =
   Agenda.resource("Acme HQ", within: cbd, concurrency: 2)
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 
-{:ok, beta} =
+beta =
   Agenda.resource("Beta Corp", within: north)
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 
-{:ok, coalworks} =
+coalworks =
   Agenda.resource("Coalworks", within: regional)
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 ```
 
 > *"Acme's CBD office can host two engagements at once and is open nine to five; Beta Corp in North Sydney can host one."*
@@ -34,17 +34,17 @@ Note `concurrency: 2` on Acme. That is *how many engagements can run there at on
 People and rooms are the same kind of thing here; only the attributes differ.
 
 ```elixir
-{:ok, dana} =
+dana =
   Agenda.resource("Dana", skills: [:elixir, :postgres, :security])
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 
-{:ok, raj} =
+raj =
   Agenda.resource("Raj", skills: [:elixir, :phoenix])
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 
-{:ok, mia} =
+mia =
   Agenda.resource("Mia", skills: [:security, :postgres])
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 ```
 
 A skills list wants the `all_of/1` predicate — the consultant must hold *every* skill the job needs, not merely one of them:
@@ -228,9 +228,9 @@ Because precedence relates exactly two sessions, it is the same kind of constrai
 A consultant with eight open hours and one-hour jobs is not available for eight jobs. Contracts, fatigue and paperwork all say otherwise, and none of them are expressible as availability:
 
 ```elixir
-{:ok, dana} =
+dana =
   Agenda.resource("Dana", skills: [:elixir, :postgres], limits: [day: 3, week: 12])
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 ```
 
 > *"Dana takes at most three jobs a day and twelve a week."*
@@ -252,9 +252,9 @@ That matters more than it looks. Availability can be derived from the ledger —
 Skills say what someone *can* do. Wishes say what they would *rather*:
 
 ```elixir
-{:ok, priya} =
+priya =
   Agenda.resource("Priya", skills: [:elixir], avoids: ~o"2027-03-01T13:00:00/2027-03-01T17:00:00")
-  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+  |> Agenda.open!("2027-03-01T09:00:00/2027-03-01T17:00:00")
 
 {:ok, week} = Agenda.prefer(week, :resource_wishes, weight: 5)
 ```

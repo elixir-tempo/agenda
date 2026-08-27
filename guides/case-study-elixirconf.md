@@ -45,9 +45,9 @@ plenary_hours =
 ```elixir
 venue = Agenda.place("Renaissance Orlando at SeaWorld")
 
-{:ok, peninsula} = Agenda.resource("Peninsula 4-7", within: venue, seats: 700) |> Agenda.open(plenary_hours)
-{:ok, canaveral} = Agenda.resource("Canaveral", within: venue, seats: 250) |> Agenda.open(talk_hours)
-{:ok, biscayne}  = Agenda.resource("Biscayne", within: venue, seats: 250) |> Agenda.open(talk_hours)
+peninsula = Agenda.resource("Peninsula 4-7", within: venue, seats: 700) |> Agenda.open!(plenary_hours)
+canaveral = Agenda.resource("Canaveral", within: venue, seats: 250) |> Agenda.open!(talk_hours)
+biscayne  = Agenda.resource("Biscayne", within: venue, seats: 250) |> Agenda.open!(talk_hours)
 ```
 
 ## The constraint invented data misses
@@ -56,8 +56,7 @@ venue = Agenda.place("Renaissance Orlando at SeaWorld")
 
 ```elixir
 speaker = fn name ->
-  {:ok, resource} = Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours)
-  resource
+  Agenda.resource(name, role: :speaker) |> Agenda.open!(plenary_hours)
 end
 
 allison = speaker.("Allison Randal")

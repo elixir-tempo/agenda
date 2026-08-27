@@ -11,21 +11,21 @@ office = Agenda.place("Head office")
 level_1 = Agenda.place("Level 1", within: office)
 level_4 = Agenda.place("Level 4", within: office)
 
-{:ok, priya} = Agenda.resource("Priya", requires: [step_free_access: true]) |> Agenda.open(day)
-{:ok, tom} = Agenda.resource("Tom") |> Agenda.open(day)
+priya = Agenda.resource("Priya", requires: [step_free_access: true]) |> Agenda.open!(day)
+tom = Agenda.resource("Tom") |> Agenda.open!(day)
 
-{:ok, boardroom} =
+boardroom =
   Agenda.resource("Boardroom",
     within: level_4, seats: 14, video_conferencing: true, step_free_access: true)
-  |> Agenda.open(day)
+  |> Agenda.open!(day)
 
-{:ok, huddle} =
+huddle =
   Agenda.resource("Huddle 4A", within: level_4, seats: 4)
-  |> Agenda.open(day)
+  |> Agenda.open!(day)
 
-{:ok, training} =
+training =
   Agenda.resource("Training Room", within: level_1, seats: 20, step_free_access: true)
-  |> Agenda.open(day)
+  |> Agenda.open!(day)
 
 rooms = [boardroom, huddle, training]
 ```
@@ -92,9 +92,9 @@ The attic satisfies every stated requirement. It is excluded because of who is a
 Portable equipment is a resource like any other. It has no seats; it has a projector:
 
 ```elixir
-{:ok, cart} =
+cart =
   Agenda.resource("Projector cart", within: level_1, projector: true)
-  |> Agenda.open(day)
+  |> Agenda.open!(day)
 
 workshop =
   Agenda.session("Onboarding workshop", duration: ~o"PT2H", window: ~o"2027-03-01/2027-03-02")
@@ -186,10 +186,10 @@ A hold good *until* five past is gone at five past, not after it. And the rest o
 The operation every hand-rolled system gets wrong. The naive implementation releases everything and re-acquires it, which hands the room to a competing booking in the gap and churns records that never moved. Ask instead what actually changed:
 
 ```elixir
-{:ok, annexe} =
+annexe =
   Agenda.resource("Annexe",
     within: level_4, seats: 12, video_conferencing: true, step_free_access: true)
-  |> Agenda.open(day)
+  |> Agenda.open!(day)
 
 free_of_itself = Agenda.busy(ledger, except: ["Quarterly review"])
 {:ok, [moved | _rest]} = Agenda.plan(review, [annexe], busy: free_of_itself)

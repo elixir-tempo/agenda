@@ -27,9 +27,9 @@ conf_days =
     ~o"2027-05-14T09:00:00/2027-05-14T17:00:00"
   ])
 
-{:ok, hall}   = Agenda.resource("Main Hall", within: main_level, seats: 800) |> Agenda.open(conf_days)
-{:ok, room_a} = Agenda.resource("Room A", within: break_level, seats: 200) |> Agenda.open(conf_days)
-{:ok, room_b} = Agenda.resource("Room B", within: break_level, seats: 200) |> Agenda.open(conf_days)
+hall   = Agenda.resource("Main Hall", within: main_level, seats: 800) |> Agenda.open!(conf_days)
+room_a = Agenda.resource("Room A", within: break_level, seats: 200) |> Agenda.open!(conf_days)
+room_b = Agenda.resource("Room B", within: break_level, seats: 200) |> Agenda.open!(conf_days)
 ```
 
 Open hours are a Tempo value, so "nine to five on two specific days" is just a two-member interval set. It could equally be an ISO 8601 recurrence or an RFC 5545 `RRULE` — `open/2` takes all three, and ISO 8601 is the preferred spelling because it is what Tempo stores and renders back.

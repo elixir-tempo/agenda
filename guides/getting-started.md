@@ -207,7 +207,7 @@ END:VCALENDAR
 """
 
 {:ok, hours} = Agenda.from_ical(vavailability)
-{:ok, clinic} = Agenda.open(Agenda.resource("Clinic"), hours)
+clinic = Agenda.open!(Agenda.resource("Clinic"), hours)
 
 {:ok, week} = Agenda.free(clinic, within: ~o"2026-06-01/2026-06-08")
 length(Tempo.IntervalSet.members(week))
