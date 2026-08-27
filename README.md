@@ -162,7 +162,7 @@ A schedule is the ledger read as *intent*; a timesheet is the same ledger read a
 {:ok, report} = Agenda.reconcile(ledger, dana, within: quarter, excluding: holidays)
 
 Agenda.Reconciliation.explain(report)
-#=> ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/2026Y6M16DT17H0M0S"]
+#=> ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/T17H0M0S"]
 ```
 
 **The answer is a set, not a total.** Summing hours and comparing to a number passes on data that is wrong: a consultant who misses a Tuesday and works the following Saturday totals exactly the same as one who did neither. `unaccounted` and `overclaimed` are interval sets, so they say *which* time is missing — which is what a person can act on.
@@ -256,12 +256,10 @@ Still open: the rest of the claim lifecycle — completed, cancelled, no-show �
 
 ## Installation
 
-Not yet published to Hex. Until the first release:
-
 ```elixir
 def deps do
   [
-    {:agenda, github: "elixir-tempo/agenda"}
+    {:agenda, "~> 0.1"}
   ]
 end
 ```

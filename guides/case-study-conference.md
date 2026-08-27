@@ -55,6 +55,9 @@ A keynote needs 500 seats, which only the main hall has; a talk needs 150, which
 ```elixir
 day1_morning = ~o"2027-05-13T09:00:00/2027-05-13T10:30:00"
 day1_rest    = ~o"2027-05-13T10:30:00/2027-05-13T17:00:00"
+
+day2_morning = ~o"2027-05-14T09:00:00/2027-05-14T10:30:00"
+day2_rest    = ~o"2027-05-14T10:30:00/2027-05-14T17:00:00"
 ```
 
 This is worth stating plainly because the alternative — a genuine "nothing else may run" constraint — does not exist in the library, and the window approach is how the requirement is actually met.
@@ -62,11 +65,11 @@ This is worth stating plainly because the alternative — a genuine "nothing els
 ## Tracks
 
 ```elixir
-core =
+{:ok, core} =
   Agenda.track("Core", of: [talk.("OTP internals", day1_rest), talk.("Ecto at scale", day2_rest)])
   |> Agenda.Track.reachable(within: ~o"PT15M")
 
-web =
+{:ok, web} =
   Agenda.track("Web", of: [talk.("LiveView patterns", day1_rest), talk.("Phoenix 2.0", day2_rest)])
   |> Agenda.Track.reachable(within: ~o"PT15M")
 ```
@@ -114,8 +117,9 @@ impossible =
   Agenda.session("Impossible keynote", duration: ~o"PT1H", window: day1_morning)
   |> Agenda.Session.needs(:room, seats: at_least(5000))
 
-Agenda.arrange(programme_with_it, [hall, room_a, room_b])
-#=> {:error, reason}
+programme_with_it = Agenda.Programme.add_session(programme, impossible)
+
+{:error, reason} = Agenda.arrange(programme_with_it, [hall, room_a, room_b])
 
 Agenda.explain(reason)
 #=> "Impossible keynote cannot be held: nothing satisfies room: Main Hall (seats is 800 —
@@ -219,15 +223,25 @@ Zero because both Core talks now sit in the same room. Preferences count *violat
 `:room_spread` is the other built-in, and it discourages piling everything into one room while another stands empty. Your own is a name and a function:
 
 ```elixir
-Agenda.prefer(programme, {:no_late_keynotes, &count_late_keynotes/2}, weight: 5)
+count_late_keynotes = fn arrangements, _programme ->
+  Enum.count(arrangements, fn arrangement ->
+    String.contains?(arrangement.session, "Keynote") and
+      Tempo.compare(arrangement.interval.from, ~o"2027-05-13T12:00") == :gt
+  end)
+end
+
+{:ok, fussy} =
+  Agenda.prefer(programme, {:no_late_keynotes, count_late_keynotes}, weight: 5)
 ```
 
 **A preference can never cost you a session.** Optimisation is lexicographic and runs in two passes: the first ignores preferences entirely and proves how many sessions can be placed, the second takes that number as a hard ceiling and looks only for a better-scoring layout placing exactly as many. So `minimal?` still means what it meant, and a separate `score_proven?` says whether the scoring pass finished:
 
 ```elixir
-layout.minimal?       #=> true   — provably the fewest left out
-layout.score_proven?  #=> true   — and the scoring pass finished too
+{layout.minimal?, layout.score_proven?}
+#=> {true, true}
 ```
+
+The first is *provably the fewest left out*; the second says the scoring pass finished too.
 
 The two are independent, and usually the first is proven while the second is merely good — the count is cheap to prove and the score is not. Declaring a preference does cost time: the search can no longer stop at the first layout that places everything, since a later one may score better. It gets its own `:score_nodes` budget so it can never spend the one that proves the count.
 
@@ -254,9 +268,9 @@ The search is depth-first with backtracking, ordered most-constrained-first, and
 **Both caps report when they are hit.** A partial programme presented as finished is worse than an admitted failure, so hitting the node limit is an error naming the limit, not a short list of arrangements:
 
 ```elixir
-Agenda.arrange(programme, rooms, nodes: 1) |> elem(1) |> Agenda.explain()
-#=> "... the search reached its node limit before placing every session — raise :nodes,
-#=>  or narrow the programme"
+Agenda.arrange(programme, [hall, room_a, room_b], nodes: 1) |> elem(1) |> Agenda.explain()
+#=> "ElixirConf 2027 cannot be held: the search reached its node limit before placing
+#=>  every session — raise :nodes, or narrow the programme"
 ```
 
 A few hundred sessions is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.

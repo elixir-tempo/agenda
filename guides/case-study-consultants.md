@@ -19,6 +19,10 @@ regional = Agenda.place("Newcastle")
 {:ok, beta} =
   Agenda.resource("Beta Corp", within: north)
   |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+
+{:ok, coalworks} =
+  Agenda.resource("Coalworks", within: regional)
+  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
 ```
 
 > *"Acme's CBD office can host two engagements at once and is open nine to five; Beta Corp in North Sydney can host one."*
@@ -36,6 +40,10 @@ People and rooms are the same kind of thing here; only the attributes differ.
 
 {:ok, raj} =
   Agenda.resource("Raj", skills: [:elixir, :phoenix])
+  |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
+
+{:ok, mia} =
+  Agenda.resource("Mia", skills: [:security, :postgres])
   |> Agenda.open("2027-03-01T09:00:00/2027-03-01T17:00:00")
 ```
 
@@ -145,7 +153,16 @@ Per-pair overrides are first-class for exactly this reason. Real geography disag
 The constraint that matters most in field work is that a person's own itinerary has to be physically possible. That is a family of sessions constrained against *each other*, which is exactly what a track is:
 
 ```elixir
-danas_day =
+visit = fn name, site ->
+  Agenda.session(name, duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-02")
+  |> Agenda.Session.roster(:consultant, [dana])
+  |> Agenda.Session.roster(:site, [site])
+end
+
+morning_standup = visit.("Acme standup", acme)
+afternoon_review = visit.("Beta review", beta)
+
+{:ok, danas_day} =
   Agenda.track("Dana", of: [morning_standup, afternoon_review])
   |> Agenda.Track.reachable(within: ~o"PT45M")
 
@@ -198,7 +215,8 @@ Enum.map(ordered, &Agenda.explain/1)
 `:within` caps the other end, which is what makes a follow-up a follow-up rather than something that happens eventually:
 
 ```elixir
-Agenda.precede(programme, "Screening", "Panel", gap: ~o"PT15M", within: ~o"PT2H")
+{:ok, tightened} =
+  Agenda.precede(engagement, "Site survey", "Installation", gap: ~o"PT15M", within: ~o"PT2H")
 ```
 
 Both are measured from the **end** of the predecessor, so a survey that runs long pushes the installation rather than eating its allowance. A chain of three is two precedences, and the search enforces each independently — it never reasons about the chain as a whole.

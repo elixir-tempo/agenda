@@ -4,6 +4,8 @@ The other case studies invent their data. This one does not: it is the real prog
 
 The point is not to reproduce the published grid. It is that a real programme has a constraint an invented one usually misses, and it only shows up when you use real people.
 
+The excerpts below show the shape rather than all forty-two talks. The complete programme, runnable cell by cell, is the [Melbourne livebook](https://github.com/elixir-tempo/agenda/blob/main/livebook/elixir_melbourne_september_2026.livemd).
+
 ## What the conference actually was
 
 Thursday 28 and Friday 29 August 2025. Three parallel rooms — **Peninsula 4-7**, **Canaveral** and **Biscayne** — with Peninsula 1-3 used for registration, coffee, lunch and the reception rather than for talks. Sessions ran 20 or 40 minutes. Each day opened with a keynote in Peninsula 4-7 and closed there too.
@@ -24,7 +26,21 @@ talk_hours =
 
 The breaks are not constraints to be enforced. They are simply time the rooms are not open, and everything downstream inherits that for free.
 
-Peninsula 4-7 is also the plenary room, so it opens earlier and closes later than the other two — a separate `plenary_hours` set with 09:00–10:15 and 15:35–17:50 on Thursday, and the equivalent on Friday.
+Peninsula 4-7 is also the plenary room, so it opens earlier and closes later than the other two:
+
+```elixir
+plenary_hours =
+  Tempo.IntervalSet.new!([
+    ~o"2025-08-28T09:00/T10:15",
+    ~o"2025-08-28T10:45/T12:45",
+    ~o"2025-08-28T13:45/T15:05",
+    ~o"2025-08-28T15:35/T17:50",
+    ~o"2025-08-29T09:00/T10:10",
+    ~o"2025-08-29T10:40/T12:40",
+    ~o"2025-08-29T13:40/T15:20",
+    ~o"2025-08-29T15:50/T17:30"
+  ])
+```
 
 ```elixir
 venue = Agenda.place("Renaissance Orlando at SeaWorld")
@@ -39,7 +55,15 @@ venue = Agenda.place("Renaissance Orlando at SeaWorld")
 **Speakers are resources.** Not attributes of a talk, not metadata — resources, exactly like rooms, with the same default concurrency of one.
 
 ```elixir
-{:ok, speaker} = Agenda.resource("Allison Randal", role: :speaker) |> Agenda.open(plenary_hours)
+speaker = fn name ->
+  {:ok, resource} = Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours)
+  resource
+end
+
+allison = speaker.("Allison Randal")
+anna = speaker.("Anna Sherman")
+savannah = speaker.("Savannah Manning")
+lorena = speaker.("Lorena Mireles")
 ```
 
 That single decision is what makes the rest work, and the reason is visible in the real programme. Allison Randal gave Thursday's opening keynote, *Open Source Resilience*, at 09:15 — and also appeared on the *Building Careers, Balancing Life* panel later that morning. Anna Sherman was on that same panel on Thursday and gave *From Bulbasaur to Venusaur* on Friday. Four people shared the panel between them.

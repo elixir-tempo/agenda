@@ -7,6 +7,13 @@ Every business above a certain size has the same problem, and almost every one o
 ```elixir
 day = "2027-03-01T09:00:00/2027-03-01T17:00:00"
 
+office = Agenda.place("Head office")
+level_1 = Agenda.place("Level 1", within: office)
+level_4 = Agenda.place("Level 4", within: office)
+
+{:ok, priya} = Agenda.resource("Priya", requires: [step_free_access: true]) |> Agenda.open(day)
+{:ok, tom} = Agenda.resource("Tom") |> Agenda.open(day)
+
 {:ok, boardroom} =
   Agenda.resource("Boardroom",
     within: level_4, seats: 14, video_conferencing: true, step_free_access: true)
@@ -19,6 +26,8 @@ day = "2027-03-01T09:00:00/2027-03-01T17:00:00"
 {:ok, training} =
   Agenda.resource("Training Room", within: level_1, seats: 20, step_free_access: true)
   |> Agenda.open(day)
+
+rooms = [boardroom, huddle, training]
 ```
 
 Attributes are whatever your building actually has — there is no fixed vocabulary. `seats`, `video_conferencing`, and `step_free_access` are just names; a room with a `hearing_loop` or a `standing_desk` needs no library change.
@@ -35,7 +44,7 @@ review =
   |> Agenda.Session.needs(:room, seats: at_least(10), video_conferencing: true)
   |> Agenda.Session.roster(:attendees, [priya, tom])
 
-{:ok, options} = Agenda.plan(review, [boardroom, huddle, training])
+{:ok, options} = Agenda.plan(review, rooms)
 
 length(options)
 #=> 8
@@ -63,15 +72,11 @@ Both reasons, not the first one. An absent attribute reads differently from a wr
 
 Here is the failure mode worth designing out. Priya uses a wheelchair. In most systems that fact lives in somebody's memory, and the booking that forgets it is discovered on the day.
 
-`step_free_access: true` on Priya is **not** a fact about Priya's availability. It is a constraint she places on whatever room she is booked into:
+`step_free_access: true` on Priya — the `requires:` she was built with above — is **not** a fact about Priya's availability. It is a constraint she places on whatever room she is booked into, and adding her to a session tightens the room requirement automatically:
 
 ```elixir
-priya = Agenda.resource("Priya", requires: [step_free_access: true])
-```
+attic = Agenda.resource("Attic", within: level_4, seats: 12, video_conferencing: true)
 
-Adding her to a session tightens the room requirement automatically:
-
-```elixir
 Agenda.needs(:room, seats: at_least(10), video_conferencing: true)
 |> Agenda.Requirement.induce([priya])
 |> Agenda.explain(attic)
@@ -96,12 +101,12 @@ workshop =
   |> Agenda.Session.needs(:room, seats: at_least(15))
   |> Agenda.Session.needs(:equipment, projector: true)
 
-{:ok, options} = Agenda.plan(workshop, [boardroom, huddle, training, cart])
+{:ok, for_workshop} = Agenda.plan(workshop, rooms ++ [cart])
 
-length(options)
+length(for_workshop)
 #=> 4
 
-Agenda.explain(hd(options))
+Agenda.explain(hd(for_workshop))
 #=> "2027Y3M1DT9H0M0S/T11H0M0S — equipment: Projector cart, room: Training Room"
 ```
 
@@ -181,7 +186,15 @@ A hold good *until* five past is gone at five past, not after it. And the rest o
 The operation every hand-rolled system gets wrong. The naive implementation releases everything and re-acquires it, which hands the room to a competing booking in the gap and churns records that never moved. Ask instead what actually changed:
 
 ```elixir
-changes = Agenda.rearrange(ledger, "Quarterly review", new_arrangement)
+{:ok, annexe} =
+  Agenda.resource("Annexe",
+    within: level_4, seats: 12, video_conferencing: true, step_free_access: true)
+  |> Agenda.open(day)
+
+free_of_itself = Agenda.busy(ledger, except: ["Quarterly review"])
+{:ok, [moved | _rest]} = Agenda.plan(review, [annexe], busy: free_of_itself)
+
+changes = Agenda.rearrange(ledger, "Quarterly review", moved)
 
 Enum.map(changes, &elem(&1, 0))
 #=> [:keep, :keep, :release, :allocate]

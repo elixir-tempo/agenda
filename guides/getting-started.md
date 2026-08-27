@@ -4,12 +4,10 @@ Agenda answers *what should I book, and where?* It is built on [Tempo](https://h
 
 ## Installation
 
-Not yet published to Hex. Until the first release:
-
 ```elixir
 def deps do
   [
-    {:agenda, github: "elixir-tempo/agenda"}
+    {:agenda, "~> 0.1"}
   ]
 end
 ```
@@ -19,12 +17,14 @@ end
 Tempo treats **every date and time as a bounded interval, never an instant.** A day is not a point; it is the span from one midnight to the next:
 
 ```elixir
-Tempo.to_interval!(~o"2027-03-02")
-#=> from 2027-03-02, to 2027-03-03
+Tempo.to_interval!(~o"2027-03-02") |> Tempo.to_iso8601()
+#=> "2027Y3M2D/3D"
 
-Tempo.to_interval!(~o"2027-03")
-#=> from 2027-03, to 2027-04
+Tempo.to_interval!(~o"2027-03") |> Tempo.to_iso8601()
+#=> "2027Y3M/4M"
 ```
+
+> *"The second of March is the span from the second to the third; March is the span from March to April."* An interval end drops whatever it shares with its start, so `/3D` is the third of the same month.
 
 A value's span is one unit of its finest *stated* field, so `~o"2027-03"` is the whole of March. Two consequences matter here:
 
@@ -190,8 +190,28 @@ Three worked case studies, each end to end, with every value in them executed ra
 Availability usually exists somewhere before it exists in your code. `from_ical/1` reads an RFC 7953 `VAVAILABILITY` — what a CalDAV server returns when asked when someone is free — into a pattern `open/2` accepts:
 
 ```elixir
+vavailability = """
+BEGIN:VCALENDAR
+BEGIN:VAVAILABILITY
+UID:clinic
+DTSTAMP:20260601T000000Z
+BEGIN:AVAILABLE
+UID:clinic-available
+DTSTAMP:20260601T000000Z
+DTSTART:20260601T090000Z
+DTEND:20260601T170000Z
+RRULE:FREQ=DAILY;COUNT=5
+END:AVAILABLE
+END:VAVAILABILITY
+END:VCALENDAR
+"""
+
 {:ok, hours} = Agenda.from_ical(vavailability)
 {:ok, clinic} = Agenda.open(Agenda.resource("Clinic"), hours)
+
+{:ok, week} = Agenda.free(clinic, within: ~o"2026-06-01/2026-06-08")
+length(Tempo.IntervalSet.members(week))
+#=> 5
 ```
 
 It stays unmaterialised until you ask about a window, so a recurring `AVAILABLE` and `PRIORITY` across overlapping components resolve against the dates you actually query. `VEVENT`s in the same document are ignored — those are time *taken*, and belong in `free/2`'s `:busy`. Needs the optional `ical` dependency.
