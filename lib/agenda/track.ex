@@ -21,7 +21,7 @@ defmodule Agenda.Track do
       iex> import Tempo.Sigils
       iex> keynote = Agenda.session("Keynote", duration: ~o"PT1H")
       iex> deep_dive = Agenda.session("OTP internals", duration: ~o"PT1H")
-      iex> track =
+      iex> {:ok, track} =
       ...>   Agenda.track("Elixir", of: [keynote, deep_dive])
       ...>   |> Agenda.Track.reachable(within: ~o"PT10M")
       iex> {length(track.sessions), track.reachable_within}
@@ -91,19 +91,28 @@ defmodule Agenda.Track do
 
   ### Returns
 
-  * the track, with the reachability requirement set.
+  * `{:ok, track}` with the reachability requirement set; or
+
+  * `{:error, {:missing_option, :within}}`.
 
   ### Examples
 
       iex> import Tempo.Sigils
       iex> track = Agenda.Track.new("Elixir")
-      iex> Agenda.Track.reachable(track, within: ~o"PT10M").reachable_within
+      iex> {:ok, track} = Agenda.Track.reachable(track, within: ~o"PT10M")
+      iex> track.reachable_within
       ~o"PT10M"
 
+      iex> Agenda.Track.reachable(Agenda.Track.new("Elixir"), [])
+      {:error, {:missing_option, :within}}
+
   """
-  @spec reachable(t(), keyword()) :: t()
+  @spec reachable(t(), keyword()) :: {:ok, t()} | {:error, {:missing_option, :within}}
   def reachable(%__MODULE__{} = track, options) do
-    %{track | reachable_within: Keyword.fetch!(options, :within)}
+    case Keyword.fetch(options, :within) do
+      {:ok, within} -> {:ok, %{track | reachable_within: within}}
+      :error -> {:error, {:missing_option, :within}}
+    end
   end
 
   @doc """

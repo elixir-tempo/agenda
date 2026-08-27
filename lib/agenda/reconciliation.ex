@@ -145,7 +145,8 @@ defmodule Agenda.Reconciliation do
   """
   @spec reconcile(Ledger.t(), Resource.t(), keyword()) :: {:ok, t()} | {:error, term()}
   def reconcile(%Ledger{} = ledger, %Resource{} = resource, options) do
-    with {:ok, window} <- Availability.normalise(Keyword.fetch!(options, :within)),
+    with {:ok, within} <- required(options, :within),
+         {:ok, window} <- Availability.normalise(within),
          {:ok, owed} <- owed(resource, window, options),
          {:ok, excluding} <- set(Keyword.get(options, :excluding), window),
          {:ok, expected} <- Tempo.difference(owed, excluding),
@@ -165,6 +166,15 @@ defmodule Agenda.Reconciliation do
          by_tag: by_tag,
          breaches: breaches(resource, allocations)
        }}
+    end
+  end
+
+  # A required option. Absent, it is an error tuple like any other bad
+  # input rather than a `KeyError` raised several frames from the call.
+  defp required(options, name) do
+    case Keyword.fetch(options, name) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:missing_option, name}}
     end
   end
 

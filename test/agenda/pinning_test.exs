@@ -130,7 +130,7 @@ defmodule Agenda.PinningTest do
         Agenda.resource("Far Room", within: Agenda.place("Annexe Building"), seats: 100)
         |> Agenda.open("2026-09-15T09:00:00/2026-09-15T10:00:00")
 
-      track =
+      {:ok, track} =
         Agenda.track("T", of: [talk("First"), talk("Second")])
         |> Track.reachable(within: "PT5M")
 

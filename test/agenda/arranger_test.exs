@@ -128,7 +128,7 @@ defmodule Agenda.ArrangerTest do
   describe "arrange/3 — reachability between consecutive track sessions" do
     test "a same-level journey fits a back-to-back-plus-gap track", context do
       # Hall and Studio are on the same level: no travel time at all.
-      track =
+      {:ok, track} =
         "Elixir"
         |> Agenda.track(of: [talk("Keynote"), talk("Deep dive")])
         |> Track.reachable(within: ~o"PT10M")
@@ -155,7 +155,7 @@ defmodule Agenda.ArrangerTest do
       first = only_at("Hall", venue, "2026-09-15T09:00:00/2026-09-15T10:00:00")
       second = only_at("Far Room", elsewhere, "2026-09-15T10:30:00/2026-09-15T11:30:00")
 
-      track =
+      {:ok, track} =
         "Elixir"
         |> Agenda.track(of: [talk("Keynote"), talk("Deep dive")])
         |> Track.reachable(within: ~o"PT10M")
@@ -173,21 +173,21 @@ defmodule Agenda.ArrangerTest do
       second = only_at("Upstairs", level_3, "2026-09-15T10:30:00/2026-09-15T11:30:00")
 
       # Hall to Upstairs is a 5-minute walk by the default table.
-      too_tight =
+      {:ok, too_tight} =
         "Elixir"
         |> Agenda.track(of: [talk("Keynote"), talk("Deep dive")])
         |> Track.reachable(within: ~o"PT1M")
 
       assert {:error, _reason} = Arranger.arrange(conf([too_tight]), [first, second])
 
-      generous = Track.reachable(too_tight, within: ~o"PT30M")
+      {:ok, generous} = Track.reachable(too_tight, within: ~o"PT30M")
 
       assert {:ok, arrangements} = Arranger.arrange(conf([generous]), [first, second])
       assert length(arrangements) == 2
     end
 
     test "the same journey is fine when the track allows enough time", context do
-      track =
+      {:ok, track} =
         "Elixir"
         |> Agenda.track(of: [talk("Keynote"), talk("Deep dive")])
         |> Track.reachable(within: ~o"PT30M")
@@ -199,7 +199,7 @@ defmodule Agenda.ArrangerTest do
     end
 
     test "a per-pair override rescues an otherwise unreachable pair", context do
-      track =
+      {:ok, track} =
         "Elixir"
         |> Agenda.track(of: [talk("Keynote"), talk("Deep dive")])
         |> Track.reachable(within: ~o"PT10M")
@@ -229,7 +229,7 @@ defmodule Agenda.ArrangerTest do
         name |> talk() |> Session.roster(:speaker, [speaker])
       end
 
-      track =
+      {:ok, track} =
         "Elixir"
         |> Agenda.track(of: [with_speaker.("Keynote"), with_speaker.("Deep dive")])
         |> Track.reachable(within: ~o"PT30M")
@@ -368,7 +368,7 @@ defmodule Agenda.ArrangerTest do
     test "a duration written as a string is read, not crashed on", context do
       # `Track.reachable/2` accepts anything `Agenda.open/2` does,
       # so the arranger must parse it rather than assume a struct.
-      track =
+      {:ok, track} =
         Agenda.track("T", of: [talk("First"), talk("Second")])
         |> Track.reachable(within: "PT10M")
 
@@ -377,15 +377,15 @@ defmodule Agenda.ArrangerTest do
     end
 
     test "a string and a sigil agree", context do
-      as_string = Track.reachable(Agenda.track("T", of: [talk("A")]), within: "PT10M")
-      as_sigil = Track.reachable(Agenda.track("T", of: [talk("A")]), within: ~o"PT10M")
+      {:ok, as_string} = Track.reachable(Agenda.track("T", of: [talk("A")]), within: "PT10M")
+      {:ok, as_sigil} = Track.reachable(Agenda.track("T", of: [talk("A")]), within: ~o"PT10M")
 
       assert Arranger.arrange(conf([as_string]), [context.hall]) ==
                Arranger.arrange(conf([as_sigil]), [context.hall])
     end
 
     test "something that is not a duration is an error, not a crash", context do
-      track =
+      {:ok, track} =
         Agenda.track("T", of: [talk("First"), talk("Second")])
         |> Track.reachable(within: "not a duration")
 
@@ -394,7 +394,7 @@ defmodule Agenda.ArrangerTest do
     end
 
     test "an interval is not a duration either", context do
-      track =
+      {:ok, track} =
         Agenda.track("T", of: [talk("First")])
         |> Track.reachable(within: "2026-09-15/2026-09-16")
 

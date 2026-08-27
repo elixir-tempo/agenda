@@ -283,6 +283,15 @@ defmodule Agenda.Ledger do
   # One resource in one role over one span. Shared so that a booking
   # and a recorded hour are the same shape in the ledger — which is
   # what lets the one block the other.
+  # A required option. Absent, it is an error tuple like any other bad
+  # input rather than a `KeyError` raised several frames from the call.
+  defp required(options, name) do
+    case Keyword.fetch(options, name) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:missing_option, name}}
+    end
+  end
+
   defp holding(resource, interval, options) do
     %Arrangement{
       session: Keyword.get(options, :session, Tempo.to_iso8601(interval)),
@@ -379,7 +388,8 @@ defmodule Agenda.Ledger do
   """
   @spec hold(t(), Arrangement.t(), keyword()) :: {:ok, t()} | {:error, term()}
   def hold(%__MODULE__{} = ledger, %Arrangement{} = arrangement, options) do
-    with {:ok, until} <- Availability.normalise(Keyword.fetch!(options, :until)) do
+    with {:ok, moment} <- required(options, :until),
+         {:ok, until} <- Availability.normalise(moment) do
       allocations =
         arrangement
         |> Allocation.from_arrangement(options)

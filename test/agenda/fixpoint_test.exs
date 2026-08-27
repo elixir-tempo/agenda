@@ -140,7 +140,7 @@ defmodule Agenda.FixpointTest do
       # The annexe is unmeasured from the venue, so a delegate cannot be
       # asked to cross between them in five minutes. Both rooms are
       # offered; the solver must keep the track on one side.
-      track =
+      {:ok, track} =
         Agenda.track("Core", of: [talk("First"), talk("Second")])
         |> Track.reachable(within: "PT5M")
 
@@ -166,7 +166,7 @@ defmodule Agenda.FixpointTest do
         |> Session.needs(:room, seats: 100)
       end
 
-      track =
+      {:ok, track} =
         Agenda.track("Core", of: [pinned_talk.("First"), pinned_talk.("Second")])
         |> Track.reachable(within: "PT5M")
 

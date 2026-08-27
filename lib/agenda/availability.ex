@@ -254,7 +254,8 @@ defmodule Agenda.Availability do
 
   def free(%Resource{} = resource, options) do
     with :ok <- usable_buffers(resource),
-         {:ok, window} <- normalise(Keyword.fetch!(options, :within)),
+         {:ok, within} <- required(options, :within),
+         {:ok, window} <- normalise(within),
          {:ok, open} <- within(resource.open, window),
          {:ok, busy} <- busy_set(Keyword.get(options, :busy, []), window) do
       busy
@@ -269,6 +270,15 @@ defmodule Agenda.Availability do
   # difference between an error the caller can act on and a
   # `FunctionClauseError` raised several frames inside `Tempo.shift/2`,
   # on some later call where the resource happened to be busy.
+  # A required option. Absent, it is an error tuple like any other bad
+  # input rather than a `KeyError` raised several frames from the call.
+  defp required(options, name) do
+    case Keyword.fetch(options, name) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:missing_option, name}}
+    end
+  end
+
   defp usable_buffers(%Resource{} = resource) do
     [before: resource.buffer_before, after: resource.buffer_after]
     |> Enum.reject(fn {_which, value} -> value == nil or is_struct(value, Tempo.Duration) end)

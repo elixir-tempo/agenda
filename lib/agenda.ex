@@ -657,12 +657,12 @@ defmodule Agenda do
   ### Examples
 
       iex> import Tempo.Sigils
-      iex> track = Agenda.track("Elixir") |> Agenda.reachable(within: ~o"PT10M")
+      iex> {:ok, track} = Agenda.track("Elixir") |> Agenda.reachable(within: ~o"PT10M")
       iex> track.reachable_within
       ~o"PT10M"
 
   """
-  @spec reachable(Track.t(), keyword()) :: Track.t()
+  @spec reachable(Track.t(), keyword()) :: {:ok, Track.t()} | {:error, {:missing_option, :within}}
   defdelegate reachable(track, options), to: Track
 
   @doc """
