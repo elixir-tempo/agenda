@@ -201,6 +201,24 @@ defmodule Agenda do
   defdelegate open(resource, pattern), to: Availability
 
   @doc """
+  Open hours on a resource, raising on a pattern it cannot read.
+  Delegates to `Agenda.Availability.open!/2`.
+
+  The `!` companion to `open/2`, for a pattern that is a literal in the
+  source — a guide, a notebook, a fixture — where the tuple is ceremony
+  around what cannot fail except by typo.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> Agenda.open!(Agenda.resource("Boardroom"), ~o"2026-06-15T09:00:00/2026-06-15T17:00:00").open
+      ~o"2026Y6M15DT9H0M0S/2026Y6M15DT17H0M0S"
+
+  """
+  @spec open!(Resource.t(), Availability.pattern()) :: Resource.t()
+  defdelegate open!(resource, pattern), to: Availability
+
+  @doc """
   Read open hours from an RFC 7953 `VAVAILABILITY`. Delegates to
   `Agenda.Availability.from_ical/1`.
 

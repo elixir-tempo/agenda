@@ -92,6 +92,50 @@ defmodule Agenda.Availability do
   end
 
   @doc """
+  Open hours on a resource, raising on a pattern it cannot read.
+
+  The `!` companion to `open/2`, for the case where the pattern is a
+  literal in the source rather than data: a guide, a notebook, or a
+  fixture. There the tuple is pure ceremony — an unreadable literal is
+  a typo, not a condition to handle — and unwrapping it at every setup
+  line buries what the example is actually about.
+
+  Reach for `open/2` wherever the pattern comes from outside the
+  program, which is most of an application.
+
+  ### Arguments
+
+  * `resource` is a `t:Agenda.Resource.t/0`.
+
+  * `pattern` is as for `open/2`.
+
+  ### Returns
+
+  * the resource with its open hours set; or raises `ArgumentError`.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> boardroom = Agenda.Availability.open!(Agenda.resource("Boardroom"), "2026-06-15T09:00:00/2026-06-15T17:00:00")
+      iex> boardroom.open
+      ~o"2026Y6M15DT9H0M0S/2026Y6M15DT17H0M0S"
+
+      iex> Agenda.Availability.open!(Agenda.resource("Boardroom"), "not a pattern")
+      ** (ArgumentError) Boardroom: cannot read :unreadable_pattern as open hours
+
+  """
+  @spec open!(Resource.t(), pattern()) :: Resource.t()
+  def open!(%Resource{} = resource, pattern) do
+    case open(resource, pattern) do
+      {:ok, opened} ->
+        opened
+
+      {:error, reason} ->
+        raise ArgumentError, "#{resource.name}: cannot read #{inspect(reason)} as open hours"
+    end
+  end
+
+  @doc """
   Read `pattern` as a Tempo value.
 
   Tempo values pass through untouched. Strings are tried as ISO 8601

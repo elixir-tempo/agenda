@@ -126,12 +126,12 @@ same_days = Tempo.select!(window, Tempo.workdays(:AU))
 A person and a meeting room are the same kind of thing here; only the attributes differ. The working pattern is availability, and the contract is a limit.
 
 ```elixir
-{:ok, dana} =
+dana =
   Agenda.resource("Dana",
     skills: [:elixir, :postgres],
     limits: [day: ~o"PT7H"]
   )
-  |> Agenda.open(business_hours.(window))
+  |> Agenda.open!(business_hours.(window))
 
 %{blocks: Tempo.IntervalSet.count(dana.open), hours: hours.(dana.open)}
 ```
@@ -332,9 +332,9 @@ A limit may set a floor as well as a ceiling. Only ceilings constrain scheduling
 But watch what an **absolute** weekly floor does in a week containing a public holiday:
 
 ```elixir
-{:ok, contracted} =
+contracted =
   Agenda.resource("Dana", limits: [day: ~o"PT7H", week: [at_least: ~o"PT35H"]])
-  |> Agenda.open(business_hours.(window))
+  |> Agenda.open!(business_hours.(window))
 
 worked =
   ekka_week
