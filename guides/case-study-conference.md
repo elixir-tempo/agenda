@@ -245,9 +245,11 @@ The first is *provably the fewest left out*; the second says the scoring pass fi
 
 The two are independent, and usually the first is proven while the second is merely good — the count is cheap to prove and the score is not. Declaring a preference does cost time: the search can no longer stop at the first layout that places everything, since a later one may score better. It gets its own `:score_nodes` budget so it can never spend the one that proves the count.
 
-## When even that is not enough
+## When to reach for a real solver
 
-Past a few dozen sessions this search runs out of road, and the guide has said so from the start: use a real solver and write its output back through `allocate/2`. With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency, that is one call:
+The natural assumption is that the built-in search runs out of road at some size and a real constraint solver takes over from there. Measured, that is not what happens, and it is worth saying so plainly before recommending anything.
+
+With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency, handing the programme to a CP solver is one call:
 
 ```elixir
 {:ok, arrangements} = Agenda.Fixpoint.solve(programme, [hall, room_a, room_b])
@@ -256,6 +258,24 @@ Past a few dozen sessions this search runs out of road, and the guide has said s
 The programme does not change shape to suit the solver. Each session already has a finite list of candidate placements that satisfy its requirements, so the variable handed over is *which candidate* — and eligibility, induced requirements, availability and the place tree all stay here, where they are explained. The solver never learns what a room is. Conflicts come from the same predicate `arrange/3` uses, so the two cannot disagree about what a clash is.
 
 Two limits. It answers the all-or-nothing question only — `unplaced: :allow`, `minimal?` and preferences all stay with `arrange/3`. And it models exclusive resources only: capacity above one is not a pairwise property, so a pool containing a resource with `concurrency > 1` is refused rather than quietly mis-solved.
+
+### Where the crossover is
+
+There is not one, in the range the bridge can reach. Both engines were measured on identical programmes — a single eight-hour day, one-hour talks, every talk needing a room, filled exactly to the hour — with each resulting layout checked by allocating it through a ledger:
+
+| talks | rooms | `arrange/3` | `Fixpoint.solve/2` |
+| ----: | ----: | ----------: | -----------------: |
+| 8 | 1 | 0 ms | 89 ms |
+| 16 | 2 | 1 ms | 2,505 ms |
+| 24 | 3 | 3 ms | gave up at 20 s |
+| 32 | 4 | 7 ms | gave up at 20 s |
+| 64 | 8 | 23 ms | gave up at 20 s |
+
+The built-in search keeps going well past the point where the bridge stops answering: two hundred talks across twenty-five rooms in 195 ms, four hundred across fifty in 918 ms, neither of them reaching the node cap.
+
+The reason is worth understanding, because it is not "one is optimised and the other is not". The solver's hard case is proving that *no* layout exists, and truncating the candidate lists manufactures exactly that case: the same sixteen talks given eight candidates each did not finish in twenty seconds, while giving them sixteen candidates found a layout in 2.5 s. Fewer candidates is a smaller space but a harder question. `arrange/3` never asks that question — it reports against its node cap instead of proving anything, which is why it answers quickly in the cases a solver finds hardest, and why its answer to an impossible programme is `:nodes` rather than a proof.
+
+So the bridge is not a performance upgrade, and reaching for it because a programme got large is the wrong instinct. What it is for is the model: a programme translates into an ordinary CP model over "which candidate", which is what you want when you need a constraint this library cannot express and intend to write it in fixpoint yourself. Either way the answer comes back as ordinary arrangements, and `allocate/2` stays authoritative.
 
 ## Scale, honestly
 
@@ -273,7 +293,7 @@ Agenda.arrange(programme, [hall, room_a, room_b], nodes: 1) |> elem(1) |> Agenda
 #=>  every session — raise :nodes, or narrow the programme"
 ```
 
-A few hundred sessions is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
+Neither cap was reached by any programme measured above, including the four-hundred-talk one; a few hundred sessions is comfortable. A university timetable of thousands of classes is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`, which stays authoritative either way; the ledger does not care who computed the answer.
 
 ## What to take away
 

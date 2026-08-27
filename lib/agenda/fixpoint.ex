@@ -4,11 +4,20 @@ if Code.ensure_loaded?(CPSolver) do
     Hand a programme to a real constraint solver, and take the answer
     back as arrangements.
 
-    `Agenda.Arranger.arrange/3` is exact and explains itself, and it
-    runs out of road somewhere in the low tens of sessions. Past that
-    the answer has always been "use a solver, then write the result
-    back through `Agenda.Ledger.allocate/2`". This module is that
-    sentence made executable, using
+    Reach for this when you need a constraint the library does not
+    express and intend to write it in fixpoint yourself — not because
+    a programme got large. `Agenda.Arranger.arrange/3` was faster on
+    every programme the two have been measured against: on a day
+    filled exactly to the hour it placed sixteen talks in 1 ms
+    against this bridge's 2.5 s, and from twenty-four talks upward
+    the bridge stopped returning inside twenty seconds while the
+    built-in search went on to place four hundred in under a second.
+    A solver's hard case is proving that no layout exists, which is
+    precisely the question `arrange/3` declines to ask.
+    `Agenda.Ledger.allocate/2` stays authoritative either way, so the
+    choice here is about what you can express, not speed.
+
+    This module makes the handover executable, using
     [fixpoint](https://hex.pm/packages/fixpoint).
 
     Nothing about the model changes. Resources, requirements, places
