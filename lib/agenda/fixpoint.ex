@@ -452,7 +452,16 @@ if Code.ensure_loaded?(CPSolver) do
     ## --- the answer -----------------------------------------------
 
     defp run(model, programme, candidates, options) do
-      solve_options = Keyword.take(options, [:timeout])
+      # The bridge answers the all-or-nothing question and reads one
+      # layout out of the result, so the search is told to stop at the
+      # first solution rather than enumerate every satisfying layout
+      # and have all but one discarded. This cannot weaken the
+      # unsatisfiable proof below: with no solution to find, the stop
+      # condition never fires and the search runs to completion.
+      solve_options =
+        options
+        |> Keyword.take([:timeout])
+        |> Keyword.put(:stop_on, {:max_solutions, 1})
 
       # `CPSolver.solve/2` answers `{:ok, result}` whether or not it
       # found anything, so an empty solution list has to be read against

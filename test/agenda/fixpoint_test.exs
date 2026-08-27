@@ -1,23 +1,14 @@
 defmodule Agenda.FixpointTest do
-  # Deliberately not async. Every test here is bounded by a wall clock:
-  # the solver runs concurrently and returns whatever it has when the
-  # timeout fires, so its result depends on how much CPU it actually
-  # got. Sharing the machine with nineteen other cases turns that into
-  # a coin toss — one of these was observed taking 4.3 s on one run and
-  # 7.1 s on the next, on an idle machine, against the same budget.
-  #
-  # Running them alone does not make the solver deterministic, but it
-  # removes the variance this suite controls. The generous timeouts
-  # below cover the rest, and cost nothing on the tests that return as
-  # soon as the solver finishes.
-  use ExUnit.Case, async: false
-
-  # Above every solver budget below, so the solver's own timeout is
-  # always the binding constraint. Left at ExUnit's 60 s default, a
-  # test given a 60 s budget would be killed by the framework first and
-  # report "test timed out" instead of the assertion that actually
-  # failed.
-  @moduletag timeout: 180_000
+  # These were once serialised behind `async: false`, given 60 s
+  # budgets and a retry helper, because a nine-session packing took
+  # anywhere from 3.8 s to 24 s. None of that was solver variance: the
+  # bridge asked for every satisfying layout and read one, so the cost
+  # grew with the number of solutions rather than the difficulty of
+  # finding one. `Agenda.Fixpoint` now stops at the first solution and
+  # the same packing settles in under 100 ms, so the scaffolding is
+  # gone. The budgets below are deliberately tight — they are what
+  # would catch that regression coming back.
+  use ExUnit.Case, async: true
 
   import Tempo.Sigils
 
@@ -75,16 +66,6 @@ defmodule Agenda.FixpointTest do
   # runner any of these can hit the budget, so give the solver more time
   # rather than failing a build over scheduling noise. Still unsettled at
   # four times the budget is a real failure, and reports as one.
-  defp settled(programme, pool, options) do
-    case Fixpoint.solve(programme, pool, options) do
-      {:error, :timeout} ->
-        Fixpoint.solve(programme, pool, Keyword.update!(options, :timeout, &(&1 * 4)))
-
-      settled ->
-        settled
-    end
-  end
-
   describe "solving" do
     test "it places every session", context do
       programme = conf(Enum.map(["A", "B", "C"], &talk/1))
@@ -240,7 +221,7 @@ defmodule Agenda.FixpointTest do
       programme = conf(Enum.map(1..9, &talk("S#{&1}")))
       pool = [context.hall, context.studio, context.far]
 
-      assert {:ok, arrangements} = settled(programme, pool, timeout: 10_000)
+      assert {:ok, arrangements} = Fixpoint.solve(programme, pool, timeout: 5_000)
       assert length(arrangements) == 9
     end
   end
@@ -267,7 +248,7 @@ defmodule Agenda.FixpointTest do
       programme = conf(Enum.map(1..9, &talk("S#{&1}")))
       pool = [context.hall, context.studio, context.far]
 
-      assert {:ok, arrangements} = settled(programme, pool, timeout: 10_000)
+      assert {:ok, arrangements} = Fixpoint.solve(programme, pool, timeout: 5_000)
       assert length(arrangements) == 9
 
       # Every room-hour used exactly once.
@@ -327,7 +308,7 @@ defmodule Agenda.FixpointTest do
       ann = days(day: 1)
 
       assert {:ok, arrangements} =
-               settled(shifts(3), [ann], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(3), [ann], timeout: 5_000)
 
       assert length(arrangements) == 3
       assert respects?(arrangements, ann)
@@ -340,7 +321,7 @@ defmodule Agenda.FixpointTest do
       ann = days(day: ~o"PT1H")
 
       assert {:ok, arrangements} =
-               settled(shifts(3), [ann], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(3), [ann], timeout: 5_000)
 
       assert length(arrangements) == 3
       assert respects?(arrangements, ann)
@@ -354,12 +335,12 @@ defmodule Agenda.FixpointTest do
       ann = days(day: 1)
 
       assert {:error, %Agenda.Infeasible{}} =
-               settled(shifts(4), [ann], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(4), [ann], timeout: 5_000)
     end
 
     test "the same programme fits once the limit allows it" do
       assert {:ok, arrangements} =
-               settled(shifts(4), [days(day: 2)], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(4), [days(day: 2)], timeout: 5_000)
 
       assert length(arrangements) == 4
     end
@@ -369,15 +350,15 @@ defmodule Agenda.FixpointTest do
       # contract written two ways, so they must decide alike — on the
       # programme that fits, and on the one that cannot.
       assert {:ok, counted} =
-               settled(shifts(3), [days(day: 1)], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(3), [days(day: 1)], timeout: 5_000)
 
       assert {:ok, timed} =
-               settled(shifts(3), [days(day: ~o"PT1H")], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(3), [days(day: ~o"PT1H")], timeout: 5_000)
 
       assert length(counted) == length(timed)
 
       assert {:error, %Agenda.Infeasible{}} =
-               settled(shifts(4), [days(day: ~o"PT1H")], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(4), [days(day: ~o"PT1H")], timeout: 5_000)
     end
 
     test "a floor is ignored, exactly as the built-in search ignores it" do
@@ -385,7 +366,7 @@ defmodule Agenda.FixpointTest do
       ann = days(week: [at_least: ~o"PT500H"])
 
       assert {:ok, arrangements} =
-               settled(shifts(3), [ann], candidates: 6, timeout: 60_000)
+               Fixpoint.solve(shifts(3), [ann], timeout: 5_000)
 
       assert length(arrangements) == 3
     end
@@ -397,7 +378,7 @@ defmodule Agenda.FixpointTest do
       busy = %{"Ann" => [Tempo.from_iso8601!("2027-04-05T09:00:00/2027-04-05T10:00:00")]}
 
       assert {:ok, arrangements} =
-               settled(shifts(2), [ann], candidates: 6, busy: busy, timeout: 60_000)
+               Fixpoint.solve(shifts(2), [ann], busy: busy, timeout: 5_000)
 
       days_used = arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort()
       refute 5 in days_used

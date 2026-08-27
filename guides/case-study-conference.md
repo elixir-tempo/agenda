@@ -249,7 +249,6 @@ The two are independent, and usually the first is proven while the second is mer
 
 Past a few dozen sessions this search runs out of road, and the guide has said so from the start: use a real solver and write its output back through `allocate/2`. With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency, that is one call:
 
-<!-- guide-test: skip (13.5s against the solver's 30s default budget — too close to run in CI) -->
 ```elixir
 {:ok, arrangements} = Agenda.Fixpoint.solve(programme, [hall, room_a, room_b])
 ```
