@@ -68,10 +68,13 @@ defmodule Agenda.Planner do
 
   * `:spread` chooses *how* the list is truncated. `false`, the
     default, keeps the best `:limit` placements, which is what a caller
-    picking one time wants. `true` round-robins across distinct start
-    moments instead, trading depth at the front of the window for
-    coverage of all of it — which is what `Agenda.Arranger.arrange/3`
-    needs, since sessions handed identical placements collide.
+    picking one time wants. `true` samples start moments evenly across
+    the window instead and round-robins between them, trading depth at
+    the front of the window for coverage of all of it — which is what
+    `Agenda.Arranger.arrange/3` needs, since sessions handed identical
+    placements collide. The coverage is what makes a cap safe to set:
+    with `:spread`, `limit: 4` over two days offers both days rather
+    than four times on the first.
 
   ### Returns
 
@@ -506,12 +509,38 @@ defmodule Agenda.Planner do
     |> Enum.group_by(&Compare.to_utc_seconds(&1.interval.from))
     |> Enum.sort_by(fn {moment, _group} -> moment end)
     |> Enum.map(fn {_moment, group} -> group end)
+    |> across(limit)
     |> round_robin([])
     |> Enum.take(limit)
     |> Enum.sort(&better?/2)
   end
 
-  # One from each bucket in turn, until every bucket is empty.
+  # Which *moments* to offer when there are more of them than the cap
+  # allows. Taking the first `limit` of them would cover the front of
+  # the window, which is the depth-over-coverage trade `:spread` exists
+  # to avoid — on a two-day show it offers the whole of day one and
+  # nothing of day two, and a resource limited per day is then held to
+  # a single day's worth of placements.
+  #
+  # Striding instead gives an even sample of the window. `div(index *
+  # limit, count)` walks 0..limit-1 in contiguous runs as `index` walks
+  # the moments, so keeping the first of each run keeps exactly `limit`
+  # moments, evenly spaced, in order.
+  defp across(buckets, limit) when length(buckets) <= limit, do: buckets
+
+  defp across(buckets, limit) do
+    count = length(buckets)
+
+    buckets
+    |> Enum.with_index()
+    |> Enum.uniq_by(fn {_bucket, index} -> div(index * limit, count) end)
+    |> Enum.map(fn {bucket, _index} -> bucket end)
+  end
+
+  # One from each bucket in turn, until every bucket is empty. Each
+  # round is *appended* to what came before: rounds are complete passes
+  # across the window, so putting a later round first would hand a
+  # truncated caller the tail of the window instead of a spread of it.
   defp round_robin([], taken), do: Enum.reverse(taken)
 
   defp round_robin(buckets, taken) do
@@ -521,7 +550,7 @@ defmodule Agenda.Planner do
           {[head | heads], (tail == [] && rest) || [tail | rest]}
       end)
 
-    round_robin(Enum.reverse(rest), Enum.reverse(heads) ++ taken)
+    round_robin(Enum.reverse(rest), heads ++ taken)
   end
 
   # Best score first, then earliest. Times must be compared

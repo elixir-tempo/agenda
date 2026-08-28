@@ -8,6 +8,7 @@ defmodule Agenda.PlannerTest do
   alias Agenda.Planner
   alias Agenda.Session
   alias Tempo.Interval
+  alias Tempo.IntervalSet
 
   doctest Agenda.Planner
 
@@ -351,6 +352,60 @@ defmodule Agenda.PlannerTest do
         end)
 
       assert booked == 2
+    end
+  end
+
+  describe "plan/3 — :spread covers the window" do
+    setup do
+      {:ok, room} =
+        Agenda.open(
+          Agenda.resource("Room", seats: 8),
+          IntervalSet.new!([
+            Tempo.from_iso8601!("2026-06-15T09:00:00/2026-06-15T17:00:00"),
+            Tempo.from_iso8601!("2026-06-16T09:00:00/2026-06-16T17:00:00")
+          ])
+        )
+
+      session =
+        "Booking"
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-17")
+        |> Session.needs(:room, seats: at_least(8))
+
+      %{room: room, session: session}
+    end
+
+    defp days_offered(options) do
+      options |> Enum.map(& &1.interval.from.time[:day]) |> Enum.uniq() |> Enum.sort()
+    end
+
+    test "a truncated spread samples the whole window, not one end", context do
+      {:ok, options} = Planner.plan(context.session, [context.room], limit: 4, spread: true)
+
+      assert length(options) == 4
+      assert days_offered(options) == [15, 16]
+    end
+
+    test "and it keeps sampling evenly as the cap tightens", context do
+      for limit <- [2, 4, 6, 8] do
+        {:ok, options} = Planner.plan(context.session, [context.room], limit: limit, spread: true)
+
+        assert days_offered(options) == [15, 16],
+               "limit #{limit} offered only #{inspect(days_offered(options))}"
+      end
+    end
+
+    test "without :spread the same cap takes the front of the window", context do
+      {:ok, options} = Planner.plan(context.session, [context.room], limit: 4, spread: false)
+
+      assert days_offered(options) == [15]
+    end
+
+    test "a cap larger than the window offers every moment either way", context do
+      {:ok, spread} = Planner.plan(context.session, [context.room], limit: 500, spread: true)
+      {:ok, packed} = Planner.plan(context.session, [context.room], limit: 500, spread: false)
+
+      assert length(spread) == length(packed)
+      assert days_offered(spread) == days_offered(packed)
     end
   end
 end

@@ -1,6 +1,6 @@
 # Hosted-buyer matchmaking — a discussion document
 
-**Status: prototyped, then partly built.** Every measurement below was taken against this codebase on 2026-08-28. The prototype answered the question the plan was written to ask and changed the plan twice — see *Density* and *The answer* — and the first stage has since landed: `Agenda.Interest`, `Agenda.interest/3`, `Agenda.meetings/3`, and a fix to `Agenda.Planner` so that `plan/3` honours a resource's `:limits`.
+**Status: prototyped, then partly built.** Every measurement below was taken against this codebase on 2026-08-28. The prototype answered the question the plan was written to ask and changed the plan twice — see *Density* and *The answer* — and the first stage has since landed: `Agenda.Interest`, `Agenda.interest/3`, `Agenda.meetings/3`, and two fixes to `Agenda.Planner` — `plan/3` now honours a resource's `:limits`, and `:spread` now covers the window instead of its tail.
 
 **On the name.** This document originally called the primitive a *wish*. That word was already taken: `Agenda.Resource`'s `avoids` and `prefers` are documented as "a wish, not a rule" and scored by the `:resource_wishes` preference. The built primitive is an **interest** — the domain's own phrase, and free.
 
@@ -118,7 +118,7 @@ The trick is to stop enumerating. Rather than hand the search a candidate list t
 
 ```elixir
 Enum.reduce(programme.sessions, Agenda.ledger(), fn meeting, ledger ->
-  case Agenda.plan(meeting, pool, busy: Agenda.busy(ledger), limit: 150, spread: true) do
+  case Agenda.plan(meeting, pool, busy: Agenda.busy(ledger), limit: 20, spread: true) do
     {:ok, [choice | _]} ->
       {:ok, ledger} = Agenda.allocate(ledger, choice)
       ledger
@@ -137,13 +137,13 @@ Measured end to end through the built API — registering interest, generating m
 | --- | --- | --- | --- |
 | 15 buyers × 60 suppliers, 6 each (90) | 5 ms | 2.2 s | 90 of 90 |
 | 30 × 80, 10 each (300) | 5 ms | 8.4 s | 300 of 300 |
-| 60 × 120, 15 each (900) | 22 ms | 28 s | 871 of 900 |
+| 60 × 120, 15 each (900) | 25 ms | 28 s | 871 of 900 |
 
 No participant exceeded the cap in any run, and the booking loop above checks nothing — the planner does. The 29 unbooked meetings at the largest size are caps genuinely binding: a buyer wanting fifteen meetings against eight a day over two days has almost no slack once their suppliers are capped too.
 
 Generation is free. Booking is the cost, and enforcing limits roughly doubled it — 900 meetings went from 12 s to 28 s once every candidate had to be checked against what its participants already hold. That is the price of a correct answer and it is worth paying, but it is the obvious place to look if the pass ever needs to be faster.
 
-### Two hazards the prototype found — one now fixed in the library
+### Two hazards the prototype found, both now fixed in the library
 
 **`plan/3` did not enforce a resource's `:limits`, and now does.** Limits lived in the arranger's compatibility check and nowhere else, so a booking pass that trusted `plan/3` would cheerfully exceed them: asked for six meetings against a buyer capped at three a day, the first prototype booked **all six**, while `arrange/3` on the identical programme correctly placed three. Caps are not a detail of a hosted-buyer programme — they are most of the contract.
 
@@ -151,9 +151,13 @@ This was fixed where it belongs rather than in the caller. `Agenda.Planner` now 
 
 The general lesson is worth keeping. **Any constraint the arranger enforces and the planner does not is a trap for incremental callers**, because the failure is silent and looks like a good answer. Limits were the one; it is worth asking whether anything else is in the same position.
 
-**Option coverage interacts badly with per-day caps.** `spread: true` with a small `:limit` samples start moments unevenly: on a two-day show, `limit: 20` returned **twenty options all on day two and none on day one**. Combined with a cap of eight a day, that silently pinned the whole show at eight meetings per buyer — 240 of 300 — and looked exactly like a capacity bound rather than a sampling artefact. Raising the limit to 150 made both days visible and the same instance booked 300 of 300.
+**`:spread` returned the tail of the window rather than a spread of it.** On a two-day show, `limit: 20, spread: true` returned **twenty options all on day two and none on day one**. Combined with a cap of eight a day that silently pinned the whole show at eight meetings per buyer — 240 of 300 — and it looked exactly like a capacity bound rather than a sampling artefact.
 
-A booking pass must ask for enough options to span every bucket its limits are measured in, and that number is a property of the window rather than a constant. This one is *not* fixed, and it is the sharpest edge left on the feature.
+The cause was a genuine bug rather than a tuning problem. `:spread` round-robins across distinct start moments and accumulated each round by *prepending* it, so the rounds came back in reverse: truncating took the last moments instead of the first. Correcting only the reversal would have swapped one wrong answer for another — the front of the window instead of the back — because taking the first `limit` moments is not a spread either.
+
+`Agenda.Planner` now **strides** the moments when there are more of them than the cap allows, keeping an even sample across the window, and appends each round so a truncated caller gets coverage rather than an end. `limit: 4` over two days now offers both days; the show that booked 240 of 300 at `limit: 20` now books 300 of 300, and gets the same answer at `limit: 150`.
+
+That last point is what actually closes the hazard: **the option cap no longer changes the answer**, so a caller does not have to know that it needs to span every bucket its limits are measured in.
 
 ### How good are the answers?
 
@@ -181,6 +185,7 @@ Better than first-fit deserves, and the reason is worth stating rather than cele
 | **Floors as a scored target, and a report of who missed** | `Preference`, `reconcile/3` | **New, assembly of built parts** |
 | **Booking a show against a ledger, one meeting at a time** | `plan/3` `:busy`, `Ledger.allocate/3` | **Measured: 899 of 900 in 12 s, caps enforced** |
 | **`plan/3` honouring `:limits` when given `:busy`** | `Agenda.Planner` | **Built — closes a silent-wrong-answer trap** |
+| **`:spread` sampling the window rather than its tail** | `Agenda.Planner` | **Built — the option cap no longer changes the answer** |
 | Solving a show through `arrange/3` | — | **Ruled out — stops under 300, and budget does not fix it** |
 | Weighted objective — mutual outranking one-sided | — | Rejected: costs the `minimal?` guarantee |
 | Preferences over a booked show — spread, first choices | — | **Open: the booking order is the lever, unmeasured** |
