@@ -34,6 +34,7 @@ defmodule Agenda.Planner do
   alias Agenda.Availability
   alias Agenda.Conflict
   alias Agenda.Infeasible
+  alias Agenda.Limit
   alias Agenda.Place
   alias Agenda.Requirement
   alias Agenda.Resource
@@ -102,7 +103,9 @@ defmodule Agenda.Planner do
          {:ok, roster_free} <- co_free(named, window, window, options) do
       with {:ok, placements} <-
              arrangements(session, candidates, roster_free, window, duration, options) do
-        ranked(placements, session, options)
+        placements
+        |> within_limits(options)
+        |> ranked(session, options)
       end
     end
   end
@@ -405,6 +408,63 @@ defmodule Agenda.Planner do
   defp widen(duration, nil), do: duration
 
   defp widen(duration, turnaround), do: Duration.add(duration, turnaround)
+
+  # --- stage 4b: load limits --------------------------------------
+
+  # A placement that would take a resource past one of its `:limits` is
+  # not a placement, and leaving it in the list is how an incremental
+  # caller books a twelfth meeting for somebody capped at eight.
+  #
+  # Unlike every other check here, a limit cannot be answered from the
+  # placement alone: it is measured over a period rather than an
+  # instant, so it needs to know what the resource is *already* doing.
+  # That is what `:busy` carries, and without it there is nothing to
+  # count and every placement stands — which is why `Agenda.Arranger`
+  # still has to check limits itself as it places.
+  defp within_limits(placements, options) do
+    case Keyword.get(options, :busy, %{}) do
+      busy when is_map(busy) and map_size(busy) > 0 ->
+        Enum.filter(placements, &permitted?(&1, busy))
+
+      _nothing_claimed ->
+        placements
+    end
+  end
+
+  defp permitted?(%Arrangement{} = arrangement, busy) do
+    Enum.all?(Arrangement.resources(arrangement), fn resource ->
+      Enum.all?(resource.limits, &fits?(&1, arrangement, claimed(busy, resource.name)))
+    end)
+  end
+
+  defp fits?(%Limit{} = limit, %Arrangement{} = arrangement, held) do
+    bucket = Limit.bucket(arrangement.interval.from, limit.period)
+
+    same_period =
+      Enum.filter(held, fn claim ->
+        case moment(claim) do
+          nil -> false
+          from -> Limit.bucket(from, limit.period) == bucket
+        end
+      end)
+
+    {count, duration} = Limit.sum([arrangement.interval | same_period])
+    Limit.permits?(limit, count, duration)
+  end
+
+  defp claimed(busy, name) do
+    case Map.get(busy, name) do
+      nil -> []
+      %IntervalSet{} = set -> IntervalSet.to_list(set)
+      claims when is_list(claims) -> claims
+      one -> [one]
+    end
+  end
+
+  # An allocation carries its interval; an interval is its own.
+  defp moment(%{interval: %{from: from}}), do: from
+  defp moment(%{from: from}), do: from
+  defp moment(_unreadable), do: nil
 
   # --- stage 5: ranking -------------------------------------------
 

@@ -271,4 +271,86 @@ defmodule Agenda.PlannerTest do
       assert length(arrangements) == 3
     end
   end
+
+  describe "plan/3 — a resource's load limits" do
+    setup do
+      {:ok, capped} =
+        Agenda.open(
+          Agenda.resource("Capped", seats: 8, limits: [day: 2]),
+          "2026-06-15T09:00:00/2026-06-15T17:00:00"
+        )
+
+      {:ok, uncapped} =
+        Agenda.open(
+          Agenda.resource("Uncapped", seats: 8),
+          "2026-06-15T09:00:00/2026-06-15T17:00:00"
+        )
+
+      claims = fn count ->
+        %{
+          "Capped" =>
+            Enum.take(
+              [
+                Tempo.from_iso8601!("2026-06-15T09:00:00/2026-06-15T10:00:00"),
+                Tempo.from_iso8601!("2026-06-15T10:00:00/2026-06-15T11:00:00")
+              ],
+              count
+            )
+        }
+      end
+
+      %{capped: capped, uncapped: uncapped, claims: claims}
+    end
+
+    defp booking(name) do
+      name
+      |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+      |> Session.needs(:room, seats: at_least(8))
+    end
+
+    test "a placement that would breach a limit is not offered", context do
+      # Nothing claimed: the day looks empty and placements stand.
+      assert {:ok, [_ | _]} = Planner.plan(booking("A"), [context.capped])
+
+      # Two of two claims already made, so the allowance is spent.
+      assert {:error, _reason} =
+               Planner.plan(booking("A"), [context.capped], busy: context.claims.(2))
+    end
+
+    test "a limit with room left still offers placements", context do
+      assert {:ok, [_ | _]} =
+               Planner.plan(booking("A"), [context.capped], busy: context.claims.(1))
+    end
+
+    test "an uncapped resource is unaffected by what it already holds", context do
+      busy = %{
+        "Uncapped" => [
+          Tempo.from_iso8601!("2026-06-15T09:00:00/2026-06-15T10:00:00"),
+          Tempo.from_iso8601!("2026-06-15T10:00:00/2026-06-15T11:00:00")
+        ]
+      }
+
+      assert {:ok, [_ | _]} = Planner.plan(booking("A"), [context.uncapped], busy: busy)
+    end
+
+    test "booking one at a time against a ledger cannot exceed the cap", context do
+      # The trap this closes: a caller that checks nothing, booking each
+      # planned placement in turn, must still respect the cap.
+      {_ledger, booked} =
+        Enum.reduce(1..6, {Agenda.ledger(), 0}, fn index, {ledger, booked} ->
+          case Planner.plan(booking("Booking #{index}"), [context.capped],
+                 busy: Agenda.busy(ledger)
+               ) do
+            {:ok, [choice | _]} ->
+              {:ok, ledger} = Agenda.allocate(ledger, choice)
+              {ledger, booked + 1}
+
+            {:error, _reason} ->
+              {ledger, booked}
+          end
+        end)
+
+      assert booked == 2
+    end
+  end
 end

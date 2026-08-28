@@ -17,8 +17,10 @@ defmodule Agenda.Programme do
   """
 
   alias Agenda.Availability
+  alias Agenda.Interest
   alias Agenda.Precedence
   alias Agenda.Preference
+  alias Agenda.Resource
   alias Agenda.Session
   alias Agenda.Track
 
@@ -29,7 +31,8 @@ defmodule Agenda.Programme do
           tracks: [Track.t()],
           sessions: [Session.t()],
           preferences: [Preference.t()],
-          precedences: [Precedence.t()]
+          precedences: [Precedence.t()],
+          interests: [Interest.t()]
         }
 
   defstruct name: nil,
@@ -37,7 +40,8 @@ defmodule Agenda.Programme do
             tracks: [],
             sessions: [],
             preferences: [],
-            precedences: []
+            precedences: [],
+            interests: []
 
   @doc """
   Build a programme.
@@ -363,5 +367,144 @@ defmodule Agenda.Programme do
   @spec track_of(t(), String.t()) :: Track.t() | nil
   def track_of(%__MODULE__{tracks: tracks}, session_name) do
     Enum.find(tracks, fn track -> session_name in Track.session_names(track) end)
+  end
+
+  @doc """
+  Register that one resource would like a session with another.
+
+  Interest is stated in one direction at a time. A meeting is held
+  where it is returned — see `meetings/3` — so both parties must say
+  so, and interest that is never returned is reported rather than
+  scheduled.
+
+  ### Arguments
+
+  * `programme` is a `t:t/0`.
+
+  * `from` is the resource registering the interest, as a
+    `t:Agenda.Resource.t/0` or its name.
+
+  * `to` is the resource it would like to meet, in the same two forms.
+
+  ### Returns
+
+  * `{:ok, programme}`; or
+
+  * `{:error, :self_interest}` when a resource names itself.
+
+  ### Examples
+
+      iex> programme = Agenda.programme("Trade Show")
+      iex> {:ok, programme} = Agenda.Programme.interest(programme, "Kim", "Harbour Tours")
+      iex> length(programme.interests)
+      1
+
+  """
+  @spec interest(t(), Resource.t() | String.t(), Resource.t() | String.t()) ::
+          {:ok, t()} | {:error, term()}
+  def interest(%__MODULE__{} = programme, from, to) do
+    with {:ok, interest} <- Interest.new(from, to) do
+      {:ok, %{programme | interests: programme.interests ++ [interest]}}
+    end
+  end
+
+  @doc """
+  Turn returned interest into sessions.
+
+  One session per mutually interested pair, each rostering both
+  parties, so the constraint that nobody is in two places at once is
+  the one the library already enforces rather than a rule anybody
+  writes. Interest that was never returned adds nothing and is left
+  for `Agenda.Interest.one_sided/1` to report.
+
+  Adding meetings twice would double them, so this is a step that
+  produces a programme rather than something `arrange/3` does on the
+  way past.
+
+  ### Arguments
+
+  * `programme` is a `t:t/0` carrying the interests.
+
+  * `pool` is the resources the interests name.
+
+  ### Options
+
+  * `:duration` is how long each meeting runs. Required.
+
+  * `:window` is when meetings may be held. Defaults to the
+    programme's own window.
+
+  * `:needs` is what every meeting requires beyond its two parties, as
+    `[role: predicates]` — a table, most often.
+
+  * `:as` is the role both parties are rostered under. The default is
+    `:party`, which says neither of them is substitutable.
+
+  * `:name` is a two-argument function naming a meeting from the pair.
+    The default reads `"Kim with Harbour Tours"`.
+
+  ### Returns
+
+  * `{:ok, programme}` with one session added per mutual pair; or
+
+  * `{:error, {:missing_option, :duration}}`; or
+
+  * `{:error, {:unknown_resources, names}}` when an interest names a
+    resource the pool does not hold.
+
+  ### Examples
+
+      iex> kim = Agenda.resource("Kim")
+      iex> harbour = Agenda.resource("Harbour Tours")
+      iex> programme = Agenda.programme("Trade Show", across: "2027-06-15/2027-06-17")
+      iex> {:ok, programme} = Agenda.Programme.interest(programme, kim, harbour)
+      iex> {:ok, programme} = Agenda.Programme.interest(programme, harbour, kim)
+      iex> {:ok, programme} = Agenda.Programme.meetings(programme, [kim, harbour], duration: "PT15M")
+      iex> Enum.map(programme.sessions, & &1.name)
+      ["Harbour Tours with Kim"]
+
+  """
+  @spec meetings(t(), [Resource.t()], keyword()) :: {:ok, t()} | {:error, term()}
+  def meetings(%__MODULE__{} = programme, pool, options \\ []) do
+    with {:ok, duration} <- required(options, :duration),
+         {:ok, sessions} <- built(programme, pool, duration, options) do
+      {:ok, Enum.reduce(sessions, programme, &add_session(&2, &1))}
+    end
+  end
+
+  defp required(options, key) do
+    case Keyword.fetch(options, key) do
+      {:ok, value} -> {:ok, value}
+      :error -> {:error, {:missing_option, key}}
+    end
+  end
+
+  defp built(programme, pool, duration, options) do
+    programme.interests
+    |> Interest.mutual()
+    |> Enum.reduce_while({:ok, []}, fn pair, {:ok, acc} ->
+      case meeting(pair, pool, programme, duration, options) do
+        {:ok, session} -> {:cont, {:ok, acc ++ [session]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp meeting({first, second}, pool, programme, duration, options) do
+    role = Keyword.get(options, :as, :party)
+    naming = Keyword.get(options, :name, &"#{&1} with #{&2}")
+    window = Keyword.get(options, :window, programme.window)
+
+    with {:ok, parties} <- Resource.fetch_all(pool, [first, second]) do
+      session =
+        naming.(first, second)
+        |> Session.new(duration: duration, window: window)
+        |> Session.roster(role, parties)
+
+      {:ok,
+       Enum.reduce(Keyword.get(options, :needs, []), session, fn {needed, predicates}, acc ->
+         Session.needs(acc, needed, predicates)
+       end)}
+    end
   end
 end

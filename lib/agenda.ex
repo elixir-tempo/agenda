@@ -889,6 +889,49 @@ defmodule Agenda do
   defdelegate precede(programme, first, then, options \\ []), to: Programme
 
   @doc """
+  Register that one resource would like a session with another.
+  Delegates to `Agenda.Programme.interest/3`.
+
+  Interest is one-directional. A meeting is held where it is returned,
+  so both parties must say so — see `meetings/3`.
+
+  ### Examples
+
+      iex> {:ok, programme} = Agenda.interest(Agenda.programme("Show"), "Kim", "Harbour")
+      iex> {:ok, programme} = Agenda.interest(programme, "Harbour", "Kim")
+      iex> Agenda.Interest.mutual(programme.interests)
+      [{"Harbour", "Kim"}]
+
+  """
+  @spec interest(Programme.t(), Resource.t() | String.t(), Resource.t() | String.t()) ::
+          {:ok, Programme.t()} | {:error, term()}
+  defdelegate interest(programme, from, to), to: Programme
+
+  @doc """
+  Turn returned interest into sessions. Delegates to
+  `Agenda.Programme.meetings/3`.
+
+  One session per mutually interested pair, each rostering both
+  parties, so nobody being in two places at once is the constraint the
+  library already enforces rather than one anybody writes.
+
+  ### Examples
+
+      iex> kim = Agenda.resource("Kim")
+      iex> harbour = Agenda.resource("Harbour")
+      iex> programme = Agenda.programme("Show", across: "2027-06-15/2027-06-17")
+      iex> {:ok, programme} = Agenda.interest(programme, kim, harbour)
+      iex> {:ok, programme} = Agenda.interest(programme, harbour, kim)
+      iex> {:ok, programme} = Agenda.meetings(programme, [kim, harbour], duration: "PT15M")
+      iex> length(programme.sessions)
+      1
+
+  """
+  @spec meetings(Programme.t(), [Resource.t()], keyword()) ::
+          {:ok, Programme.t()} | {:error, term()}
+  defdelegate meetings(programme, pool, options \\ []), to: Programme
+
+  @doc """
   Rebuild what a ledger holds as arrangements, ready to pin. Delegates
   to `Agenda.Ledger.arrangements/3`.
 
