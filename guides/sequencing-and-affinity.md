@@ -81,7 +81,16 @@ Read that row by row. `within: "PT0S"` is **immediately after** — the successo
 
 So "immediately after" is `within: "PT0S"`, and "after, whenever" is no option at all. Everything else is a window between the two.
 
-> **A refused ordering reports as a clash.** The message for all three refusals above is *"Briefing cannot be placed without clashing with something already placed"* — accurate in that the search could not place it, but it names a clash when the cause is order. If a session refuses to place and nothing appears to be competing for the room, check the precedences before the pool.
+A refusal says which constraint did the refusing, and names the session on the other side of it:
+
+```elixir
+{:error, reason} = Agenda.arrange(immediately, rooms)
+
+Agenda.explain(reason)
+#=> "Day cannot be held: Briefing cannot be placed anywhere its ordering with Setup allows"
+```
+
+Only a constraint that refuses *every* candidate placement is named. A reason that accounts for some of them accounts for nothing, so where no single constraint explains the whole refusal the message falls back to saying the session could not be placed at all. The other three read the same way — a room already taken is a clash, two sessions in one track are a collision, and a resource worked past its `:limits` is a load limit — so the first line of a failure tells you which part of the programme to look at.
 
 A chain is just two precedences, and the search enforces each independently rather than reasoning about the chain as a whole:
 

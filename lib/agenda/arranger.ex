@@ -1136,10 +1136,10 @@ defmodule Agenda.Arranger do
     end
   end
 
-  defp descend([{session, symmetry, candidates} | rest], context, placed, skipped, state) do
+  defp descend([{_session, symmetry, candidates} = entry | rest], context, placed, skipped, state) do
     state
     |> place_each(candidates, symmetry, rest, context, placed, skipped)
-    |> leave_out(session, symmetry, rest, context, placed, skipped)
+    |> leave_out(entry, rest, context, placed, skipped)
   end
 
   defp place_each(state, [], _symmetry, _rest, _context, _placed, _skipped), do: state
@@ -1190,9 +1190,9 @@ defmodule Agenda.Arranger do
   # not merely as a fallback once its placements fail: placing a
   # session can foreclose two others, so the best layout sometimes
   # gives up one to keep more.
-  defp leave_out(state, session, symmetry, rest, context, placed, skipped) do
+  defp leave_out(state, {session, symmetry, candidates} = _entry, rest, context, placed, skipped) do
     cond do
-      length(skipped) >= state.ceiling -> note_stuck(state, session)
+      length(skipped) >= state.ceiling -> note_stuck(state, session, candidates, placed, context)
       settled?(state) -> state
       state.budget <= 0 -> %{state | exhausted?: true}
       true -> skip_it(state, session, symmetry, rest, context, placed, skipped)
@@ -1258,10 +1258,18 @@ defmodule Agenda.Arranger do
   end
 
   # The first session whose placements all failed with no room to drop
-  # it. Only reached when `:unplaced` is `:error`, and only used to name
-  # the session in the failure.
-  defp note_stuck(%{stuck: nil} = state, session), do: %{state | stuck: session}
-  defp note_stuck(state, _session), do: state
+  # it. Only reached when `:unplaced` is `:error`. The candidates and
+  # what was already placed are kept alongside the session so the
+  # failure can say *which* constraint refused it — a diagnosis that
+  # costs nothing until there is a failure to explain.
+  defp note_stuck(%{stuck: nil} = state, session, candidates, placed, context) do
+    %{
+      state
+      | stuck: %{session: session, candidates: candidates, placed: placed, context: context}
+    }
+  end
+
+  defp note_stuck(state, _session, _candidates, _placed, _context), do: state
 
   # Symmetry breaking, and the reason the search is tractable at all.
   #
@@ -1337,8 +1345,13 @@ defmodule Agenda.Arranger do
   # the whole thing is what the caller asked for. Inside a layout the
   # session is the subject instead — there, the programme succeeded and
   # this one session is what did not.
-  defp to_result(%{best: nil, stuck: %Session{} = session}, programme, _unplaceable, _starved) do
-    {:error, Infeasible.new(programme.name, [unplaceable_because(session.name)])}
+  defp to_result(
+         %{best: nil, stuck: %{session: %Session{}} = stuck},
+         programme,
+         _unplaceable,
+         _starved
+       ) do
+    {:error, Infeasible.new(programme.name, [unplaceable_because(stuck)])}
   end
 
   # No layout, nothing named, no exhaustion flag — the budget ran out
@@ -1380,9 +1393,68 @@ defmodule Agenda.Arranger do
     ])
   end
 
-  defp unplaceable_because(name) do
-    "#{name} cannot be placed without clashing with something already placed"
+  # Why the stuck session's placements were all refused. Every
+  # candidate is re-checked against what was already placed, one
+  # constraint at a time, and only a constraint that refuses *every*
+  # candidate is named — a reason that explains some of them explains
+  # nothing. Costs nothing until there is a failure to describe.
+  defp unplaceable_because(%{session: session} = stuck) do
+    case refusals(stuck) do
+      [] -> "#{session.name} cannot be placed without clashing with something already placed"
+      phrases -> "#{session.name} cannot be placed #{Enum.join(phrases, ", nor ")}"
+    end
   end
+
+  defp refusals(%{candidates: [], placed: _placed}), do: []
+
+  defp refusals(%{candidates: candidates, placed: placed, context: context}) do
+    %{programme: programme, options: options} = context
+    refused = Enum.map(candidates, &refused_by(&1, placed, programme, options))
+
+    refused
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.reduce(&MapSet.intersection/2)
+    |> Enum.map(&phrase(&1, blocker(refused)))
+  end
+
+  # The kind of refusal is intersected across candidates, but the
+  # session named in an ordering is not: one that is blocked by a
+  # different predecessor each time is still wholly blocked by
+  # ordering, and deserves to be told so without a name it cannot
+  # attach to a single session.
+  defp blocker(refused) do
+    case refused |> Enum.map(&elem(&1, 1)) |> Enum.reject(&is_nil/1) |> Enum.uniq() do
+      [only] -> only
+      _none_or_several -> nil
+    end
+  end
+
+  defp refused_by(candidate, placed, programme, options) do
+    blocked_by =
+      Enum.find(placed, fn {other, _symmetry} -> not order_ok?(candidate, other, programme) end)
+
+    kinds =
+      []
+      |> add(:capacity, not within_capacity?(candidate, placed))
+      |> add(:limit, not within_limits?(candidate, placed, options))
+      |> add(
+        :track,
+        Enum.any?(placed, fn {other, _} -> not track_ok?(candidate, other, programme, options) end)
+      )
+      |> add(:order, not is_nil(blocked_by))
+      |> MapSet.new()
+
+    {kinds, blocked_by && elem(blocked_by, 0).session}
+  end
+
+  defp add(reasons, _reason, false), do: reasons
+  defp add(reasons, reason, true), do: [reason | reasons]
+
+  defp phrase(:capacity, _blocker), do: "without clashing with something already placed"
+  defp phrase(:limit, _blocker), do: "without exceeding a load limit"
+  defp phrase(:track, _blocker), do: "without colliding with another session in its track"
+  defp phrase(:order, nil), do: "anywhere its ordering allows"
+  defp phrase(:order, other), do: "anywhere its ordering with #{other} allows"
 
   defp in_programme_order(arrangements, programme) do
     order =

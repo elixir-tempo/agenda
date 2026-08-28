@@ -38,6 +38,12 @@ defmodule Agenda.ArrangerTest do
     |> Session.needs(:room, seats: 100)
   end
 
+  defp fixed(name, window) do
+    name
+    |> Agenda.session(duration: "PT1H", window: window)
+    |> Session.needs(:room, seats: 100)
+  end
+
   defp conf(tracks_or_sessions) do
     Enum.reduce(
       tracks_or_sessions,
@@ -400,6 +406,101 @@ defmodule Agenda.ArrangerTest do
 
       assert {:error, reason} = Arranger.arrange(conf([track]), [context.hall])
       assert Agenda.explain(reason) =~ "which is not a duration"
+    end
+  end
+
+  describe "arrange/3 — a refusal names the constraint that refused it" do
+    test "an ordering that cannot be met names the session it follows", context do
+      # An hour apart and told to be immediate, so only the ordering
+      # can refuse it — the room is free either way.
+      programme =
+        Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+        |> Programme.add_session(fixed("Setup", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
+        |> Programme.add_session(fixed("Briefing", "2026-09-15T11:00:00/2026-09-15T12:00:00"))
+
+      {:ok, programme} = Agenda.precede(programme, "Setup", "Briefing", within: "PT0S")
+
+      assert {:error, reason} = Arranger.arrange(programme, [context.hall])
+
+      message = Agenda.explain(reason)
+      assert message =~ "Briefing"
+      assert message =~ "ordering with Setup"
+      refute message =~ "clashing"
+    end
+
+    test "two predecessors blocking different placements are not named", context do
+      # C must start the instant A ends and the instant B ends, so
+      # every placement is refused by ordering — but by a different
+      # predecessor each time, and naming either one would be wrong.
+      programme =
+        Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+        |> Programme.add_session(fixed("A", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
+        |> Programme.add_session(fixed("B", "2026-09-15T10:00:00/2026-09-15T11:00:00"))
+        |> Programme.add_session(fixed("C", "2026-09-15T09:00:00/2026-09-15T12:00:00"))
+
+      {:ok, programme} = Agenda.precede(programme, "A", "C", within: "PT0S")
+      {:ok, programme} = Agenda.precede(programme, "B", "C", within: "PT0S")
+
+      # Two rooms, so nothing is competing for space and ordering is
+      # the only thing left that can refuse it.
+      assert {:error, reason} = Arranger.arrange(programme, [context.hall, context.studio])
+
+      message = Agenda.explain(reason)
+      assert message =~ "anywhere its ordering allows"
+      refute message =~ "ordering with"
+    end
+
+    test "a genuine resource clash still reads as one", context do
+      programme =
+        Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+        |> Programme.add_session(fixed("A", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
+        |> Programme.add_session(fixed("B", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
+
+      assert {:error, reason} = Arranger.arrange(programme, [context.hall])
+      assert Agenda.explain(reason) =~ "clashing with something already placed"
+    end
+
+    test "a track collision is named as one, not as a clash", context do
+      # Two rooms are free, so capacity is satisfied and only the
+      # track's own non-overlap can be what refuses the second.
+      {:ok, track} =
+        Agenda.track("Core",
+          of: [
+            fixed("T1", "2026-09-15T09:00:00/2026-09-15T10:00:00"),
+            fixed("T2", "2026-09-15T09:00:00/2026-09-15T10:00:00")
+          ]
+        )
+        |> Track.reachable(within: "PT15M")
+
+      assert {:error, reason} = Arranger.arrange(conf([track]), [context.hall, context.studio])
+
+      message = Agenda.explain(reason)
+      assert message =~ "another session in its track"
+      refute message =~ "clashing"
+    end
+
+    test "a load limit is named as one", _context do
+      # Two free hours and two one-hour shifts fit the clock; one
+      # shift a day is what refuses the second.
+      {:ok, ann} =
+        Agenda.open(
+          Agenda.resource("Ann", qualified: true, limits: [day: 1]),
+          "2027-04-05T09:00:00/2027-04-05T11:00:00"
+        )
+
+      programme =
+        Enum.reduce(1..2, Agenda.programme("Roster", across: "2027-04-05/2027-04-06"), fn index,
+                                                                                          acc ->
+          Programme.add_session(
+            acc,
+            "S#{index}"
+            |> Agenda.session(duration: "PT1H", window: "2027-04-05/2027-04-06")
+            |> Session.needs(:staff, qualified: true)
+          )
+        end)
+
+      assert {:error, reason} = Arranger.arrange(programme, [ann])
+      assert Agenda.explain(reason) =~ "exceeding a load limit"
     end
   end
 end
