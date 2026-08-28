@@ -530,14 +530,14 @@ Turnaround is real time the room is unavailable, so it holds against a booking t
 
 ## Scale
 
-Shape matters more than size. 1,200 sessions across twenty days take about twice as long as 200 competing for a single day — six times the work for twice the time, because sessions that cannot interact are solved separately and concurrently.
+Shape matters more than size. 1,200 sessions across twenty days take about four times as long as 200 competing for a single day — six times the work for four times the time, because sessions that cannot interact are solved separately and concurrently.
 
 | Programme | Time |
 | --- | --- |
 | ElixirConf: 46 sessions, 3 rooms, 2 days | ~175 ms |
-| 240 sessions over 6 days | ~385 ms |
-| 1,200 sessions over 20 days | ~2.5 s |
-| 200 sessions competing for **one** day | ~1.2 s |
+| 240 sessions over 6 days | ~70 ms |
+| 1,200 sessions over 20 days | ~1 s |
+| 200 sessions competing for **one** day | ~240 ms |
 
 ## Two days is not two problems
 

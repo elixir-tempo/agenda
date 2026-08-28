@@ -294,7 +294,7 @@ The conference case study works all three end to end.
 
 `plan/3` enumerates the ways one session could be held. `arrange/3` searches for a consistent layout across many. Both are exact, and both are bounded by caps that *report* when they are hit rather than returning a partial answer as though it were complete.
 
-Scale depends on the shape of the programme more than its size, because sessions that cannot interact are solved separately and at the same time: 1,200 sessions across twenty days lay out in under three seconds, while 200 all competing for a single day take about five. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is not — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
+Scale depends on the shape of the programme more than its size, because sessions that cannot interact are solved separately and at the same time: 1,200 sessions spread across twenty days lay out in about a second, while 200 all competing for a single day take about 220 ms and 500 exhaust the default `:nodes` budget — which is raised rather than worked around, and those same 500 then place in about two seconds. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is a different matter — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
 
 With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that hand-off is already written:
 
@@ -303,3 +303,5 @@ With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that h
 ```
 
 The solver is only asked to *choose*. Eligibility, induced requirements, availability and the place tree all stay here, where they are explained — the model handed over is which of each session's candidate placements to take, and the answer comes back as ordinary arrangements the ledger accepts. It covers the all-or-nothing question for exclusive resources; partial layouts, preferences and concurrency above one stay with `arrange/3`.
+
+Reach for it when you need a constraint this library cannot express, not because a programme got large: measured head to head `arrange/3` is faster at every size, and on a day filled to the hour the bridge stops returning inside twenty seconds from about two dozen sessions.

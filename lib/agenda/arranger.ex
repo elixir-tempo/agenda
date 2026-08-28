@@ -105,9 +105,9 @@ defmodule Agenda.Arranger do
   depend on which scheduler finished first.
 
   What that adds up to on defaults: 1,200 sessions across twenty days
-  lay out in under three seconds, 240 across six days in about four
-  hundred milliseconds, and 200 competing for a *single* day — one
-  component, so nothing to divide — in about five seconds. The shape of
+  lay out in about a second, 240 across six days in about seventy
+  milliseconds, and 200 competing for a *single* day — one component,
+  so nothing to divide — in about 240 milliseconds. The shape of
   the programme matters more than its size: sessions that cannot
   interact are nearly free, and sessions that all compete for the same
   rooms are the real cost. Saying "no" stays fast either way, since an

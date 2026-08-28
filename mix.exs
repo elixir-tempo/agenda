@@ -71,9 +71,12 @@ defmodule Agenda.MixProject do
         [
           "README.md",
           "guides/getting-started.md",
+          "guides/sequencing-and-affinity.md",
           "LICENSE.md",
           "CHANGELOG.md"
-        ] ++ (Path.wildcard("guides/*.md") -- ["guides/getting-started.md"]),
+        ] ++
+          (Path.wildcard("guides/*.md") --
+             ["guides/getting-started.md", "guides/sequencing-and-affinity.md"]),
       formatters: ["html", "markdown"],
       groups_for_modules: groups_for_modules(),
       groups_for_extras: groups_for_extras(),
