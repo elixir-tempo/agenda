@@ -245,19 +245,13 @@ The first is *provably the fewest left out*; the second says the scoring pass fi
 
 The two are independent, and usually the first is proven while the second is merely good — the count is cheap to prove and the score is not. Declaring a preference does cost time: the search can no longer stop at the first layout that places everything, since a later one may score better. It gets its own `:score_nodes` budget so it can never spend the one that proves the count.
 
-## When to reach for a real solver
+## Why there is no solver mode
 
-The natural assumption is that the built-in search runs out of road at some size and a real constraint solver takes over from there. Measured, that is not what happens, and it is worth saying so plainly before recommending anything.
+The natural assumption is that the built-in search runs out of road at some size and a real constraint solver takes over from there. That assumption is worth testing rather than repeating, and when it was tested here it did not survive.
 
-With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency, handing the programme to a CP solver is one call:
+A bridge to [fixpoint](https://hex.pm/packages/fixpoint) was built to find out. The programme does not change shape to suit a solver: each session already has a finite list of candidate placements that satisfy its requirements, so the variable handed over is *which candidate*, and eligibility, induced requirements, availability and the place tree all stay here where they are explained. The solver never learns what a room is, and conflicts come from the same predicate `arrange/3` uses, so the two cannot disagree about what a clash is.
 
-```elixir
-{:ok, arrangements} = Agenda.Fixpoint.solve(programme, [hall, room_a, room_b])
-```
-
-The programme does not change shape to suit the solver. Each session already has a finite list of candidate placements that satisfy its requirements, so the variable handed over is *which candidate* — and eligibility, induced requirements, availability and the place tree all stay here, where they are explained. The solver never learns what a room is. Conflicts come from the same predicate `arrange/3` uses, so the two cannot disagree about what a clash is.
-
-Two limits. It answers the all-or-nothing question only — `unplaced: :allow`, `minimal?` and preferences all stay with `arrange/3`. And it models exclusive resources only: capacity above one is not a pairwise property, so a pool containing a resource with `concurrency > 1` is refused rather than quietly mis-solved.
+That made a fair comparison possible, and the comparison is the point of this section.
 
 ### Where the crossover is
 
@@ -275,7 +269,11 @@ The built-in search keeps going well past the point where the bridge stops answe
 
 The reason is worth understanding, because it is not "one is optimised and the other is not". The solver's hard case is proving that *no* layout exists, and truncating the candidate lists manufactures exactly that case: the same sixteen talks given eight candidates each did not finish in twenty seconds, while giving them sixteen candidates found a layout in 2.5 s. Fewer candidates is a smaller space but a harder question. `arrange/3` never asks that question — it reports against its node cap instead of proving anything, which is why it answers quickly in the cases a solver finds hardest, and why its answer to an impossible programme is `:nodes` rather than a proof.
 
-So the bridge is not a performance upgrade, and reaching for it because a programme got large is the wrong instinct. What it is for is the model: a programme translates into an ordinary CP model over "which candidate", which is what you want when you need a constraint this library cannot express and intend to write it in fixpoint yourself. Either way the answer comes back as ordinary arrangements, and `allocate/2` stays authoritative.
+### Where it ended up
+
+Slower at every size is not a feature, so the bridge is not one. It lives in the test suite — `test/support/fixpoint.ex` — where being a *second, independent* solver is worth more than being a slower first one: every programme in that suite is laid out twice, by different means, and the two answers must agree. That is a check on `arrange/3` a single-solver suite cannot be, because the suite and the bug would share an author.
+
+Keeping it out of the API is the useful part of this story. A library with two ways to do the same thing owes its readers an explanation of which to pick, and here the honest explanation would have been "always the first one". A programme genuinely too large for `arrange/3` wants a purpose-built solver rather than this one, and the way to use it is to write its answer back through `allocate/2` — the ledger does not care who computed the layout.
 
 ## Scale, honestly
 

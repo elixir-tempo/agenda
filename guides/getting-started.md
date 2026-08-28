@@ -294,14 +294,6 @@ The conference case study works all three end to end.
 
 `plan/3` enumerates the ways one session could be held. `arrange/3` searches for a consistent layout across many. Both are exact, and both are bounded by caps that *report* when they are hit rather than returning a partial answer as though it were complete.
 
-Scale depends on the shape of the programme more than its size, because sessions that cannot interact are solved separately and at the same time: 1,200 sessions spread across twenty days lay out in about a second, while 200 all competing for a single day take about 220 ms and 500 exhaust the default `:nodes` budget — which is raised rather than worked around, and those same 500 then place in about two seconds. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is a different matter — that wants a purpose-built constraint solver. The way to use one here is to write its output back through `Agenda.allocate/2`: the ledger does not care who computed the answer, and everything downstream keeps working.
+Scale depends on the shape of the programme more than its size, because sessions that cannot interact are solved separately and at the same time: 1,200 sessions spread across twenty days lay out in about a second, while 200 all competing for a single day take about 220 ms and 500 exhaust the default `:nodes` budget — which is raised rather than worked around, and those same 500 then place in about two seconds. A university timetable of thousands of classes, or a month's roster for hundreds of staff minimising overtime, is a different matter — that wants a purpose-built constraint solver, and the way to use one is to write its answer back through `Agenda.allocate/2`. The ledger does not care who computed the answer, and everything downstream keeps working.
 
-With the optional [fixpoint](https://hex.pm/packages/fixpoint) dependency that hand-off is already written:
-
-```elixir
-{:ok, arrangements} = Agenda.Fixpoint.solve(programme, rooms)
-```
-
-The solver is only asked to *choose*. Eligibility, induced requirements, availability and the place tree all stay here, where they are explained — the model handed over is which of each session's candidate placements to take, and the answer comes back as ordinary arrangements the ledger accepts. It covers the all-or-nothing question for exclusive resources; partial layouts, preferences and concurrency above one stay with `arrange/3`.
-
-Reach for it when you need a constraint this library cannot express, not because a programme got large: measured head to head `arrange/3` is faster at every size, and on a day filled to the hour the bridge stops returning inside twenty seconds from about two dozen sessions.
+One thing this guide deliberately does not offer is a solver mode. A bridge to [fixpoint](https://hex.pm/packages/fixpoint) was built and measured, and `arrange/3` was faster at every size — so it lives in the test suite, where two independent solvers checking each other is worth more than a slower second option would be. The [conference case study](https://hexdocs.pm/agenda/case-study-conference.html) has the numbers.

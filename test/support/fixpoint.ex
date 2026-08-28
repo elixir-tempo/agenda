@@ -4,18 +4,44 @@ if Code.ensure_loaded?(CPSolver) do
     Hand a programme to a real constraint solver, and take the answer
     back as arrangements.
 
-    Reach for this when you need a constraint the library does not
-    express and intend to write it in fixpoint yourself — not because
-    a programme got large. `Agenda.Arranger.arrange/3` was faster on
-    every programme the two have been measured against: on a day
-    filled exactly to the hour it placed sixteen talks in 1 ms
-    against this bridge's 2.5 s, and from twenty-four talks upward
-    the bridge stopped returning inside twenty seconds while the
-    built-in search went on to place four hundred in under a second.
-    A solver's hard case is proving that no layout exists, which is
-    precisely the question `arrange/3` declines to ask.
-    `Agenda.Ledger.allocate/2` stays authoritative either way, so the
-    choice here is about what you can express, not speed.
+    ## When this is worth using
+
+    Three things, and scale is not one of them.
+
+    * **A second opinion.** Two exact solvers that reach the same
+      answer by different means must never disagree about whether a
+      programme can be laid out, and a test asserts they do not. That
+      makes this bridge a differential check on
+      `Agenda.Arranger.arrange/3` — the kind of error a single-solver
+      suite cannot catch, because the suite and the bug share an
+      author.
+
+    * **A starting point for a constraint this library cannot
+      express.** A weighted objective, a cardinality rule, anything
+      the arranger has no vocabulary for: write it in fixpoint
+      against the model below rather than forking the search. The
+      hard part — turning resources, requirements and travel into a
+      finite set of candidates — is already done.
+
+    * **A demonstration that the model is solver-agnostic**, which is
+      a design claim worth being able to run.
+
+    **It is not a bigger engine, and reaching for it because a
+    programme got large is the wrong instinct.**
+    `Agenda.Arranger.arrange/3` was faster on every programme the two
+    have been measured against: on a day filled exactly to the hour it
+    placed sixteen talks in 1 ms against this bridge's 2.5 s, and from
+    twenty-four talks upward the bridge stopped returning inside
+    twenty seconds while the built-in search went on to place four
+    hundred in under a second. A solver's hard case is proving that no
+    layout exists, which is precisely the question `arrange/3`
+    declines to ask.
+
+    A programme genuinely too large for the built-in search wants a
+    purpose-built solver — a different tool from this one — and the
+    way to use it is to write its answer back through
+    `Agenda.Ledger.allocate/2`, which stays authoritative whoever
+    computed it.
 
     This module makes the handover executable, using
     [fixpoint](https://hex.pm/packages/fixpoint).

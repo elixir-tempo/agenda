@@ -32,4 +32,4 @@ First release. Resource-constrained scheduling on top of [Tempo](https://hex.pm/
 
 * **Scale.** Candidate enumeration runs concurrently and sessions that cannot constrain each other are solved as separate problems: 1,200 sessions across twenty days lay out in under three seconds.
 
-* **Optional integrations.** `Agenda.from_ical/1` reads open hours from an RFC 7953 `VAVAILABILITY`; `Agenda.Fixpoint.solve/3` hands a whole programme to the [fixpoint](https://hex.pm/packages/fixpoint) CP solver.
+* **Optional integrations.** `Agenda.from_ical/1` reads open hours from an RFC 7953 `VAVAILABILITY` — what a CalDAV server hands you when asked when someone is free.

@@ -94,12 +94,11 @@ defmodule Agenda.MixProject do
       "Resources and places": ~r/^Agenda\.(Resource|Place)$/,
       "Requirements and matching": ~r/^Agenda\.(Requirement|Predicate)$/,
       "Sessions and programmes":
-        ~r/^Agenda\.(Session|Programme|Track|Series|Precedence|Preference)$/,
+        ~r/^Agenda\.(Session|Programme|Track|Series|Precedence|Preference|Interest)$/,
       "Planning and arranging":
         ~r/^Agenda\.(Planner|Arranger|Arrangement|Layout|Infeasible|Conflict)$/,
       Availability: ~r/^Agenda\.(Availability|Refine)$/,
-      "Claims and reconciliation": ~r/^Agenda\.(Ledger|Allocation|Limit|Reconciliation)$/,
-      "Solver integration": ~r/^Agenda\.Fixpoint$/
+      "Claims and reconciliation": ~r/^Agenda\.(Ledger|Allocation|Limit|Reconciliation)$/
     ]
   end
 
@@ -107,9 +106,13 @@ defmodule Agenda.MixProject do
     [
       {:ex_tempo, "~> 1.5"},
       {:ical, "~> 3.2", optional: true},
-      # A proof-of-concept CP solver. Optional, and `Agenda.Fixpoint`
-      # is only compiled when it is present.
-      {:fixpoint, "~> 0.22", optional: true},
+      # A proof-of-concept CP solver, used only by the test suite. The
+      # same programmes are solved a second way and the two answers
+      # must agree — a differential check on `Agenda.Arranger` that a
+      # single-solver suite cannot be. It is deliberately not a
+      # feature: it was measured slower than the built-in search at
+      # every size. See `test/support/fixpoint.ex`.
+      {:fixpoint, "~> 0.22", only: [:test]},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
