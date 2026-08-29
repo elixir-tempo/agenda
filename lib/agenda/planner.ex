@@ -477,14 +477,75 @@ defmodule Agenda.Planner do
 
   defp ranked(arrangements, session, options) do
     limit = Keyword.get(options, :limit, @default_limit)
+    invited = attendance(session, options)
 
     scored =
       arrangements
-      |> Enum.map(&%{&1 | score: score(&1, session.preferences)})
+      |> Enum.map(&attended(&1, invited))
+      |> Enum.map(&%{&1 | score: &1.score + score(&1, session.preferences)})
       |> Enum.sort(&better?/2)
       |> take(limit, Keyword.get(options, :spread, false))
 
     {:ok, scored}
+  end
+
+  # --- optional participants ---------------------------------------
+
+  # `Agenda.Session.invite/3` names people who may come but need not.
+  # They are scored, never required: a time more of them can make is a
+  # better time, and a time none of them can make is still a time.
+  #
+  # Their free sets are computed once for the whole window rather than
+  # per candidate, because a session with forty candidate placements
+  # and six invitees would otherwise ask the same question 240 times.
+  defp attendance(%Session{invitees: []}, _options), do: %{}
+
+  defp attendance(%Session{} = session, options) do
+    case Availability.normalise(session.window) do
+      {:ok, window} ->
+        Map.new(session.invitees, fn {role, resources} ->
+          {role, Enum.map(resources, &{&1, free_or_nothing(&1, window, options)})}
+        end)
+
+      {:error, _unreadable} ->
+        %{}
+    end
+  end
+
+  defp free_or_nothing(resource, window, options) do
+    case free_within(resource, window, options) do
+      {:ok, free} -> free
+      {:error, _reason} -> IntervalSet.new!([])
+    end
+  end
+
+  defp attended(%Arrangement{} = arrangement, invited) when map_size(invited) == 0 do
+    arrangement
+  end
+
+  defp attended(%Arrangement{} = arrangement, invited) do
+    available =
+      Map.new(invited, fn {role, pairs} ->
+        free_now =
+          for {resource, free} <- pairs,
+              free_throughout?(free, arrangement.interval),
+              do: resource
+
+        {role, free_now}
+      end)
+
+    count = available |> Map.values() |> Enum.map(&length/1) |> Enum.sum()
+
+    %{arrangement | attending: available, score: arrangement.score + count}
+  end
+
+  # Free for the *whole* interval. Somebody who can make half a meeting
+  # cannot make the meeting, so a partial overlap counts for nothing.
+  defp free_throughout?(free, interval) do
+    case Tempo.difference(interval, free) do
+      {:ok, remainder} -> IntervalSet.count(remainder) == 0
+      {:error, _reason} -> false
+    end
   end
 
   # Truncating a ranked list takes a *prefix*, and for a session with no

@@ -408,4 +408,116 @@ defmodule Agenda.PlannerTest do
       assert days_offered(spread) == days_offered(packed)
     end
   end
+
+  describe "plan/3 — optional attendees" do
+    setup do
+      day = "2026-06-15T09:00:00/2026-06-15T13:00:00"
+
+      open = fn resource, hours ->
+        {:ok, r} = Agenda.open(resource, hours)
+        r
+      end
+
+      %{
+        room: open.(Agenda.resource("Boardroom", seats: 8), day),
+        # Bob can only make the first hour, Carol the last two.
+        bob: open.(Agenda.resource("Bob"), "2026-06-15T09:00:00/2026-06-15T10:00:00"),
+        carol: open.(Agenda.resource("Carol"), "2026-06-15T11:00:00/2026-06-15T13:00:00"),
+        dave: open.(Agenda.resource("Dave"), "2026-06-15T11:00:00/2026-06-15T13:00:00"),
+        # Half an hour of a one-hour meeting is not attendance.
+        half: open.(Agenda.resource("Half"), "2026-06-15T10:00:00/2026-06-15T10:30:00")
+      }
+    end
+
+    defp review_with(context, invitees) do
+      "Review"
+      |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+      |> Session.needs(:room, seats: at_least(8))
+      |> Session.invite(:optional, invitees)
+    end
+
+    test "a time more invitees can make scores higher", context do
+      # Bob suits the first hour alone; Carol and Dave both suit the
+      # last two, so those placements are worth more.
+      session = review_with(context, [context.bob, context.carol, context.dave])
+      pool = [context.room, context.bob, context.carol, context.dave]
+
+      {:ok, [best | _rest]} = Planner.plan(session, pool, limit: 10)
+
+      assert best.attending[:optional] |> Enum.map(& &1.name) |> Enum.sort() == ["Carol", "Dave"]
+      assert best.score == 2
+    end
+
+    test "an equal score falls back to the earlier time", context do
+      # One invitee each side, so the two placements score alike and
+      # the ordinary chronological tie-break decides.
+      session = review_with(context, [context.bob, context.carol])
+      pool = [context.room, context.bob, context.carol]
+
+      {:ok, [best | _rest]} = Planner.plan(session, pool, limit: 10)
+
+      assert best.attending[:optional] |> Enum.map(& &1.name) == ["Bob"]
+      assert best.score == 1
+    end
+
+    test "a time no invitee can make is still offered", context do
+      session = review_with(context, [context.bob, context.carol])
+      pool = [context.room, context.bob, context.carol]
+
+      {:ok, options} = Planner.plan(session, pool, limit: 10)
+
+      # The room is free 09:00-13:00, so all four hours are on offer —
+      # inviting people must not remove any of them.
+      assert length(options) == 4
+      assert Enum.any?(options, &(&1.attending[:optional] == []))
+    end
+
+    test "invitees never gate a placement the way a roster does", context do
+      invited = review_with(context, [context.bob])
+
+      rostered =
+        "Review"
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+        |> Session.needs(:room, seats: at_least(8))
+        |> Session.roster(:attendees, [context.bob])
+
+      pool = [context.room, context.bob]
+
+      {:ok, invited_options} = Planner.plan(invited, pool, limit: 10)
+      {:ok, rostered_options} = Planner.plan(rostered, pool, limit: 10)
+
+      # Bob is free for one hour of four. Rostering him leaves one
+      # placement; inviting him leaves all four.
+      assert length(rostered_options) == 1
+      assert length(invited_options) == 4
+    end
+
+    test "an invitee is not allocated", context do
+      session = review_with(context, [context.carol])
+      {:ok, [best | _]} = Planner.plan(session, [context.room, context.carol], limit: 10)
+
+      assert Map.keys(best.allocations) == [:room]
+      refute best.attending == %{}
+    end
+
+    test "attending half a meeting is not attending", context do
+      session = review_with(context, [context.half])
+      {:ok, options} = Planner.plan(session, [context.room, context.half], limit: 10)
+
+      assert Enum.all?(options, &(&1.attending[:optional] == []))
+      assert Enum.all?(options, &(&1.score == 0))
+    end
+
+    test "a session with no invitees is unchanged", context do
+      session =
+        "Review"
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+        |> Session.needs(:room, seats: at_least(8))
+
+      {:ok, options} = Planner.plan(session, [context.room], limit: 10)
+
+      assert Enum.all?(options, &(&1.attending == %{}))
+      assert Enum.all?(options, &(&1.score == 0))
+    end
+  end
 end

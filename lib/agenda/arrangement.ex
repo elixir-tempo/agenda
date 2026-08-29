@@ -17,11 +17,17 @@ defmodule Agenda.Arrangement do
           session: String.t(),
           interval: Tempo.Interval.t(),
           allocations: %{optional(atom()) => [Resource.t()]},
+          attending: %{optional(atom()) => [Resource.t()]},
           score: number(),
           series: String.t() | nil
         }
 
-  defstruct session: nil, interval: nil, allocations: %{}, score: 0, series: nil
+  defstruct session: nil,
+            interval: nil,
+            allocations: %{},
+            attending: %{},
+            score: 0,
+            series: nil
 
   @doc """
   Every resource allocated, across all roles.

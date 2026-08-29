@@ -166,6 +166,8 @@ Two habits worth forming early:
 
 * **`needs/3` describes, `roster/3` names.** Use `needs` when any qualifying resource will do and let the planner choose; use `roster` when the choice is already made — these three people, that customer's office. When the names arrive as strings, `Agenda.Resource.fetch_all/2` turns them into resources all-or-nothing, so a typo fails the call instead of quietly handing `roster` a shorter list.
 
+* **`invite/3` asks.** A rostered resource must be free or the session cannot be held; an invitee never affects whether a placement is possible, only which one is best — `plan/3` scores a time higher when more of them can make it, and the arrangement's `attending` records who those are. They are deliberately not allocated: an optional attendee whose inclusion could cost some *other* session its placement would not be optional. Book them once the time is settled.
+
 * **Put a person's access needs on the person.** `Agenda.resource("Priya", requires: [step_free_access: true])` turns "somebody must remember" into "the room is not eligible". The requirement travels with them into every session they join.
 
 ## Two words that are not what you expect

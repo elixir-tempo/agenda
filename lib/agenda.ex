@@ -21,6 +21,44 @@ defmodule Agenda do
     vocabulary of `Agenda.Predicate`. See
     `Agenda.Requirement`.
 
+  * **Session** — something to be held: how long it runs, the window it
+    must fall inside, and what it demands of resources. A session is a
+    *request*, not a booking. See `Agenda.Session`.
+
+  * **Programme** — sessions to be laid out together, with whatever
+    relates them: tracks, orderings, preferences and interests. See
+    `Agenda.Programme`.
+
+  * **Track** — sessions that may not overlap each other, and that
+    somebody following them must be able to travel between. Not
+    overlapping is intrinsic to a track rather than an option on one:
+    a set of sessions that may collide is already expressible, as a
+    list. See `Agenda.Track`.
+
+  * **Interest** — one resource would like a session with another.
+    The demand side of the model: where interest is returned,
+    `meetings/3` writes the sessions. See `Agenda.Interest`.
+
+  * **Arrangement** — one workable way to hold a session: a particular
+    interval, and the particular resources it would take. A *proposal*
+    rather than a commitment — `plan/3` returns many, and none of them
+    is booked. See `Agenda.Arrangement`.
+
+  * **Allocation** — one resource, held for one session, over one
+    interval. The unit a ledger stores, and what a `:tag` labels. See
+    `Agenda.Allocation`.
+
+  * **Ledger** — the record of what is allocated and to whom, and the
+    only authority on it. Nothing stores availability: `free/2` is
+    open hours minus what the ledger holds, computed when asked, so a
+    booking cannot drift out of step with the calendar it came from.
+
+    A ledger is an ordinary immutable value rather than a running
+    store, and that is deliberate — it is what lets `arrange/3` fork
+    one, try a layout, abandon it and try another. Durable shared
+    state belongs in whatever persists the answer, not here. See
+    `Agenda.Ledger`.
+
   ### Reading a match aloud
 
       iex> import Agenda.Predicate
@@ -43,10 +81,20 @@ defmodule Agenda do
 
   ### Status
 
-  Phases 1 to 4 of the plan — the model, matching, availability,
-  single-session planning, the allocation ledger, and whole-programme
-  arrangement. The AshScheduling adapter follows; see
-  [the plan](https://github.com/elixir-tempo/agenda/blob/main/plans/agenda.md).
+  First release. Resources and places, matching by description or by
+  name, derived availability, single-session planning, whole-programme
+  arrangement, ordering, tracks, load limits, preferences, the
+  allocation ledger, recurrence, reconciliation, and meetings
+  generated from mutual interest are all here, and each has a guide.
+
+  Two things are deliberately outside it. **Booking** — durable shared
+  state, a clock, and concurrent claims — belongs in a sibling
+  library, because the arranger's freedom to fork and abandon ledgers
+  depends on a ledger being an ordinary value. And **holiday
+  calendars** are accepted as data rather than resolved here, since
+  jurisdiction rules have far broader use than scheduling. An
+  AshScheduling adapter is planned; see
+  [the plan](https://github.com/elixir-tempo/agenda/blob/v0.1.0/plans/agenda.md).
 
   """
 
@@ -127,6 +175,28 @@ defmodule Agenda do
   """
   @spec roster(atom(), [Resource.t()]) :: Requirement.t()
   defdelegate roster(name, resources), to: Requirement
+
+  @doc """
+  Invite resources who may attend but are not required. Delegates to
+  `Agenda.Session.invite/3`.
+
+  The counterpart to `roster/2`. An invitee never affects whether a
+  session can be held, only which time is best: `Agenda.plan/3` scores
+  a placement higher when more of them are free, and the arrangement
+  records which of them it suits. They are not allocated — an optional
+  attendee that could cost some other session its placement would not
+  be optional.
+
+  ### Examples
+
+      iex> bob = Agenda.resource("Bob")
+      iex> session = Agenda.session("Review", duration: "PT1H")
+      iex> Agenda.invite(session, :optional, [bob]).invitees |> Keyword.keys()
+      [:optional]
+
+  """
+  @spec invite(Session.t(), atom(), [Resource.t()]) :: Session.t()
+  defdelegate invite(session, role, resources), to: Session
 
   @doc """
   The resources satisfying `requirement`. Delegates to

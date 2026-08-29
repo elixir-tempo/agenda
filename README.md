@@ -1,18 +1,25 @@
 # Agenda
 
-Resource-constrained scheduling for [Tempo](https://github.com/elixir-tempo/tempo).
+Resource-constrained scheduling for [Tempo](https://hexdocs.pm/ex_tempo).
 
 Tempo answers *when is this free?* Agenda answers *what should I book, and where?* It adds the named resources, the attributes describing them, the places containing them, and the requirements a session places on them — so that a scheduling question can be asked the way a person would ask it.
 
 ```elixir
 import Agenda.Predicate
 
-boardroom = Agenda.resource("Boardroom", within: level_2, seats: 8, video_conferencing: true)
-alice     = Agenda.resource("Alice", requires: [step_free_access: true])
+level_2 = Agenda.place("Level 2", within: Agenda.place("Convention Centre"))
+
+boardroom      = Agenda.resource("Boardroom", within: level_2, seats: 8, video_conferencing: true)
+meeting_room_2 = Agenda.resource("Meeting room 2", within: level_2, seats: 4, video_conferencing: true)
+attic          = Agenda.resource("Attic", within: level_2, seats: 12, video_conferencing: true)
+alice          = Agenda.resource("Alice", requires: [step_free_access: true])
+
+rooms = [boardroom, meeting_room_2, attic]
 
 needs_a_room = Agenda.needs(:room, seats: at_least(8), video_conferencing: true)
 
-Agenda.eligible(needs_a_room, rooms)
+Agenda.eligible(needs_a_room, rooms) |> Enum.map(& &1.name)
+#=> ["Boardroom", "Attic"]
 ```
 
 > *"Which rooms seat at least eight and have video conferencing?"*
@@ -121,6 +128,18 @@ It works on a single session too, naming the demands that are impossible *togeth
 Agenda.conflict(session, rooms)
 #=> {:ok, [needs: {:room, :video_conferencing}, requires: {"Alice", :step_free_access}]}
 ```
+
+## The ledger, and why nothing stores availability
+
+A **ledger** is the record of what is allocated and to whom. It is the only place a booking lives, and everything else is computed from it rather than kept alongside it: `free/2` is a resource's open hours minus what the ledger holds, worked out when asked. There is no availability field to update, so availability cannot drift out of step with the bookings it came from.
+
+```elixir
+{:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement)
+
+Agenda.free(boardroom, within: week, busy: Agenda.busy(ledger))
+```
+
+A ledger is an ordinary immutable value, not a running store — and that is deliberate rather than unfinished. It is what lets `arrange/3` fork a ledger, try a layout on it, abandon it and try another, which a shared mutable one could not survive. Durable state, concurrent claims and a clock belong in whatever persists the answer; the ledger stays the thing they persist.
 
 ## Order, contracts, and what people would rather
 
@@ -238,17 +257,15 @@ Requires the optional `ical` dependency.
 
 ## Status
 
-**Early development, but no longer only a model.** Implemented: resources, attributes, the place tree and derived travel, requirements and the predicate vocabulary, induced requirements, explanations, availability, single-session planning, the allocation ledger, tagged claims, holds, recurring series, tracks, whole-programme arrangement, partial arrangement, pinning, precedence, load limits measured in claims or in time with floors and ceilings, reconciliation over a period, soft constraints including per-resource wishes, minimal conflict sets, RFC 7953 import, and the fixpoint solver bridge.
+**First release.** Implemented: resources, attributes, the place tree and derived travel, requirements and the predicate vocabulary, induced requirements, explanations, availability, single-session planning, required and optional participants, the allocation ledger, tagged claims, holds, recurring series, tracks, whole-programme arrangement, partial arrangement, pinning, precedence, load limits measured in claims or in time with floors and ceilings, reconciliation over a period, soft constraints including per-resource wishes, minimal conflict sets, meetings generated from mutual interest, and RFC 7953 import.
 
 Meeting and conference scheduling is the focus. Task and shift scheduling are expressible — precedence makes a task graph, limits make a contract, wishes make a roster people will accept — and exact at small scale, or handed to a solver at large.
 
-Still open: the rest of the claim lifecycle — completed, cancelled, no-show — which belongs with the persistence adapter, since none of those states changes what is available. The full design is in [the plan](https://github.com/elixir-tempo/agenda/blob/main/plans/agenda.md).
+Still open: the rest of the claim lifecycle — completed, cancelled, no-show — which belongs with the persistence adapter, since none of those states changes what is available. The full design is in [the plan](https://github.com/elixir-tempo/agenda/blob/v0.1.0/plans/agenda.md).
 
 ### Optional dependencies
 
 * [`ical`](https://hex.pm/packages/ical) `~> 3.2` for RFC 7953 `VAVAILABILITY` import — 3.2 is the first release carrying it.
-
-* [`fixpoint`](https://hex.pm/packages/fixpoint) for the solver bridge. It describes itself as a proof of concept, so treat that path accordingly.
 
 ## Installation
 

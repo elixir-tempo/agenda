@@ -25,6 +25,7 @@ defmodule Agenda.Session do
           window: Availability.pattern() | nil,
           requirements: [Requirement.t()],
           preferences: keyword(),
+          invitees: keyword([Resource.t()]),
           series: String.t() | nil
         }
 
@@ -33,6 +34,7 @@ defmodule Agenda.Session do
             window: nil,
             requirements: [],
             preferences: [],
+            invitees: [],
             series: nil
 
   @doc """
@@ -294,5 +296,51 @@ defmodule Agenda.Session do
   @spec named_resources(t()) :: [Resource.t()]
   def named_resources(%__MODULE__{} = session) do
     session |> rosters() |> Enum.flat_map(& &1.roster)
+  end
+
+  @doc """
+  Invite resources who may attend but are not required.
+
+  The counterpart to `roster/3`. A rostered resource must be free or
+  the session cannot be held; an invitee never affects whether a
+  placement is possible, only how good it is — a time when more of
+  them can come scores better, and `Agenda.Arrangement` records which
+  of them the chosen time actually suits.
+
+  This is deliberately weaker than `roster/3` in a second way: an
+  invitee is **not allocated**. Their time is not taken and the ledger
+  does not know about them, because a placement that consumed an
+  optional person could make some *other* session impossible — and an
+  optional attendee that can cost a placement is not optional. Book
+  them with `Agenda.Ledger.allocate/3` once the time is settled, if
+  they are coming.
+
+  ### Arguments
+
+  * `session` is a `t:t/0`.
+
+  * `role` names what the invitees would be there as, the same way
+    `roster/3` does.
+
+  * `resources` is a list of `t:Agenda.Resource.t/0`.
+
+  ### Returns
+
+  * The session, with the invitees added.
+
+  ### Examples
+
+      iex> bob = Agenda.resource("Bob")
+      iex> session = Agenda.session("Review", duration: "PT1H")
+      iex> Agenda.Session.invite(session, :optional, [bob]).invitees
+      [optional: [bob]]
+
+  """
+  @spec invite(t(), atom(), [Resource.t()]) :: t()
+  def invite(%__MODULE__{} = session, _role, []), do: session
+
+  def invite(%__MODULE__{} = session, role, resources)
+      when is_atom(role) and is_list(resources) do
+    %{session | invitees: Keyword.update(session.invitees, role, resources, &(&1 ++ resources))}
   end
 end

@@ -4,7 +4,7 @@ The other case studies invent their data. This one does not: it is the real prog
 
 The point is not to reproduce the published grid. It is that a real programme has a constraint an invented one usually misses, and it only shows up when you use real people.
 
-The excerpts below show the shape rather than all forty-two talks. The complete programme, runnable cell by cell, is the [Melbourne livebook](https://github.com/elixir-tempo/agenda/blob/main/livebook/elixir_melbourne_september_2026.livemd).
+The excerpts below show the shape rather than all forty-two talks. The complete programme, runnable cell by cell, is the [Melbourne livebook](https://github.com/elixir-tempo/agenda/blob/v0.1.0/livebook/elixir_melbourne_september_2026.livemd).
 
 ## What the conference actually was
 
