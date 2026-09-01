@@ -106,12 +106,6 @@ defmodule Agenda.MixProject do
     [
       {:ex_tempo, "~> 1.5"},
       {:ical, "~> 3.2", optional: true},
-      # A proof-of-concept CP solver, used only by the test suite. The
-      # same programmes are solved a second way and the two answers
-      # must agree — a differential check on `Agenda.Arranger` that a
-      # single-solver suite cannot be. It is deliberately not a
-      # feature: it was measured slower than the built-in search at
-      # every size. See `test/support/fixpoint.ex`.
       {:fixpoint, "~> 0.22", only: [:test]},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
