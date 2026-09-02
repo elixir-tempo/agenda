@@ -1355,7 +1355,7 @@ defmodule Agenda.Arranger do
   end
 
   # No layout, nothing named, no exhaustion flag — the budget ran out
-  # somewhere that did not record it. Reporting the cap is the honest
+  # somewhere that did not record it. Reporting the cap is the closest
   # reading, and a clause here is cheaper than a FunctionClauseError.
   defp to_result(%{best: nil}, programme, _unplaceable, starved) do
     {:error, Infeasible.new(programme.name, [exhausted_because(starved)])}

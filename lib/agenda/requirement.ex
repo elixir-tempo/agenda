@@ -124,6 +124,55 @@ defmodule Agenda.Requirement do
   end
 
   @doc """
+  Combine two requirements on the same role into one.
+
+  Naming a role twice is one demand stated in two calls, not two
+  demands: `roster(:speaker, [alice])` followed by
+  `roster(:speaker, [bob])` wants both people on stage. The
+  alternative — keeping both requirements — cannot be honoured,
+  because an arrangement fills each role once, so the second would
+  quietly displace the first.
+
+  Attributes combine the way `induce/2` combines them, with the later
+  predicate winning where both name the same attribute. Rosters are
+  concatenated, and a resource named twice is named once.
+
+  ### Arguments
+
+  * `requirement` is the `t:t/0` stated first.
+
+  * `addition` is the `t:t/0` stated after it, under the same name.
+
+  ### Returns
+
+  * one `t:t/0` demanding everything both demanded.
+
+  ### Examples
+
+      iex> alice = Agenda.Resource.new("Alice")
+      iex> bob = Agenda.Resource.new("Bob")
+      iex> first = Agenda.Requirement.roster(:speaker, [alice])
+      iex> second = Agenda.Requirement.roster(:speaker, [bob])
+      iex> Agenda.Requirement.merge(first, second).roster |> Enum.map(& &1.name)
+      ["Alice", "Bob"]
+
+      iex> import Agenda.Predicate
+      iex> seating = Agenda.Requirement.new(:room, seats: at_least(250))
+      iex> wired = Agenda.Requirement.new(:room, projector: true)
+      iex> Agenda.Requirement.merge(seating, wired).attributes |> Map.keys() |> Enum.sort()
+      [:projector, :seats]
+
+  """
+  @spec merge(t(), t()) :: t()
+  def merge(%__MODULE__{name: name} = requirement, %__MODULE__{name: name} = addition) do
+    %{
+      requirement
+      | attributes: Map.merge(requirement.attributes, addition.attributes),
+        roster: Enum.uniq(requirement.roster ++ addition.roster)
+    }
+  end
+
+  @doc """
   Every way `resource` fails `requirement`, as readable phrases.
 
   An empty list means the resource is eligible — so `eligible?/2` is

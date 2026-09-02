@@ -145,6 +145,38 @@ defmodule Agenda.Programme do
   end
 
   @doc """
+  Add every session in a list.
+
+  A programme is usually built from a list of sessions rather than one
+  at a time, and folding `add_session/2` over that list means writing
+  the fold — with the arguments the other way round from the reduce —
+  at every such site.
+
+  ### Arguments
+
+  * `programme` is a `t:t/0`.
+
+  * `sessions` is a list of `t:Agenda.Session.t/0`, added in order.
+
+  ### Returns
+
+  * the programme, with the sessions added.
+
+  ### Examples
+
+      iex> programme = Agenda.Programme.new("Conf")
+      iex> sessions = [Agenda.session("Registration"), Agenda.session("Keynote")]
+      iex> Agenda.Programme.add_sessions(programme, sessions)
+      ...> |> Map.get(:sessions) |> Enum.map(& &1.name)
+      ["Registration", "Keynote"]
+
+  """
+  @spec add_sessions(t(), [Session.t()]) :: t()
+  def add_sessions(%__MODULE__{} = programme, sessions) when is_list(sessions) do
+    Enum.reduce(sessions, programme, &add_session(&2, &1))
+  end
+
+  @doc """
   Require that one session finishes before another starts.
 
   This is what makes a task graph out of a set of tasks. Both names

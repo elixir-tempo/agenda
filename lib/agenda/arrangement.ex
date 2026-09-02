@@ -135,7 +135,7 @@ defmodule Agenda.Arrangement do
 
   The common case, because most roles take exactly one: a session has
   one room even when it has four speakers. Where a role holds several,
-  this is the first and `resources/2` is the honest question.
+  this is the first and `resources/2` is the question to ask.
 
   ### Arguments
 

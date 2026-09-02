@@ -429,7 +429,7 @@ defmodule Agenda.PlannerTest do
       }
     end
 
-    defp review_with(context, invitees) do
+    defp review_with(_context, invitees) do
       "Review"
       |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
       |> Session.needs(:room, seats: at_least(8))

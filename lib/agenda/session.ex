@@ -142,9 +142,34 @@ defmodule Agenda.Session do
     add(session, Requirement.roster(role, resources))
   end
 
+  # Naming a role twice states one demand in two calls. An arrangement
+  # fills each role once, so keeping both requirements would let the
+  # second displace the first and lose whatever the first asked for —
+  # silently, and only at planning time. They are combined here
+  # instead, where the caller can still see the result.
+  #
+  # A named role and a described one are not combined: "these four
+  # people" and "any room seating 250" under one name is a
+  # contradiction rather than a pair of demands, and merging them
+  # would answer it by ignoring one.
   defp add(%__MODULE__{} = session, requirement) do
-    %{session | requirements: session.requirements ++ [requirement]}
+    case Enum.find_index(session.requirements, &combinable?(&1, requirement)) do
+      nil ->
+        %{session | requirements: session.requirements ++ [requirement]}
+
+      index ->
+        combined =
+          List.update_at(session.requirements, index, &Requirement.merge(&1, requirement))
+
+        %{session | requirements: combined}
+    end
   end
+
+  defp combinable?(%Requirement{name: name, roster: held}, %Requirement{name: name, roster: added}) do
+    (held == [] and added == []) or (held != [] and added != [])
+  end
+
+  defp combinable?(_requirement, _addition), do: false
 
   @doc """
   Set the interval the session must fall inside.

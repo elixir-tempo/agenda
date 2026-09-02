@@ -134,8 +134,7 @@ plenary_hours =
   ])
 
 room = fn name, seats, hours ->
-  {:ok, resource} = Agenda.resource(name, within: venue, seats: seats) |> Agenda.open(hours)
-  resource
+  Agenda.resource(name, within: venue, seats: seats) |> Agenda.open!(hours)
 end
 
 peninsula = room.("Peninsula 4-7", 700, plenary_hours)
@@ -185,20 +184,19 @@ speaker_names =
 
 speakers =
   Enum.map(speaker_names, fn name ->
-    {:ok, speaker} = Agenda.resource(name, role: :speaker) |> Agenda.open(plenary_hours)
-    speaker
+    Agenda.resource(name, role: :speaker) |> Agenda.open!(plenary_hours)
   end)
 
 length(speakers)
 ```
 
-## One roster call per role
+## A role is one demand
 
-A trap worth knowing, because it silently costs you the exact constraint this talk is about.
+Preparing this talk found a bug, which is why this slide exists — naming a role twice used to keep only the last call, so a panel built up one speaker at a time silently lost three of its four people.
 
-* `roster(:speaker, [a, b, c])` binds all three
-* `roster(:speaker, [a])` three times keeps only the last
-* No error, no warning — the panel simply loses three of its four people
+* `roster(:speaker, [a, b, c])` and three calls of `roster(:speaker, [a])` now mean the same thing
+* Same for `needs/3`: two calls describing one role combine into one description
+* An arrangement fills each role once, so two requirements for a role could never both be honoured
 
 ## The programme
 
@@ -333,11 +331,9 @@ Forty-two talks and four plenaries, against three rooms and forty-five speakers.
 
 ```elixir
 programme =
-  Enum.reduce(
-    sessions ++ plenaries,
-    Agenda.programme("ElixirConf US 2025") |> Agenda.Programme.across(~o"2025-08-28/2025-08-30"),
-    &Agenda.Programme.add_session(&2, &1)
-  )
+  Agenda.programme("ElixirConf US 2025")
+  |> Agenda.Programme.across(~o"2025-08-28/2025-08-30")
+  |> Agenda.Programme.add_sessions(sessions ++ plenaries)
 
 pool = rooms ++ speakers
 
@@ -411,14 +407,15 @@ clash =
   |> Agenda.Session.needs(:room, seats: at_least(250))
   |> Agenda.Session.roster(:speaker, panel)
 
-forced =
+swapped =
   (sessions ++ plenaries)
   |> Enum.reject(&(&1.name == "Building Careers, Balancing Life"))
   |> Kernel.++([clash])
-  |> Enum.reduce(
-    Agenda.programme("ElixirConf US 2025") |> Agenda.Programme.across(~o"2025-08-28/2025-08-30"),
-    &Agenda.Programme.add_session(&2, &1)
-  )
+
+forced =
+  Agenda.programme("ElixirConf US 2025")
+  |> Agenda.Programme.across(~o"2025-08-28/2025-08-30")
+  |> Agenda.Programme.add_sessions(swapped)
 
 case Agenda.arrange(forced, pool, pinned: pinned) do
   {:error, reason} -> Agenda.explain(reason)
@@ -470,11 +467,9 @@ Three forty-minute talks, and Canaveral open for the eighty minutes after lunch.
 three = sessions |> Enum.filter(&(&1.duration == ~o"PT40M")) |> Enum.take(3)
 
 one_block =
-  Enum.reduce(
-    three,
-    Agenda.programme("After lunch") |> Agenda.Programme.across(~o"2025-08-28"),
-    &Agenda.Programme.add_session(&2, &1)
-  )
+  Agenda.programme("After lunch")
+  |> Agenda.Programme.across(~o"2025-08-28")
+  |> Agenda.Programme.add_sessions(three)
 
 {:ok, in_tension} = Agenda.conflict(one_block, [afternoon] ++ speakers)
 in_tension
@@ -494,13 +489,9 @@ Declared on the room, it holds between every pair the search places. These are f
   |> Agenda.open(~o"2025-08-28T10:45/T12:45")
 
 turnaround =
-  sessions
-  |> Enum.filter(&(&1.duration == ~o"PT20M"))
-  |> Enum.take(4)
-  |> Enum.reduce(
-    Agenda.programme("Turnaround") |> Agenda.Programme.across(~o"2025-08-28"),
-    &Agenda.Programme.add_session(&2, &1)
-  )
+  Agenda.programme("Turnaround")
+  |> Agenda.Programme.across(~o"2025-08-28")
+  |> Agenda.Programme.add_sessions(sessions |> Enum.filter(&(&1.duration == ~o"PT20M")) |> Enum.take(4))
 
 {:ok, spaced} = Agenda.arrange(turnaround, [hall] ++ speakers)
 

@@ -80,9 +80,15 @@ defmodule Agenda.Planner do
 
   * `{:ok, arrangements}` ranked best-first; or
 
-  * `{:error, t:Agenda.Infeasible.t/0}` carrying the reasons.
+  * `{:error, t:Agenda.Infeasible.t/0}` carrying the reasons — which
+    includes a session that never said when it may be held.
 
   ### Examples
+
+      iex> session = Agenda.session("Review", duration: "PT1H")
+      iex> {:error, reason} = Agenda.Planner.plan(session, [])
+      iex> Agenda.explain(reason)
+      "Review cannot be held: no window — say when it may be held, with window: on the session or by arranging it inside a programme"
 
       iex> boardroom = Agenda.Resource.new("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T12:00:00")
@@ -96,7 +102,21 @@ defmodule Agenda.Planner do
   """
   @spec plan(Session.t(), [Resource.t()], keyword()) ::
           {:ok, [Arrangement.t()]} | {:error, Infeasible.t()}
-  def plan(%Session{} = session, pool, options \\ []) when is_list(pool) do
+  def plan(session, pool, options \\ [])
+
+  # A session with no window is not asking a malformed question, it is
+  # asking an unbounded one — "whenever" has no answer to rank. The
+  # window is what `Agenda.arrange/3` gives every session from the
+  # programme's own span, so a session reaching here without one was
+  # planned on its own and never told when.
+  def plan(%Session{window: nil} = session, _pool, _options) do
+    {:error,
+     Infeasible.new(session.name, [
+       "no window — say when it may be held, with window: on the session or by arranging it inside a programme"
+     ])}
+  end
+
+  def plan(%Session{} = session, pool, options) when is_list(pool) do
     named = Session.named_resources(session)
     roles = induced_roles(session, named)
 
