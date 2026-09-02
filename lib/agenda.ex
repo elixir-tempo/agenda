@@ -93,7 +93,7 @@ defmodule Agenda do
   depends on a ledger being an ordinary value. And **holiday
   calendars** are accepted as data rather than resolved here, since
   jurisdiction rules have far broader use than scheduling. An
-  AshScheduling adapter is planned; see
+  adapter for Ash is planned; see
   [the plan](https://github.com/elixir-tempo/agenda/blob/v0.1.0/plans/agenda.md).
 
   """

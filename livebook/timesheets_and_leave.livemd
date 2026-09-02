@@ -234,7 +234,7 @@ report.by_tag
 
 ## Holidays are somebody else's problem
 
-Surprise at Queensland show days being micro-regional is the right reaction. Under the *Holidays Act 1983* (Qld) a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday while Toowoomba's, Cairns's and Townsville's fall on entirely different dates. Australia Day is national, Labour Day is per state on different dates, Easter Sunday is a holiday in some states and not others.
+Surprise that Queensland show days are micro-regional is the right reaction. Under the *Holidays Act 1983* (Qld) a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday while Toowoomba's, Cairns's and Townsville's fall on entirely different dates. Australia Day is national, Labour Day is per state on different dates, Easter Sunday is a holiday in some states and not others.
 
 **None of that is this library's business.** Accurate sub-national holiday data is a maintenance problem with a far wider audience than scheduling, so holidays arrive as an ordinary interval set from wherever you resolve them — a jurisdiction library, a CalDAV feed through `Agenda.from_ical/1`, or a hand-written list.
 

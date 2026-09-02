@@ -1,14 +1,14 @@
 # Timesheets, leave, and working-time reconciliation — a discussion document
 
-**Audience:** Kip Cole and Josh Price. This is a proposal to talk about, not a design to sign off. Everything that is Alembic's call is marked as a question rather than answered.
+**Audience:** the team whose timesheet problem prompted it. This is a proposal to talk about, not a design to sign off. Everything that is theirs to call is marked as a question rather than answered.
 
-**Note on circulation:** this document quotes Alembic's internal discussion and describes their commercial context. It should stay internal until Alembic are happy for it to travel — in particular it should not ship in a public release of `agenda`, nor survive the repository being made public. The Hex package is unaffected: `mix.exs` does not include `plans/` in its `files:` list.
+**Note on circulation:** this document paraphrases a prospective user's internal discussion. Names, clients and commercial specifics have been removed; what remains is the design argument, which stands on its own. The Hex package is unaffected either way: `mix.exs` does not include `plans/` in its `files:` list.
 
-**Basis:** Josh's three notes of 2026-08-25 on timesheets, multi-jurisdiction leave, and OR-based allocation. `agenda` at `c3c6157`, `ex_tempo` 1.3.1, `calendrical` as vendored in `agenda`'s lockfile. Code blocks written with `iex>` prompts were executed against those versions and show real output; blocks without them are proposed API that does not exist yet.
+**Basis:** three notes of 2026-08-25 on timesheets, multi-jurisdiction leave, and OR-based allocation. `agenda` at `c3c6157`, `ex_tempo` 1.3.1, `calendrical` as vendored in `agenda`'s lockfile. Code blocks written with `iex>` prompts were executed against those versions and show real output; blocks without them are proposed API that does not exist yet.
 
 ## The three questions
 
-Josh asked three things that look like one problem and are actually three, with a different answer each:
+The brief asked three things that look like one problem and are actually three, with a different answer each:
 
 1. **Timesheets.** Consultants record time; it is billed to clients and allocated to projects.
 2. **Leave.** The same structure, allocated to a leave type rather than a project — across jurisdictions whose public holidays vary down to the local government area.
@@ -18,7 +18,7 @@ The third is the one that makes the first two hard, and it is the one most times
 
 ## The one idea: work and leave are the same claim
 
-Josh already has this — *"leave is the same structure but allocated to a leave type rather than a project"* — and it is worth stating as the load-bearing decision rather than an implementation convenience, because everything downstream either falls out of it or fights it.
+The brief already has this — *"leave is the same structure but allocated to a leave type rather than a project"* — and it is worth stating as the load-bearing decision rather than an implementation convenience, because everything downstream either falls out of it or fights it.
 
 A timesheet line and a leave line are both **a claim on a person's time, tagged with what it was for**. The tag is a sum type, not a foreign key to one table:
 
@@ -87,7 +87,7 @@ Note what the second step did on its own: the 5 October holiday is outside the w
 
 **A public holiday inside a leave period must not consume leave balance.** Someone taking the fortnight over Christmas does not spend ten days of annual leave, and every payroll system that has ever conflated holidays with leave has shipped this bug.
 
-In the algebra above it cannot occur, because of the order of subtraction: holidays leave the working-day set *before* leave is applied, so a leave request only ever consumes days that were owed in the first place. The rule is not enforced; it is unrepresentable. That is the strongest argument for doing reconciliation as sets rather than as counters, and it is worth showing Josh's team explicitly, because the counter-based version of this code is where the bug lives.
+In the algebra above it cannot occur, because of the order of subtraction: holidays leave the working-day set *before* leave is applied, so a leave request only ever consumes days that were owed in the first place. The rule is not enforced; it is unrepresentable. That is the strongest argument for doing reconciliation as sets rather than as counters, and it is worth showing the team explicitly, because the counter-based version of this code is where the bug lives.
 
 ## Holidays are somebody else's problem, and the seam is an `IntervalSet`
 
@@ -132,7 +132,7 @@ That also removes the first design question this document originally posed. Juri
 
 Recorded here because the analysis is already done and whoever builds it will need it — not as a proposal for this family.
 
-The structure is a containment hierarchy with **inheritance and override at every level**, and the depth at which an authoritative answer appears varies by holiday. Australia Day is national. Labour Day is per state, on different dates in different states. Easter Sunday is a public holiday in some states and not others. And under the *Holidays Act 1983* (Qld) a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday while Toowoomba's, Cairns's and Townsville's fall on entirely different dates. Josh's 🤯 is the right reaction, but micro-regional is not a special case — it is one more level of the same nesting, and a flat `state:` or `region:` key cannot express it because there is no fixed depth to flatten to.
+The structure is a containment hierarchy with **inheritance and override at every level**, and the depth at which an authoritative answer appears varies by holiday. Australia Day is national. Labour Day is per state, on different dates in different states. Easter Sunday is a public holiday in some states and not others. And under the *Holidays Act 1983* (Qld) a show holiday is appointed **per district**, so Brisbane's falls on the Ekka Wednesday while Toowoomba's, Cairns's and Townsville's fall on entirely different dates. Surprise here is the right reaction, but micro-regional is not a special case — it is one more level of the same nesting, and a flat `state:` or `region:` key cannot express it because there is no fixed depth to flatten to.
 
 Three properties that will bite whoever takes it on, and that argue the maintenance burden is real:
 
@@ -142,11 +142,11 @@ Three properties that will bite whoever takes it on, and that argue the maintena
 
 * **The data is effective-dated, not a pure function.** Holidays get proclaimed late, and one-off national days of mourning have been declared with weeks of notice. A reconciliation that ran clean in September must be re-runnable in November and produce a different, also-correct answer.
 
-That last property is the one with a consequence *inside* Josh's system regardless of who supplies the data: **a closed period must record which calendar version it was closed against**, or restatement is not reproducible. That is question 3 below.
+That last property is the one with a consequence *inside* the consuming system regardless of who supplies the data: **a closed period must record which calendar version it was closed against**, or restatement is not reproducible. That is question 3 below.
 
 ## Expected hours: the contract, and the two kinds of year
 
-Josh's *"per time unit (day, week, month, quarter, year (fin/cal))"* is asking for a granularity ladder, and the parenthetical is the interesting half.
+The brief's *"per time unit (day, week, month, quarter, year (fin/cal))"* is asking for a granularity ladder, and the parenthetical is the interesting half.
 
 ### The financial year is a calendar, not an offset
 
@@ -175,9 +175,9 @@ iex> Tempo.relation(Tempo.from_iso8601!("2026-01-01", calendar), ~o"2025-07-01")
 
 That last line is the trap, and it is worth running rather than reasoning about. `"2026Y1M"` is a *fiscal* label, not a Gregorian date, and Australian FY2026 begins in July **2025** — so "FY26" and "2026" name overlapping but different stretches of time. Any report carrying both has to agree with its reader about which calendar year a financial year starts in, and the projection above is what settles it rather than a convention nobody wrote down.
 
-The territory data is already there — `1 July - 30 June` for `AU` — for every country Alembic is likely to employ anyone in. The whole of Josh's day/week/month/quarter/year ladder is then one mechanism rather than five, because each is a granule of some calendar, and the same set algebra runs at every level. A quarter is `~o"2026Y3Q"`; a fiscal quarter is the same expression in a fiscal calendar.
+The territory data is already there — `1 July - 30 June` for `AU` — for every country such a consultancy is likely to employ anyone in. The whole of the brief's day/week/month/quarter/year ladder is then one mechanism rather than five, because each is a granule of some calendar, and the same set algebra runs at every level. A quarter is `~o"2026Y3Q"`; a fiscal quarter is the same expression in a fiscal calendar.
 
-The ladder also has to include the **ISO week**, which belongs to neither of Josh's two years. A 38-hour week is defined against a week, and week 1 of 2027 begins in December 2026. Any system that reconciles weekly and reports annually will meet the boundary case where the last week of the year is split; deciding *now* whether a week belongs to the year containing its Thursday, or is pro-rated, is much cheaper than discovering it in a year-end report.
+The ladder also has to include the **ISO week**, which belongs to neither of the brief's two years. A 38-hour week is defined against a week, and week 1 of 2027 begins in December 2026. Any system that reconciles weekly and reports annually will meet the boundary case where the last week of the year is split; deciding *now* whether a week belongs to the year containing its Thursday, or is pro-rated, is much cheaper than discovering it in a year-end report.
 
 ### The contract is a pattern, not a number
 
@@ -198,7 +198,7 @@ So the contract is an **availability pattern with an effective date range**, whi
 Agenda.resource("Dana", limits: [day: 3, week: 12])
 ```
 
-That reads "at most three engagements a day, twelve a week" — a count of claims over a stretch of calendar. What a timesheet needs is the same construct measuring **duration**: at most 7.6 hours a day, at least 38 a week, at most 1710 billable in the year. The period vocabulary, the ledger it counts against, and the semantics — *"however far apart, unlike concurrency"* — all carry over unchanged. Extending `limits:` to accept a duration alongside a count looks like the single highest-value change to `agenda` that Josh's problem implies, and it is additive.
+That reads "at most three engagements a day, twelve a week" — a count of claims over a stretch of calendar. What a timesheet needs is the same construct measuring **duration**: at most 7.6 hours a day, at least 38 a week, at most 1710 billable in the year. The period vocabulary, the ledger it counts against, and the semantics — *"however far apart, unlike concurrency"* — all carry over unchanged. Extending `limits:` to accept a duration alongside a count looks like the single highest-value change to `agenda` that this problem implies, and it is additive.
 
 Note the direction, too. A scheduling limit is a **ceiling**; a timesheet expectation is usually a **floor**, or a pair. That is a genuine extension rather than a re-reading, and it wants stating explicitly rather than being smuggled in as a negative number.
 
@@ -227,7 +227,7 @@ The three bolded rows are built, tested and documented in `agenda`. The two belo
 
 ## Where OR earns its place, and where it does not
 
-Josh's read — *"for our needs of people-project allocation, the solution is usually very constrained"* — is right, and it is better news than it sounds.
+The brief's read — *"for our needs of people-project allocation, the solution is usually very constrained"* — is right, and it is better news than it sounds.
 
 **Constrained is the regime exact search is good at.** `agenda`'s arranger splits a programme into components that cannot affect one another and searches them concurrently, so cost tracks the shape of the problem rather than its size: 1,200 sessions spread across twenty days lay out in about a second, while 200 all competing for a single day take about 220 ms and 500 exhaust the default `:nodes` budget. Consulting allocation decomposes unusually well — a practice staffing a client in July rarely interacts with a different practice's October — so the realistic instance is many small components, not one large one. Skills requirements that eliminate most consultants for most engagements shrink the search further. A solver may simply not be needed, and if it is, the `Agenda.Fixpoint` bridge already writes a solver's answer back through the same model.
 
@@ -246,7 +246,7 @@ Agenda.conflict(session, pool)
 
 An account manager can act on that sentence. Most OR tooling answers this question badly, and it is the question a staffing desk asks most often.
 
-**On soft constraints, the direction differs from Josh's school work, and the difference is load-bearing.** `agenda` optimises lexicographically in two passes: it first *proves* how many sessions can be placed, then improves the score without ever placing fewer. So a preference can never cost you a placement — which is exactly right for staffing, where you never leave an engagement unstaffed to give someone their preferred Friday, and exactly wrong for timetabling, where a school will trade one lesson's preferred slot for a cohort's whole-week compactness without hesitating. That divergence is why `plans/timetable.md` proposes a sibling with a local-search engine rather than an extension of `agenda`, and it is worth Josh's team knowing which side of that line each of their products sits on. Primary school scheduling, as he says, sits nearer the staffing side: one teacher per cohort for most of the week collapses most of the grid before the search starts.
+**On soft constraints, the direction differs from the school timetabling work, and the difference is load-bearing.** `agenda` optimises lexicographically in two passes: it first *proves* how many sessions can be placed, then improves the score without ever placing fewer. So a preference can never cost you a placement — which is exactly right for staffing, where you never leave an engagement unstaffed to give someone their preferred Friday, and exactly wrong for timetabling, where a school will trade one lesson's preferred slot for a cohort's whole-week compactness without hesitating. That divergence is why `plans/timetable.md` proposes a sibling with a local-search engine rather than an extension of `agenda`, and it is worth the team knowing which side of that line each of their products sits on. Primary school scheduling, as the brief says, sits nearer the staffing side: one teacher per cohort for most of the week collapses most of the grid before the search starts.
 
 Consultant preferences themselves are already expressible as wishes rather than as availability, which is the modelling point worth stealing:
 
@@ -265,15 +265,15 @@ The split that seems right:
 * **`ex_tempo`** — nothing new required. It already has workdays, the recurrence grammar, the set algebra, and the iCalendar reader.
 * **`agenda`** — three additions, built: `Agenda.Allocation`'s `:tag`, `Agenda.Limit` (duration measures, floors and ceilings), and `Agenda.reconcile/3`. All three are useful to every existing user, and none of them mentions timesheets or knows what a holiday is.
 * **A separate holiday library** — the jurisdiction tree, effective-dated calendars, and the data behind them. Outside this family entirely, with its own maintainers and cadence, feeding `agenda` an `IntervalSet`.
-* **Alembic's application** — leave balances, accrual, approval workflow, billing rates, invoicing. All the things that are not time.
+* **The consuming application** — leave balances, accrual, approval workflow, billing rates, invoicing. All the things that are not time.
 
 ### One naming hazard
 
-**Tempo is already the name of the dominant timesheet product in the Jira ecosystem.** A Tempo-family library about timesheets will collide in search results and in the heads of precisely the buyers Alembic is selling to. This does not affect the design, but it argues for naming the sibling for what it does — working time, attendance, reconciliation — rather than for the family it belongs to. (If Josh's *"— also tempo I guess"* was a nod at that product rather than at this library, then he has already spotted it.)
+**Tempo is already the name of the dominant timesheet product in the Jira ecosystem.** A Tempo-family library about timesheets will collide in search results and in the heads of precisely the buyers such a product is sold to. This does not affect the design, but it argues for naming the sibling for what it does — working time, attendance, reconciliation — rather than for the family it belongs to. (If the *"— also tempo I guess"* aside was a nod at that product rather than at this library, then it is already spotted.)
 
-## Questions for Josh
+## Questions for the team
 
-Marked as questions because each is Alembic's call, and the answers change the schema rather than the code around it.
+Marked as questions because each is the team's call, and the answers change the schema rather than the code around it.
 
 1. **Is a timesheet entry placed or unplaced?** *"Six hours on Acme on Tuesday"* is a quantity in a bucket; *"09:00–15:00 on Acme"* is an interval. `agenda` deals in intervals, and only the second detects that a consultant was double-booked. Which one do consultants actually enter, and is the wall-clock detail worth asking for?
 2. **What granularity is billed?** Six-minute units are conventional in professional services and interact with the 7.6-hour day in ways worth deciding once, in decimal, up front.
@@ -283,4 +283,4 @@ Marked as questions because each is Alembic's call, and the answers change the s
 
 ## Suggested next step
 
-The cheapest thing that would tell us whether this analysis is right: build the reconciliation report **for one real Alembic consultant, for one real past quarter**, using only what exists today plus a hand-written holiday set for their jurisdiction. It needs no new library. If the resulting `unaccounted` list matches what Alembic's current process says about that quarter, the model holds and the sibling is worth building; if it does not, the disagreement will be far more informative than any further design.
+The cheapest thing that would tell us whether this analysis is right: build the reconciliation report **for one real consultant, for one real past quarter**, using only what exists today plus a hand-written holiday set for their jurisdiction. It needs no new library. If the resulting `unaccounted` list matches what the current process says about that quarter, the model holds and the sibling is worth building; if it does not, the disagreement will be far more informative than any further design.

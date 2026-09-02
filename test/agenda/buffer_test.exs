@@ -30,7 +30,7 @@ defmodule Agenda.BufferTest do
     end
 
     test "buffer_after extends the claim forwards" do
-      # AshScheduling's own worked case: a 30-minute claim with a
+      # A worked case from the Ash scheduling library: a 30-minute claim with a
       # 15-minute after-buffer blocks 45 minutes.
       assert free(
                room(buffer_after: ~o"PT15M"),

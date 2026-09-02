@@ -10,7 +10,8 @@ defmodule Agenda.Session do
   The word is deliberately not "meeting" (too narrow — a court hearing
   and a conference talk are neither), not "event" (`Tempo.Event` is
   taken, and it collides with event sourcing), and not "booking" (which
-  names the request in AshScheduling, not the thing requested).
+  names the request in some scheduling libraries, not the thing
+  requested).
 
   """
 

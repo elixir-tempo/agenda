@@ -2,7 +2,7 @@
 
 ## Vocabulary alignment with iCalendar and CalDAV
 
-Agenda's lexicon was chosen in [plans/agenda.md](plans/agenda.md) to dodge collisions with Elixir's stdlib, Tempo and AshScheduling. That constraint still governs: where the two pull in different directions, the collision wins and the RFC loses. What follows is a review of the remaining terms against the vendored specifications — RFC 5545 (iCalendar), RFC 5546 (iTIP), RFC 4791 (CalDAV), RFC 6638 (CalDAV scheduling), RFC 7953 (`VAVAILABILITY`), RFC 7986 (new calendar properties), RFC 9073 (event publishing extensions) and RFC 9253 (relationships) — sorted into what already lines up, what is worth changing, and what should stay divergent with the reason recorded so it is not re-litigated.
+Agenda's lexicon was chosen in [plans/agenda.md](plans/agenda.md) to dodge collisions with Elixir's stdlib, Tempo and the Ash scheduling library. That constraint still governs: where the two pull in different directions, the collision wins and the RFC loses. What follows is a review of the remaining terms against the vendored specifications — RFC 5545 (iCalendar), RFC 5546 (iTIP), RFC 4791 (CalDAV), RFC 6638 (CalDAV scheduling), RFC 7953 (`VAVAILABILITY`), RFC 7986 (new calendar properties), RFC 9073 (event publishing extensions) and RFC 9253 (relationships) — sorted into what already lines up, what is worth changing, and what should stay divergent with the reason recorded so it is not re-litigated.
 
 Agenda is at 0.1.0, so a rename costs a CHANGELOG line and nothing else. That is the cheapest this will ever be.
 

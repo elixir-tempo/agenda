@@ -1,6 +1,6 @@
 # Plan — `agenda`: resources, requirements, and programmes
 
-Tempo answers *when is this free?* It cannot answer *what should I book, and where?* This plan adds named resources, the attributes that describe them, the places that contain them, the requirements a session places on them, and the allocation ledger that keeps the answer true as sessions move. The temporal core stays where it is; the resource vocabulary goes into a companion library, `agenda`; an adapter makes it drop into AshScheduling's declared extension points.
+Tempo answers *when is this free?* It cannot answer *what should I book, and where?* This plan adds named resources, the attributes that describe them, the places that contain them, the requirements a session places on them, and the allocation ledger that keeps the answer true as sessions move. The temporal core stays where it is; the resource vocabulary goes into a companion library, `agenda`; an adapter makes it drop into an Ash-based scheduling library's declared extension points.
 
 ## Problem
 
@@ -32,11 +32,11 @@ The premise that `IntervalSet` metadata is "already the base platform" is half r
 
 Two further pieces of prior art matter more than the metadata question:
 
-* **Tempo's set operations are already a sweep-line** (`sweep_intersection`, `sweep_members` in `lib/operations.ex`), which is precisely the algorithm AshScheduling's ADR-003 selects for its unbuilt availability engine — and Tempo's is calendar-correct, zone-aware, and non-Gregorian-capable, which a hand-rolled one would not be. `Tempo.IntervalSet.Backend.Tree` additionally provides the interval tree ADR-003 lists as the structure to reach for "if the engine gains a long-lived, frequently-queried dataset".
+* **Tempo's set operations are already a sweep-line** (`sweep_intersection`, `sweep_members` in `lib/operations.ex`), which is precisely the algorithm that library's architecture decision record selects for its unbuilt availability engine — and Tempo's is calendar-correct, zone-aware, and non-Gregorian-capable, which a hand-rolled one would not be. `Tempo.IntervalSet.Backend.Tree` additionally provides the interval tree that same record lists as the structure to reach for "if the engine gains a long-lived, frequently-queried dataset".
 
-* **`Tempo.Network` is a Simple Temporal Problem solver** and `Tempo.Schedule` is critical-path scheduling on top of it. ADR-003 considers temporal CSP, rejects it *for the enumeration engine*, and says it "belong[s] in that layer" if an optimiser is ever added. That layer is what this plan builds, and its solver is already written.
+* **`Tempo.Network` is a Simple Temporal Problem solver** and `Tempo.Schedule` is critical-path scheduling on top of it. That library's architecture record considers temporal CSP, rejects it *for the enumeration engine*, and says it "belong[s] in that layer" if an optimiser is ever added. That layer is what this plan builds, and its solver is already written.
 
-The summary: Tempo has the temporal engine AshScheduling has not yet built, plus the constraint solver AshScheduling explicitly defers to its consumer. What is missing from both is the resource vocabulary in between.
+The summary: Tempo has the temporal engine that library has not yet built, plus the constraint solver it explicitly defers to its consumer. What is missing from both is the resource vocabulary in between.
 
 ## Architectural boundary — core, companion, adapter
 
@@ -54,7 +54,7 @@ Scheduling is a field where the obvious word is almost always already taken by s
 
 * **`Stream` is unusable.** Elixir's stdlib owns it, and a conference "stream" would shadow it in every `alias`. The concept is a **track**.
 
-* **`Schedule` is triple-booked** — `Tempo.Schedule` is critical-path project scheduling, `AshScheduling.Schedule` is *the bookable resource*, and colloquially "the conference schedule" is the finished output. The library never uses the bare word as a module name.
+* **`Schedule` is triple-booked** — `Tempo.Schedule` is critical-path project scheduling, the Ash library's `Schedule` is *the bookable resource*, and colloquially "the conference schedule" is the finished output. The library never uses the bare word as a module name.
 
 * **`Event` is already taken inside Tempo** — `Tempo.Event.Easter` exists — and it collides with event-sourcing besides. The thing being scheduled is a **session**.
 
@@ -62,15 +62,15 @@ The settled vocabulary, with what each term displaces:
 
 | Concept | Term | Not, because |
 | --- | --- | --- |
-| A bookable thing — room, person, projector | **Resource** | `Asset` implies ownership; `Schedule` is AshScheduling's word for this exact thing |
+| A bookable thing — room, person, projector | **Resource** | `Asset` implies ownership; `Schedule` is the Ash library's word for this exact thing |
 | A fact about a resource | **Attribute** | `Property` collides with property-based testing |
 | A resource that contains others | **Place** | `Venue` is event-only — a hospital is not a venue; `Location` is a coordinate, not a container |
 | The containment relation | **`within`** | `parent`/`child` says nothing about what the relation means |
-| A thing needing resources for a span | **Session** | `Meeting` too narrow; `Event` taken; `Booking` is AshScheduling's, and means the *request* there |
+| A thing needing resources for a span | **Session** | `Meeting` too narrow; `Event` taken; `Booking` is the Ash library's, and means the *request* there |
 | Sessions that must not self-overlap | **Track** | `Stream` fatal; `Series` implies recurrence |
 | The whole collection being laid out | **Programme** | `Schedule` overloaded; `Plan` is the verb |
 | What a session demands of a resource | **Requirement** | `Constraint` leaks solver internals into the API |
-| One resource bound to one session | **Allocation** | `Claim` and `Reservation` are AshScheduling's |
+| One resource bound to one session | **Allocation** | `Claim` and `Reservation` are the Ash library's |
 | The set of allocations | **Ledger** | — |
 | One candidate solution | **Arrangement** | `Solution` implies uniqueness; `Option` is too weak for a whole programme |
 
@@ -118,7 +118,7 @@ Agenda.travel_time(boardroom, main_stage)  # different venues
 
 > *"Two rooms on the same level are three minutes apart; two rooms in different venues are twenty-five."*
 
-Travel time is a function of the **lowest common ancestor** of the two resources in the place tree — a default per-depth table, overridable for any specific pair when the real building disagrees with the geometry. This is what makes the containment tree earn its place: a flat `location: :sydney` attribute can answer *"is this room in Sydney?"* but not *"can a delegate get from here to there in the break?"*, and the second question is the one that decides whether a programme is workable at all. It is also precisely what AshScheduling's `CostFn.transition_cost/3` exists to answer.
+Travel time is a function of the **lowest common ancestor** of the two resources in the place tree — a default per-depth table, overridable for any specific pair when the real building disagrees with the geometry. This is what makes the containment tree earn its place: a flat `location: :sydney` attribute can answer *"is this room in Sydney?"* but not *"can a delegate get from here to there in the break?"*, and the second question is the one that decides whether a programme is workable at all. It is also precisely what the Ash library's transition-cost callback exists to answer.
 
 ### Sessions and requirements read as the sentence a person would say
 
@@ -171,7 +171,7 @@ Two verbs, two scopes, deliberately distinct: `plan/2` returns ranked arrangemen
 
 ### Five distinctions that decide whether the model survives contact
 
-**Seats are not concurrency.** `seats: 8` is an attribute matched against demand. *How many sessions may hold this resource at once* is a separate property, and conflating them is the trap that makes a 200-seat lecture hall accept two simultaneous lectures. They are orthogonal: the lecture hall is `seats: 200, concurrency: 1`; a bank of twenty identical lockers is `seats: 1, concurrency: 20`. AshScheduling's `Schedule.capacity` is the *concurrency* one, which is why the word "capacity" is avoided in this library entirely.
+**Seats are not concurrency.** `seats: 8` is an attribute matched against demand. *How many sessions may hold this resource at once* is a separate property, and conflating them is the trap that makes a 200-seat lecture hall accept two simultaneous lectures. They are orthogonal: the lecture hall is `seats: 200, concurrency: 1`; a bank of twenty identical lockers is `seats: 1, concurrency: 20`. the Ash library's `capacity` is the *concurrency* one, which is why the word "capacity" is avoided in this library entirely.
 
 **A place is a tree, not a label.** Covered above; the consequence for the API is that `within:` takes a place, never a string, and travel is computed rather than configured.
 
@@ -216,7 +216,7 @@ Agenda.explain(reason)
 
 > *"You cannot hold this session, and the thing standing in the way is the board."*
 
-At programme scale the same discipline applies to a partial failure — an infeasible programme names the track and the session that could not be placed, not merely that placement failed. This is the capability AshScheduling's `explain: true` mode reaches for and can only supply at the temporal level; attribute- and place-level reasons are only expressible once attributes and places exist.
+At programme scale the same discipline applies to a partial failure — an infeasible programme names the track and the session that could not be placed, not merely that placement failed. This is the capability the Ash library's `explain: true` mode reaches for and can only supply at the temporal level; attribute- and place-level reasons are only expressible once attributes and places exist.
 
 ## How an arrangement is solved
 
@@ -240,7 +240,7 @@ Stages 1–3 and 6 are existing machinery. Stage 4 is the genuinely new algorith
 
 ### What this deliberately is not
 
-This is a **search over enumerated candidates**, not a general constraint optimiser. Single-session planning against a few hundred resources is exact and fast. A conference of a few dozen sessions across a handful of rooms is tractable by search with the track and travel constraints pruning hard. A university timetable of thousands of classes, or a month's roster for two hundred staff minimising overtime, is not — that is CP-SAT's job, and ADR-002 already routes it to the `Optimizer` behaviour with the consumer bringing their own solver.
+This is a **search over enumerated candidates**, not a general constraint optimiser. Single-session planning against a few hundred resources is exact and fast. A conference of a few dozen sessions across a handful of rooms is tractable by search with the track and travel constraints pruning hard. A university timetable of thousands of classes, or a month's roster for two hundred staff minimising overtime, is not — that is CP-SAT's job, and the Ash library already routes it to an optimiser behaviour with the consumer bringing their own solver.
 
 The line is worth stating plainly rather than letting it be discovered in production. Where the two meet is that an external optimiser's output is written back through the same allocation API, so the ledger stays authoritative either way.
 
@@ -290,17 +290,17 @@ The changeset is an ordinary value. The library never applies it — it has no d
 
 ### Concurrency is the adapter's problem, and the library must not pretend otherwise
 
-A ledger is an immutable value, so two processes can plan against the same snapshot and both succeed. Nothing in a pure library can prevent that. What the library owes the adapter is enough information to detect it: every allocation carries the session key and interval needed for a uniqueness or exclusion constraint to reject the loser, and `allocate/2` is idempotent on an unchanged changeset so a retry after losing a race is safe. AshScheduling's roadmap already assigns this to its P3 orchestration phase (exclusion constraints for concurrency 1, advisory locks above it); the adapter should use that machinery rather than duplicate it.
+A ledger is an immutable value, so two processes can plan against the same snapshot and both succeed. Nothing in a pure library can prevent that. What the library owes the adapter is enough information to detect it: every allocation carries the session key and interval needed for a uniqueness or exclusion constraint to reject the loser, and `allocate/2` is idempotent on an unchanged changeset so a retry after losing a race is safe. the Ash library's roadmap already assigns this to its orchestration phase (exclusion constraints for concurrency 1, advisory locks above it); the adapter should use that machinery rather than duplicate it.
 
-## Fitting AshScheduling
+## Fitting an Ash scheduling library
 
-AshScheduling's architecture was designed with exactly this seam in mind. ADR-002 defines four behaviours as the places domain logic plugs in, and states that the library "does not implement constraint solvers", "does not implement skill/preference matching logic", "does not model geography, locations, or spatial relationships", and carries a free-form `context` map on every callback for whatever the consumer needs. `agenda` is a consumer that fills all four.
+That library's architecture was designed with exactly this seam in mind. Its architecture decision record defines four behaviours as the places domain logic plugs in, and states that the library "does not implement constraint solvers", "does not implement skill/preference matching logic", "does not model geography, locations, or spatial relationships", and carries a free-form `context` map on every callback for whatever the consumer needs. `agenda` is a consumer that fills all four.
 
-| AshScheduling extension point | `agenda` supplies | Status upstream |
+| Extension point | `agenda` supplies | Status upstream |
 | --- | --- | --- |
 | `Matcher.eligible?/3` | Stage 1 — attribute matching with `explain` | Behaviour defined, no implementation |
 | `Selector.select/3`, `Strategy.select/3` | Stages 4–5 — matching and ranking | `Fifo` only |
-| `CostFn.transition_cost/3` | `travel_time/2` over the place tree | Default fixed buffers only |
+| transition cost | `travel_time/2` over the place tree | Default fixed buffers only |
 | `Optimizer.optimize/3` | Programme-scale `arrange/2`; passes through to an external solver above that | No implementation |
 | `ScheduleEngine.resolve/3` (P2) | Tempo's sweep-line set algebra, calendar- and zone-correct | **Not started** |
 | P5 Constraints | Requirements and tracks | **Not started** |
@@ -309,29 +309,29 @@ AshScheduling's architecture was designed with exactly this seam in mind. ADR-00
 
 The mapping of nouns is close to one-to-one, which is the strongest evidence the two models agree:
 
-* A `Agenda.Resource` is an `AshScheduling.Schedule` — both are polymorphic handles onto a consumer entity. Attributes are the missing half: AshScheduling has nowhere to put `seats: 8` except `PoolMember.metadata`, an untyped map every strategy must parse for itself. The adapter should not add an attribute column; it should define a small behaviour the consumer implements to project *their own* `Room` resource into attributes and its place, which keeps ADR-002's "your domain stays yours" promise intact.
+* A `Agenda.Resource` is that library's `Schedule` — both are polymorphic handles onto a consumer entity. Attributes are the missing half: it has nowhere to put `seats: 8` except an untyped metadata map every strategy must parse for itself. The adapter should not add an attribute column; it should define a small behaviour the consumer implements to project *their own* `Room` resource into attributes and its place, which keeps its "your domain stays yours" promise intact.
 
 * A `Agenda.Ledger` is the set of `Claim` rows; `allocate`/`release`/`rearrange` are `Booking`'s `reserve`/`release`/`reschedule` actions. The `rearrange` changeset maps directly onto the `supersedes` / `superseded_by` chain those actions already maintain.
 
 * `Agenda.plan/2` is what `Booking.available_slots` and `Pool.process` want to call.
 
-* **Places have no counterpart, by their design not by oversight.** ADR-002 lists geography as a non-goal that "must never be prevented", supported via `context`. The place tree is exactly the thing a consumer is expected to bring, and `travel_time/2` is exactly the `CostFn` they left open.
+* **Places have no counterpart, by their design not by oversight.** The Ash library lists geography as a non-goal that "must never be prevented", supported via a free-form context map. The place tree is exactly the thing a consumer is expected to bring, and `travel_time/2` is exactly the cost function they left open.
 
 Two frictions are real and should be stated rather than discovered:
 
-* **Value conversion at every boundary.** AshScheduling stores `tstzrange` and `DateTime`; this library works in `Tempo` and `Tempo.Interval`. Tempo has `from_date_time/1`, `to_date_time/1`, `from_naive_date_time/1` and `to_date/1`, so the conversion is mechanical — but a `tstzrange` cannot represent a Tempo *resolution* (`~o"2026-06"` is a month-long interval, not a timestamp), so round-tripping flattens resolution to explicit bounds. Persisted intervals must therefore be treated as explicit spans, never relying on implicit-span semantics surviving a database round trip.
+* **Value conversion at every boundary.** The Ash library stores `tstzrange` and `DateTime`; this library works in `Tempo` and `Tempo.Interval`. Tempo has `from_date_time/1`, `to_date_time/1`, `from_naive_date_time/1` and `to_date/1`, so the conversion is mechanical — but a `tstzrange` cannot represent a Tempo *resolution* (`~o"2026-06"` is a month-long interval, not a timestamp), so round-tripping flattens resolution to explicit bounds. Persisted intervals must therefore be treated as explicit spans, never relying on implicit-span semantics surviving a database round trip.
 
-* **Half-open agreement is a precondition, and it holds.** Both libraries enforce `[)` — Tempo as a stated architectural invariant, AshScheduling in `TimeRange`/`Tstzrange` canonicalisation (their R-08). Had they disagreed, none of this would compose.
+* **Half-open agreement is a precondition, and it holds.** Both libraries enforce `[)` — Tempo as a stated architectural invariant, the Ash library in its range canonicalisation. Had they disagreed, none of this would compose.
 
 ## Rejected alternatives
 
 * **Put it all in Tempo core.** Rejected: doubles the surface area of a focused 1.0 temporal library with a domain vocabulary most of its users will never touch, and couples Tempo's release cadence to a scheduling product's. The metadata provenance work is the only part that passes the core test.
 
-* **Build it inside AshScheduling directly.** Rejected: it would be unusable outside Ash, and ADR-002 is explicit that this logic belongs in the consumer. A pure library with a thin adapter serves both the Ash user and the plain-Elixir user; the reverse does not.
+* **Build it inside the Ash library directly.** Rejected: it would be unusable outside Ash, and its architecture decision record is explicit that this logic belongs in the consumer. A pure library with a thin adapter serves both the Ash user and the plain-Elixir user; the reverse does not.
 
 * **`location` as a flat attribute instead of a place tree.** Rejected: it answers "is this room in Sydney?" but not "can a delegate get between these two rooms in ten minutes?", and only the second question decides whether a programme is workable. A flat label also forces every caller to maintain their own travel matrix — the thing the tree derives.
 
-* **Attributes as an untyped map matched by a consumer-supplied function.** Rejected: it is what `PoolMember.metadata` already offers and it is why nothing can explain a failure. Without a declared predicate vocabulary there is no way to say *"needs at least 8, this seats 4"* — only `false`.
+* **Attributes as an untyped map matched by a consumer-supplied function.** Rejected: it is what an untyped metadata map already offers and it is why nothing can explain a failure. Without a declared predicate vocabulary there is no way to say *"needs at least 8, this seats 4"* — only `false`.
 
 * **A full CP-SAT solver in the library.** Rejected: enormous, and the wrong shape for the incremental path that dominates. The staged pipeline handles single sessions exactly and modest programmes well; the `Optimizer` behaviour is the documented door for the rest.
 
@@ -363,7 +363,7 @@ The search itself was rewritten twice in the process, both times because measure
 
 **Phase 4c — soft constraints and the solver hand-off.** `Preference` with `:room_changes`, `:room_spread` and custom counters, optimised lexicographically in two passes so a preference can never cost a placement. `Agenda.Fixpoint.solve/3` makes the "bring your own solver" line below executable against [fixpoint](https://hex.pm/packages/fixpoint). **Done.**
 
-**Phase 5 — adapter.** `Matcher`, `Selector`/`Strategy`, `CostFn` over the place tree, then the attribute-and-place projection behaviour. Whether this lands as a separate `ash_scheduling_agenda` package or as an optional dependency contributed into `ash_scheduling` is Alembic's call and worth asking before building — the technical content is identical either way.
+**Phase 5 — adapter.** The matcher, selector and cost-function behaviours over the place tree, then the attribute-and-place projection behaviour. Whether this lands as a separate adapter package or as an optional dependency contributed upstream is the downstream maintainers' call and worth asking before building — the technical content is identical either way.
 
 ## Risks
 
@@ -377,7 +377,7 @@ The search itself was rewritten twice in the process, both times because measure
 
 * **Explain quality decays silently.** Reasons are the feature; they are also the thing no test asserts unless one is written to. Every `Infeasible` constructor should be required to carry a reason, enforced by the type rather than by discipline.
 
-* **Upstream coupling.** AshScheduling is pre-1.0, private, and its README already lags its own tree (Reservation → Claim). Phase 5 should not start until its P2/P3 land, and per the standing rule, gaps found in it get reported upstream rather than worked around here.
+* **Upstream coupling.** That library is pre-1.0 and private, and its README already lags its own tree. Phase 5 should not start until its engine and orchestration phases land, and per the standing rule, gaps found in it get reported upstream rather than worked around here.
 
 ## Definition of done
 
@@ -385,7 +385,7 @@ Phase 0 meets Tempo's six gates on the mise-current toolchain and is the only ph
 
 ## Open questions
 
-* **Packaging of the adapter** — separate package, or contributed upstream into `ash_scheduling` as an optional dependency? Worth asking Alembic before Phase 5.
+* **Packaging of the adapter** — separate package, or contributed upstream as an optional dependency? Worth asking the downstream maintainers before Phase 5.
 
 * ~~**The default travel table**~~ — **settled.** Zero for the same place, five and ten minutes for one and two levels apart, twenty for anything deeper, and `{:error, :unknown}` for unrelated roots. The safer half of the original suggestion won: unrelated places are never guessed at, and any specific pair can be overridden with `:between`.
 

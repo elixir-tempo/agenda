@@ -11,8 +11,8 @@ defmodule Agenda.Programme do
 
   The word is deliberately not "schedule" — that is triple-booked
   already (`Tempo.Schedule` is critical-path planning,
-  `AshScheduling.Schedule` is a bookable resource, and colloquially it
-  is this output).
+  elsewhere a `Schedule` is the bookable resource itself, and
+  colloquially it is this output).
 
   """
 
