@@ -185,7 +185,7 @@ Only *located* resources count towards a journey. Dana has no place of her own: 
 
 A track is a **known** set of sessions. That works when the consultant is named — a retained client, a continuity-of-service commitment, a specialist only one person can cover. It does not directly express *"whoever ends up with these three jobs must be able to drive between them"*, because the itinerary does not exist until the assignment is made, and the assignment is what you are trying to compute.
 
-The practical approach is two-pass: let `plan/3` propose who, commit that to the ledger, then validate each person's resulting day as a track. If a day fails, re-plan the offending job with that consultant excluded from the pool. That is honest about what the library does rather than pretending the general case is solved — the general case is vehicle routing, and it belongs with a solver built for it.
+The practical approach is two-pass: let `plan/3` propose who, commit that to the ledger, then validate each person's resulting day as a track. If a day fails, re-plan the offending job with that consultant excluded from the pool. That states what the library does rather than pretending the general case is solved — the general case is vehicle routing, and it belongs with a solver built for it.
 
 ## Some jobs have to happen in order
 

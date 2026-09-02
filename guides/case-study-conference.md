@@ -273,9 +273,9 @@ The reason is worth understanding, because it is not "one is optimised and the o
 
 Slower at every size is not a feature, so the bridge is not one. It lives in the test suite — `test/support/fixpoint.ex` — where being a *second, independent* solver is worth more than being a slower first one: every programme in that suite is laid out twice, by different means, and the two answers must agree. That is a check on `arrange/3` a single-solver suite cannot be, because the suite and the bug would share an author.
 
-Keeping it out of the API is the useful part of this story. A library with two ways to do the same thing owes its readers an explanation of which to pick, and here the honest explanation would have been "always the first one". A programme genuinely too large for `arrange/3` wants a purpose-built solver rather than this one, and the way to use it is to write its answer back through `allocate/2` — the ledger does not care who computed the layout.
+Keeping it out of the API is the useful part of this story. A library with two ways to do the same thing owes its readers an explanation of which to pick, and here the explanation would have been "always the first one". A programme genuinely too large for `arrange/3` wants a purpose-built solver rather than this one, and the way to use it is to write its answer back through `allocate/2` — the ledger does not care who computed the layout.
 
-## Scale, honestly
+## Scale, measured
 
 The search is depth-first with backtracking, ordered most-constrained-first, and bounded by two explicit caps:
 

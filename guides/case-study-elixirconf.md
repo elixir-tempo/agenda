@@ -163,7 +163,7 @@ Agenda.explain(reason)
 
 *Everyone free* is the operative phrase. The room is free at 09:15 — Canaveral and Biscayne are both empty — and the session still cannot be held, because one of the four people it names is on stage in Peninsula 4-7. When several sessions are in tension rather than one, `conflict/3` names the minimal set.
 
-## Two honest notes
+## Two notes on the result
 
 **The layout is denser than the real one.** Agenda placed talks at 10:45, 11:25 and 12:05; the published programme used 10:45, 11:35 and 12:25. The extra ten minutes is changeover — one speaker unplugging while the next sets up — and Agenda does not invent it, because nothing here asked for it.
 

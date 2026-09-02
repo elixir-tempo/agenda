@@ -6,6 +6,7 @@ Tempo answers *when is this free?* Agenda answers *what should I book, and where
 
 ```elixir
 import Agenda.Predicate
+import Tempo.Sigils
 
 level_2 = Agenda.place("Level 2", within: Agenda.place("Convention Centre"))
 
@@ -53,6 +54,10 @@ needs_a_room
 A place contains resources and other places, to whatever depth suits — campus, building, floor, wing. The library never interprets what a level means, only how the levels nest. Travel time then falls out of the structure rather than being configured:
 
 ```elixir
+level_3    = Agenda.place("Level 3", within: Agenda.place("Convention Centre"))
+upstairs   = Agenda.resource("Upstairs Room", within: level_3, seats: 20)
+main_stage = Agenda.resource("Main Stage", within: Agenda.place("Riverside Theatre"))
+
 Agenda.travel_time(boardroom, upstairs)
 #=> {:ok, ~o"PT5M"}
 
@@ -99,6 +104,7 @@ Three things separate a scheduler you can ship from one that only works on the h
 
 **Place what you can.** By default an unplaceable session fails the whole programme, which is right when the programme is a unit and wrong when it is a wish list. `unplaced: :allow` leaves out as few sessions as the search can manage — and says so, under a tag that cannot be mistaken for success:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 case Agenda.arrange(programme, rooms, unplaced: :allow) do
   {:ok, arrangements} -> publish(arrangements)
@@ -109,12 +115,14 @@ end
 
 **Hold the announced sessions still.** A published programme gets edited, and the keynote must not move. `:pinned` fixes chosen placements and searches around them, with every constraint still applying to the pins:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 Agenda.arrange(programme, rooms, pinned: already_announced)
 ```
 
 **Say which sessions are actually in tension.** "No arrangement found" is a dead end. `conflict/3` returns a *minimal* set — remove any one member and the rest fit:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 Agenda.conflict(programme, rooms)
 #=> {:ok, ["Keynote", "Workshop", "Panel"]}
@@ -124,6 +132,7 @@ Agenda.conflict(programme, rooms)
 
 It works on a single session too, naming the demands that are impossible *together* — including the ones a person induced rather than the session asking for them:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 Agenda.conflict(session, rooms)
 #=> {:ok, [needs: {:room, :video_conferencing}, requires: {"Alice", :step_free_access}]}
@@ -133,6 +142,7 @@ Agenda.conflict(session, rooms)
 
 A **ledger** is the record of what is allocated and to whom. It is the only place a booking lives, and everything else is computed from it rather than kept alongside it: `free/2` is a resource's open hours minus what the ledger holds, worked out when asked. There is no availability field to update, so availability cannot drift out of step with the bookings it came from.
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement)
 
@@ -147,6 +157,7 @@ Three constraints that turn meeting scheduling into task and shift scheduling. E
 
 **Order.** An installation cannot precede its survey. That is not a clash and not a track:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, programme} = Agenda.precede(programme, "Survey", "Installation", gap: "PT1H")
 ```
@@ -155,6 +166,7 @@ Three constraints that turn meeting scheduling into task and shift scheduling. E
 
 **Contracts.** Eight open hours is not eight jobs:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 Agenda.resource("Dana", limits: [day: 3, week: 12])
 Agenda.resource("Dana", limits: [day: ~o"PT7H36M", week: [at_least: ~o"PT38H"]])
@@ -166,6 +178,7 @@ A limit measures either claims or *time*, and may set a floor as well as a ceili
 
 **Wishes.** What someone would rather, as against what is possible:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 Agenda.resource("Priya", avoids: friday_afternoons)
 {:ok, programme} = Agenda.prefer(programme, :resource_wishes, weight: 5)
@@ -177,6 +190,7 @@ Agenda.resource("Priya", avoids: friday_afternoons)
 
 A schedule is the ledger read as *intent*; a timesheet is the same ledger read as *record*. `reconcile/3` compares the two over a period:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, report} = Agenda.reconcile(ledger, dana, within: quarter, excluding: holidays)
 
@@ -188,6 +202,7 @@ Agenda.Reconciliation.explain(report)
 
 Work and leave are the same structure, separated by a tag on the claim:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, ledger} = Agenda.allocate(ledger, arrangement, tag: {:project, "ACME-2026-01"})
 {:ok, ledger} = Agenda.allocate(ledger, arrangement, tag: {:leave, :annual})
@@ -201,6 +216,7 @@ One ledger means a day cannot be two things — billing a client while on leave 
 
 A booking page needs to take a room *tentatively*. A hold occupies the resource exactly as a booking does — which is why it lives in the ledger rather than in a persistence layer: availability is derived on every call, so a hold nobody can see is a hold nobody subtracts.
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, ledger} = Agenda.hold(ledger, arrangement, until: "2026-06-15T10:15:00")
 {:ok, ledger} = Agenda.confirm(ledger, "Review")
@@ -208,6 +224,7 @@ A booking page needs to take a room *tentatively*. A hold occupies the resource 
 
 **Nothing expires on its own.** `expire/2` takes the moment as an argument rather than reading a clock:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, ledger} = Agenda.expire(ledger, now)
 ```
@@ -220,6 +237,7 @@ The rest of the claim lifecycle — completed, cancelled, no-show — is deliber
 
 Every constraint above is hard. A preference is soft: it never makes a layout invalid, only worse.
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, programme} = Agenda.prefer(programme, :room_changes, weight: 10)
 {:ok, programme} = Agenda.prefer(programme, :room_spread, weight: 3)
@@ -246,6 +264,7 @@ There is deliberately **no solver mode** in this library. One was built against 
 
 Availability usually already exists somewhere. `from_ical/1` reads [RFC 7953](https://www.rfc-editor.org/rfc/rfc7953.html) `VAVAILABILITY` — what a CalDAV server hands you when asked when someone is free:
 
+<!-- guide-test: skip (names data the README does not build) -->
 ```elixir
 {:ok, hours} = Agenda.from_ical(vavailability)
 {:ok, clinic} = Agenda.open(Agenda.resource("Clinic"), hours)
@@ -269,6 +288,7 @@ Still open: the rest of the claim lifecycle — completed, cancelled, no-show �
 
 ## Installation
 
+<!-- guide-test: skip (mix.exs fragment) -->
 ```elixir
 def deps do
   [
@@ -281,6 +301,7 @@ end
 
 Elixir ships a UTC-only timezone database, and with it every zone resolves to UTC and daylight-saving arithmetic is **silently wrong** rather than failing — a London window across the spring-forward boundary measures an hour longer than it is. Any application doing zoned scheduling should configure a real IANA database:
 
+<!-- guide-test: skip (config fragment) -->
 ```elixir
 config :elixir, :time_zone_database, Tz.TimeZoneDatabase
 ```

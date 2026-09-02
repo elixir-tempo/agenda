@@ -465,6 +465,10 @@ defmodule Agenda do
   @doc """
   An empty ledger. Delegates to `Agenda.Ledger.new/0`.
 
+  ### Returns
+
+  * a `t:Agenda.Ledger.t/0` holding no allocations.
+
   ### Examples
 
       iex> Agenda.count(Agenda.ledger())
