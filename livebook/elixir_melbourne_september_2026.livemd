@@ -1,9 +1,5 @@
 # Scheduling ElixirConf
 
-## Section
-
-[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Felixir_melbourne_september_2026.livemd)
-
 ```elixir
 Mix.install([
   {:agenda, "~> 0.1"},
@@ -22,6 +18,8 @@ Mix.install([
 <!-- slide: event Melbourne Elixir Meetup -->
 
 <!-- slide: date 3 September 2026 -->
+
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Felixir_melbourne_september_2026.livemd)
 
 Everything in this talk runs. The data is the real ElixirConf US 2025 programme, taken from the published schedule, and every number on these slides is calculated by the notebook.
 
