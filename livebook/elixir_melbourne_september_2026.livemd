@@ -1,10 +1,12 @@
 # Scheduling ElixirConf
 
+## Section
+
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Felixir_melbourne_september_2026.livemd)
 
 ```elixir
 Mix.install([
-  {:agenda, github: "elixir-tempo/agenda"},
+  {:agenda, "~> 0.1"},
   {:kino, "~> 0.19"}
 ])
 ```
@@ -76,14 +78,14 @@ The five nouns say what *exists*; these say what *limits what*. Each line holds 
 
 Two days at the Renaissance Orlando at SeaWorld, three parallel rooms, and a fourth room used for registration, coffee, lunch and the reception rather than for talks.
 
-| What | ElixirConf US 2025 |
-| --- | --- |
-| Days | Thursday 28 – Friday 29 August 2025 |
-| Talk rooms | Peninsula 4-7, Canaveral, Biscayne |
-| Breakout talks | 42 |
-| Plenaries | 4 keynotes and updates |
-| Session lengths | 20 and 40 minutes |
-| Speakers | 45 |
+| What            | ElixirConf US 2025                    |
+| --------------- | ------------------------------------- |
+| Days            | Thursday 28 – Friday 29 August 2025 |
+| Talk rooms      | Peninsula 4-7, Canaveral, Biscayne    |
+| Breakout talks  | 42                                    |
+| Plenaries       | 4 keynotes and updates                |
+| Session lengths | 20 and 40 minutes                     |
+| Speakers        | 45                                    |
 
 ## Breaks are not constraints
 
@@ -314,12 +316,12 @@ Both verbs have now appeared — `plan/3` produced the keynote pins, and `arrang
 
 Three one-hour sessions and one room open nine to twelve. `plan/3` returns three placements for **one** session and you pick one of them. `arrange/3` returns three placements for **three** sessions and you take them all. Same three lines, opposite meanings.
 
-| | `plan/3` | `arrange/3` |
-| --- | --- | --- |
-| Takes | one session | a programme of many |
-| Returns | the ways it could be held, ranked | one placement each, all compatible |
-| Is | an enumeration | a search |
-| When it cannot | `{:error, reason}` | also `{:partial, layout}` |
+|                | `plan/3`                          | `arrange/3`                        |
+| -------------- | --------------------------------- | ---------------------------------- |
+| Takes          | one session                       | a programme of many                |
+| Returns        | the ways it could be held, ranked | one placement each, all compatible |
+| Is             | an enumeration                    | a search                           |
+| When it cannot | `{:error, reason}`                | also `{:partial, layout}`          |
 
 Arranging is built on planning: it asks `plan/3` for each session's candidates, then searches the combinations. Planning never asks whether two sessions can coexist, and that question is the whole of arranging — a room taken by the keynote is gone for the workshop.
 
@@ -523,12 +525,12 @@ Turnaround is real time the room is unavailable, so it holds against a booking t
 
 Shape matters more than size. 1,200 sessions across twenty days take about four times as long as 200 competing for a single day — six times the work for four times the time, because sessions that cannot interact are solved separately and concurrently.
 
-| Programme | Time |
-| --- | --- |
-| ElixirConf: 46 sessions, 3 rooms, 2 days | ~55 ms |
-| 240 sessions over 6 days | ~70 ms |
-| 1,200 sessions over 20 days | ~1 s |
-| 200 sessions competing for **one** day | ~240 ms |
+| Programme                                | Time    |
+| ---------------------------------------- | ------- |
+| ElixirConf: 46 sessions, 3 rooms, 2 days | ~55 ms  |
+| 240 sessions over 6 days                 | ~70 ms  |
+| 1,200 sessions over 20 days              | ~1 s    |
+| 200 sessions competing for **one** day   | ~240 ms |
 
 ## Two days is not two problems
 
