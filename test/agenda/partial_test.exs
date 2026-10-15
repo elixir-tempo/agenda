@@ -42,7 +42,7 @@ defmodule Agenda.PartialTest do
   defp conf(tracks_or_sessions) do
     Enum.reduce(
       tracks_or_sessions,
-      Agenda.programme("Conf", across: "2026-09-15/2026-09-16"),
+      Agenda.programme("Conf", across: "2026-09-15/2026-09-15"),
       fn
         %Track{} = track, programme -> Programme.add_track(programme, track)
         session, programme -> Programme.add_session(programme, session)

@@ -76,7 +76,7 @@ The engagement needs a qualified consultant, and it happens at a named site:
 
 ```elixir
 audit =
-  Agenda.session("Security audit", duration: ~o"PT3H", window: ~o"2027-03-01/2027-03-02")
+  Agenda.session("Security audit", duration: ~o"PT3H", window: ~o"2027-03-01/2027-03-01")
   |> Agenda.Session.needs(:consultant, skills: all_of([:elixir, :security]))
   |> Agenda.Session.roster(:site, [acme])
 
@@ -95,7 +95,7 @@ Two roles, expressed two ways. `needs/3` describes a resource and lets the plann
 Every arrangement also records which resources' free time produced it:
 
 ```elixir
-Tempo.Interval.metadata(hd(options).interval)
+Tempo.metadata(hd(options).interval)
 #=> %{free: ["Acme HQ", "Dana"]}
 ```
 
@@ -154,7 +154,7 @@ The constraint that matters most in field work is that a person's own itinerary 
 
 ```elixir
 visit = fn name, site ->
-  Agenda.session(name, duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-02")
+  Agenda.session(name, duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-01")
   |> Agenda.Session.roster(:consultant, [dana])
   |> Agenda.Session.roster(:site, [site])
 end
@@ -167,7 +167,7 @@ afternoon_review = visit.("Beta review", beta)
   |> Agenda.Track.reachable(within: ~o"PT45M")
 
 week =
-  Agenda.programme("Week 9", across: ~o"2027-03-01/2027-03-02")
+  Agenda.programme("Week 9", across: ~o"2027-03-01/2027-03-01")
   |> Agenda.Programme.add_track(danas_day)
 
 {:ok, itinerary} = Agenda.arrange(week, [dana, acme, beta])
@@ -193,12 +193,12 @@ An installation cannot precede the survey that specifies it. That is not a resou
 
 ```elixir
 job = fn name ->
-  Agenda.session(name, duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-02")
+  Agenda.session(name, duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-01")
   |> Agenda.Session.needs(:consultant, skills: all_of([:elixir]))
 end
 
 engagement =
-  Agenda.programme("Acme rollout", across: ~o"2027-03-01/2027-03-02")
+  Agenda.programme("Acme rollout", across: ~o"2027-03-01/2027-03-01")
   |> Agenda.Programme.add_session(job.("Site survey"))
   |> Agenda.Programme.add_session(job.("Installation"))
 

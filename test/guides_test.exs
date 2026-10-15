@@ -3,7 +3,8 @@ defmodule Agenda.GuidesTest do
 
   @moduledoc """
   Every `elixir` block in the README and every guide, executed, and
-  every result they claim, checked.
+  every result they claim, checked, and the cells of the livebook
+  written for this version.
 
   The guides are prose with worked examples, and nothing else runs
   them — they are not doctests, so a broken one fails silently until a
@@ -19,8 +20,9 @@ defmodule Agenda.GuidesTest do
   containing `...` is an abbreviation rather than a value, and is
   read as illustration.
 
-  Blocks within a guide share bindings, in the order they appear, the
-  way a reader working through the page would. A block preceded by
+  Blocks within a guide share bindings, imports and aliases, in the
+  order they appear, the way a reader working through the page (or
+  Livebook, through a notebook) would. A block preceded by
   `<!-- guide-test: skip -->` is excluded, and the marker takes an
   optional reason — `<!-- guide-test: skip (why) -->`. It is an HTML
   comment, so it does not render.
@@ -35,7 +37,11 @@ defmodule Agenda.GuidesTest do
 
   @claim ~r/^\s*#=>\s?(?<text>.*)$/
 
-  documents = ["README.md" | Path.wildcard("guides/*.md")]
+  # The livebooks written against this version of Agenda run here too.
+  # The Elixir Melbourne talk installs the release it was given with, and
+  # is left as its record.
+  documents =
+    ["README.md" | Path.wildcard("guides/*.md")] ++ ["livebook/timesheets_and_leave.livemd"]
 
   # A wildcard that matches nothing would make this file pass by
   # testing zero guides, which is the failure mode it exists to catch.
@@ -50,22 +56,24 @@ defmodule Agenda.GuidesTest do
       @document
       |> runnable_blocks()
       |> Enum.with_index(1)
-      |> Enum.reduce([], fn {code, index}, binding ->
-        run_block(code, index, binding, @document)
+      |> Enum.reduce({[], __ENV__}, fn {code, index}, scope ->
+        run_block(code, index, scope, @document)
       end)
     end
   end
 
-  defp run_block(code, index, binding, document) do
-    Enum.reduce(claims(code), binding, fn {chunk, claimed}, binding ->
-      {result, binding} = evaluate(chunk, code, index, binding, document)
+  defp run_block(code, index, scope, document) do
+    Enum.reduce(claims(code), scope, fn {chunk, claimed}, scope ->
+      {result, scope} = evaluate(chunk, code, index, scope, document)
       if claimed, do: compare(result, claimed, chunk, index, document)
-      binding
+      scope
     end)
   end
 
-  defp evaluate(chunk, code, index, binding, document) do
-    Code.eval_string(@preamble <> chunk, binding)
+  defp evaluate(chunk, code, index, {binding, env}, document) do
+    quoted = Code.string_to_quoted!(@preamble <> chunk, file: document)
+    {result, binding, env} = Code.eval_quoted_with_env(quoted, binding, env)
+    {result, {binding, env}}
   rescue
     error ->
       flunk("""
@@ -146,10 +154,12 @@ defmodule Agenda.GuidesTest do
 
   defp closed({chunks, held, claiming}), do: chunks ++ [{Enum.join(held, "\n"), claiming}]
 
+  # A livebook's setup cell installs the packages this suite already has.
   defp runnable_blocks(path) do
     @block
     |> Regex.scan(File.read!(path), capture: :all_names)
     |> Enum.reject(fn [_code, skip] -> skip != "" end)
     |> Enum.map(fn [code, _skip] -> code end)
+    |> Enum.reject(&String.starts_with?(&1, "Mix.install("))
   end
 end

@@ -4,6 +4,7 @@ defmodule Agenda.ReconciliationTest do
   import Tempo.Sigils
 
   alias Agenda.Arrangement
+  alias Agenda.Hours
   alias Agenda.Limit
   alias Agenda.Reconciliation
   alias Calendrical.FiscalYear
@@ -13,12 +14,12 @@ defmodule Agenda.ReconciliationTest do
   doctest Agenda.Reconciliation
 
   # Monday to Friday, 9 to 5, in one week.
-  @week "2026-06-15/2026-06-20"
+  @week "2026-06-15/2026-06-19"
 
   defp business_hours(days) do
     IntervalSet.new!(
       for day <- days do
-        Tempo.from_iso8601!("2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00")
+        Hours.on({2026, 6, day}, 9, 17)
       end
     )
   end
@@ -36,7 +37,7 @@ defmodule Agenda.ReconciliationTest do
         ledger,
         %Arrangement{
           session: session,
-          interval: Tempo.from_iso8601!(interval),
+          interval: interval,
           allocations: %{consultant: [resource]}
         },
         tag: tag
@@ -65,7 +66,7 @@ defmodule Agenda.ReconciliationTest do
             ledger,
             dana,
             "Acme day #{day}",
-            "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+            Hours.on({2026, 6, day}, 9, 17),
             {:project, "ACME"}
           )
         end)
@@ -88,16 +89,16 @@ defmodule Agenda.ReconciliationTest do
           Agenda.ledger(),
           dana,
           "Acme",
-          "2026-06-15T09:00:00/2026-06-15T12:00:00",
+          ~o"2026-06-15T09:00:00/2026-06-15T12:00:00",
           {:project, "ACME"}
         )
 
-      assert {:ok, report} = Agenda.reconcile(ledger, dana, within: "2026-06-15/2026-06-16")
+      assert {:ok, report} = Agenda.reconcile(ledger, dana, within: "2026-06-15/2026-06-15")
 
       refute Reconciliation.balanced?(report)
       assert total(report.unaccounted) == 5.0
 
-      assert report.unaccounted |> IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1) ==
+      assert report.unaccounted |> IntervalSet.members() |> Enum.map(&Tempo.to_iso8601!/1) ==
                ["2026Y6M15DT12H0M0S/T17H0M0S"]
     end
 
@@ -107,14 +108,14 @@ defmodule Agenda.ReconciliationTest do
       # The window runs to the 21st so that Saturday the 20th is inside
       # it — intervals are half-open, so `/2026-06-20` would exclude it.
       dana = dana()
-      window = "2026-06-15/2026-06-21"
+      window = "2026-06-15/2026-06-20"
 
       ledger =
         claim(
           Agenda.ledger(),
           dana,
           "Saturday",
-          "2026-06-20T09:00:00/2026-06-20T17:00:00",
+          ~o"2026-06-20T09:00:00/2026-06-20T17:00:00",
           {:project, "ACME"}
         )
 
@@ -124,7 +125,7 @@ defmodule Agenda.ReconciliationTest do
             ledger,
             dana,
             "Acme day #{day}",
-            "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+            Hours.on({2026, 6, day}, 9, 17),
             {:project, "ACME"}
           )
         end)
@@ -142,7 +143,7 @@ defmodule Agenda.ReconciliationTest do
   describe "holidays reduce what is owed" do
     test "a holiday is not time the resource must account for" do
       dana = dana()
-      holiday = IntervalSet.new!([~o"2026-06-15/2026-06-16"])
+      holiday = IntervalSet.new!([~o"2026-06-15/2026-06-15"])
 
       ledger =
         Enum.reduce(16..19, Agenda.ledger(), fn day, ledger ->
@@ -150,7 +151,7 @@ defmodule Agenda.ReconciliationTest do
             ledger,
             dana,
             "Acme day #{day}",
-            "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+            Hours.on({2026, 6, day}, 9, 17),
             {:project, "ACME"}
           )
         end)
@@ -167,7 +168,7 @@ defmodule Agenda.ReconciliationTest do
       # four non-holiday days are owed, so only four are claimed as
       # leave — and the week still balances.
       dana = dana()
-      holiday = IntervalSet.new!([~o"2026-06-15/2026-06-16"])
+      holiday = IntervalSet.new!([~o"2026-06-15/2026-06-15"])
 
       ledger =
         Enum.reduce(16..19, Agenda.ledger(), fn day, ledger ->
@@ -175,7 +176,7 @@ defmodule Agenda.ReconciliationTest do
             ledger,
             dana,
             "Leave day #{day}",
-            "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+            Hours.on({2026, 6, day}, 9, 17),
             {:leave, :annual}
           )
         end)
@@ -196,7 +197,7 @@ defmodule Agenda.ReconciliationTest do
       assert {:ok, from_set} =
                Agenda.reconcile(Agenda.ledger(), dana,
                  within: @week,
-                 excluding: IntervalSet.new!([~o"2026-06-15/2026-06-16"])
+                 excluding: IntervalSet.new!([~o"2026-06-15/2026-06-15"])
                )
 
       assert {:ok, from_day} =
@@ -231,9 +232,9 @@ defmodule Agenda.ReconciliationTest do
 
       ledger =
         Agenda.ledger()
-        |> claim(dana, "Acme", "2026-06-15T09:00:00/2026-06-15T17:00:00", {:project, "ACME"})
-        |> claim(dana, "Beta", "2026-06-16T09:00:00/2026-06-16T17:00:00", {:project, "BETA"})
-        |> claim(dana, "Leave", "2026-06-17T09:00:00/2026-06-17T17:00:00", {:leave, :annual})
+        |> claim(dana, "Acme", ~o"2026-06-15T09:00:00/2026-06-15T17:00:00", {:project, "ACME"})
+        |> claim(dana, "Beta", ~o"2026-06-16T09:00:00/2026-06-16T17:00:00", {:project, "BETA"})
+        |> claim(dana, "Leave", ~o"2026-06-17T09:00:00/2026-06-17T17:00:00", {:leave, :annual})
 
       assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
 
@@ -252,22 +253,24 @@ defmodule Agenda.ReconciliationTest do
           Agenda.ledger(),
           dana,
           "Acme",
-          "2026-06-15T09:00:00/2026-06-15T17:00:00",
+          ~o"2026-06-15T09:00:00/2026-06-15T17:00:00",
           {:project, "ACME"}
         )
 
       assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
 
-      assert %IntervalSet{} = billed = report.by_tag[{:project, "ACME"}]
+      assert %Tempo{} = billed = report.by_tag[{:project, "ACME"}]
       assert [interval] = IntervalSet.members(billed)
-      assert Tempo.to_iso8601(interval) == "2026Y6M15DT9H0M0S/T17H0M0S"
+      assert Tempo.to_iso8601!(interval) == "2026Y6M15DT9H0M0S/T17H0M0S"
     end
 
     test "untagged claims group under nil rather than being dropped" do
       dana = dana()
 
-      ledger = claim(Agenda.ledger(), dana, "Acme", @week <> "T00:00:00", nil)
-      ledger = claim(ledger, dana, "Acme", "2026-06-15T09:00:00/2026-06-15T17:00:00", nil)
+      ledger =
+        claim(Agenda.ledger(), dana, "Acme", ~o"2026-06-15T00:00:00/2026-06-20T00:00:00", nil)
+
+      ledger = claim(ledger, dana, "Acme", ~o"2026-06-15T09:00:00/2026-06-15T17:00:00", nil)
 
       assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
       assert Map.has_key?(report.by_tag, nil)
@@ -284,7 +287,7 @@ defmodule Agenda.ReconciliationTest do
             ledger,
             dana,
             "Acme day #{day}",
-            "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+            Hours.on({2026, 6, day}, 9, 17),
             {:project, "ACME"}
           )
         end)
@@ -306,7 +309,7 @@ defmodule Agenda.ReconciliationTest do
             ledger,
             dana,
             "Acme day #{day}",
-            "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+            Hours.on({2026, 6, day}, 9, 17),
             {:project, "ACME"}
           )
         end)
@@ -323,14 +326,14 @@ defmodule Agenda.ReconciliationTest do
           Agenda.ledger(),
           dana,
           "Acme",
-          "2026-06-15T09:00:00/2026-06-15T17:00:00",
+          ~o"2026-06-15T09:00:00/2026-06-15T17:00:00",
           {:project, "ACME"}
         )
 
       assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
 
       assert [%{period: :day, bucket: {2026, 6, 15}, breach: {:over, _}}] = report.breaches
-      assert Reconciliation.explain(report) |> Enum.any?(&(&1 =~ "2026-06-15"))
+      assert Reconciliation.explain(report) |> Enum.any?(&(&1 =~ "the day of 2026Y6M15D"))
     end
   end
 
@@ -343,7 +346,7 @@ defmodule Agenda.ReconciliationTest do
           Agenda.ledger(),
           dana,
           "Next week",
-          "2026-06-22T09:00:00/2026-06-22T17:00:00",
+          ~o"2026-06-22T09:00:00/2026-06-22T17:00:00",
           {:project, "ACME"}
         )
 
@@ -355,7 +358,7 @@ defmodule Agenda.ReconciliationTest do
 
     test "a holiday set outside the window costs nothing" do
       dana = dana()
-      distant = IntervalSet.new!([~o"2030-01-01/2030-01-02"])
+      distant = IntervalSet.new!([~o"2030-01-01/2030-01-01"])
 
       assert {:ok, report} =
                Agenda.reconcile(ledger_for(dana), dana, within: @week, excluding: distant)
@@ -368,7 +371,7 @@ defmodule Agenda.ReconciliationTest do
     test "a quarter designator, not only an interval" do
       dana = dana()
 
-      assert {:ok, from_designator} = Agenda.reconcile(Agenda.ledger(), dana, within: ~o"2026Y2Q")
+      assert {:ok, from_designator} = Agenda.reconcile(Agenda.ledger(), dana, within: ~o"2026Y2q")
       assert {:ok, from_interval} = Agenda.reconcile(Agenda.ledger(), dana, within: @week)
 
       # June is inside Q2, so the designator sees at least the week.
@@ -376,11 +379,10 @@ defmodule Agenda.ReconciliationTest do
     end
 
     test "a fiscal quarter names a period its own calendar defines" do
-      # ISO 8601-2 month codes 33..36 are Q1..Q4, expanded against the
-      # calendar's own year — so Q1 of Australian FY2027 is July to
-      # September 2026, not January to March.
+      # A quarter is expanded against the calendar's own year — so Q1 of
+      # Australian FY2027 is July to September 2026, not January to March.
       {:ok, calendar} = FiscalYear.calendar_for(:AU)
-      quarter = Tempo.from_iso8601!("2027Y33M", calendar)
+      quarter = Tempo.new!(year: 2027, quarter: 1, calendar: calendar)
 
       {:ok, dana} = Agenda.open(Agenda.resource("Dana"), business_hours(15..19))
 
@@ -391,8 +393,28 @@ defmodule Agenda.ReconciliationTest do
 
       # And the quarter agrees with the Gregorian window it stands for.
       {:ok, fiscal} = Tempo.select(quarter, Tempo.workdays(:AU))
-      {:ok, literal} = Tempo.select(~o"2026-07-01/2026-10-01", Tempo.workdays(:AU))
+      {:ok, literal} = Tempo.select(~o"2026-07-01/2026-09-30", Tempo.workdays(:AU))
       assert IntervalSet.count(fiscal) == IntervalSet.count(literal)
+    end
+
+    test "hours of a fiscal calendar are explained in the Gregorian one" do
+      # ISO 8601 cannot name a fiscal calendar, so a sentence names the
+      # same hours as the Gregorian dates they fall on (decision 69).
+      {:ok, calendar} = FiscalYear.calendar_for(:AU)
+
+      hours =
+        Tempo.new!(year: 2027, quarter: 1, calendar: calendar)
+        |> Tempo.select!(Tempo.workdays(:AU))
+        |> Tempo.select!([~o"T09/T17"])
+
+      {:ok, dana} = Agenda.open(Agenda.resource("Dana"), hours)
+
+      assert {:ok, report} =
+               Agenda.reconcile(Agenda.ledger(), dana, within: ~o"2026-08-10/2026-08-10")
+
+      assert Reconciliation.explain(report) == [
+               "Dana: 8 hours unaccounted — 2026Y8M10DT9H/T17H"
+             ]
     end
   end
 
@@ -406,7 +428,7 @@ defmodule Agenda.ReconciliationTest do
           Agenda.ledger(),
           dana,
           "Acme",
-          "2026-06-15T09:00:00/2026-06-15T13:00:00",
+          ~o"2026-06-15T09:00:00/2026-06-15T13:00:00",
           {:project, "ACME"}
         )
 
@@ -423,7 +445,7 @@ defmodule Agenda.ReconciliationTest do
         ledger,
         dana,
         "Acme day #{day}",
-        "2026-06-#{day}T09:00:00/2026-06-#{day}T17:00:00",
+        Hours.on({2026, 6, day}, 9, 17),
         {:project, "ACME"}
       )
     end)

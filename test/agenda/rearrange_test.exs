@@ -18,7 +18,7 @@ defmodule Agenda.RearrangeTest do
     {:ok, annexe} = Agenda.resource("Annexe", seats: 12) |> Agenda.open(day)
 
     review =
-      Agenda.session("Quarterly review", duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-02")
+      Agenda.session("Quarterly review", duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-01")
       |> Session.roster(:room, [boardroom])
       |> Session.roster(:attendees, [priya, tom])
 
@@ -30,7 +30,7 @@ defmodule Agenda.RearrangeTest do
 
   test "changing only the room keeps the people", context do
     moved_session =
-      Agenda.session("Quarterly review", duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-02")
+      Agenda.session("Quarterly review", duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-01")
       |> Session.roster(:room, [context.annexe])
       |> Session.roster(:attendees, [context.priya, context.tom])
 

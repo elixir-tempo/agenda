@@ -4,14 +4,16 @@ defmodule Agenda.LimitsTest do
   import Tempo.Sigils
 
   alias Agenda.Arrangement
+  alias Agenda.Hours
   alias Agenda.Limit
   alias Agenda.Programme
   alias Agenda.Session
   alias Tempo.Duration
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   # A fortnight of mornings, so a week boundary falls inside the window.
-  @fortnight "2027-04-05/2027-04-19"
+  @fortnight "2027-04-05/2027-04-18"
 
   defp nurse(name, limits) do
     {:ok, nurse} =
@@ -19,10 +21,7 @@ defmodule Agenda.LimitsTest do
       |> Agenda.open(
         IntervalSet.new!(
           for day <- 5..16 do
-            Tempo.from_iso8601!(
-              "2027-04-#{String.pad_leading("#{day}", 2, "0")}T09:00:00" <>
-                "/2027-04-#{String.pad_leading("#{day}", 2, "0")}T17:00:00"
-            )
+            Hours.on({2027, 4, day}, 9, 17)
           end
         )
       )
@@ -46,7 +45,7 @@ defmodule Agenda.LimitsTest do
 
   defp days(arrangements) do
     arrangements
-    |> Enum.map(& &1.interval.from.time[:day])
+    |> Enum.map(&Tempo.day(Interval.from(&1.interval)))
     |> Enum.sort()
   end
 
@@ -146,8 +145,8 @@ defmodule Agenda.LimitsTest do
 
       busy = %{
         "Ann" => [
-          Tempo.from_iso8601!("2027-04-05T09:00:00/2027-04-05T17:00:00"),
-          Tempo.from_iso8601!("2027-04-06T09:00:00/2027-04-06T17:00:00")
+          ~o"2027-04-05T09:00:00/2027-04-05T17:00:00",
+          ~o"2027-04-06T09:00:00/2027-04-06T17:00:00"
         ]
       }
 

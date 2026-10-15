@@ -48,7 +48,7 @@ defmodule Agenda.Resource do
           limits: [Limit.t()],
           avoids: term(),
           prefers: term(),
-          open: Tempo.Interval.t() | Tempo.IntervalSet.t() | nil,
+          open: Tempo.t() | Tempo.t() | nil,
           buffer_before: Tempo.Duration.t() | nil,
           buffer_after: Tempo.Duration.t() | nil
         }

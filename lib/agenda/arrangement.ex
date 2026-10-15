@@ -11,11 +11,12 @@ defmodule Agenda.Arrangement do
   """
 
   alias Agenda.Resource
+  alias Agenda.Written
 
   @typedoc "A candidate placement of a session."
   @type t :: %__MODULE__{
           session: String.t(),
-          interval: Tempo.Interval.t(),
+          interval: Tempo.t(),
           allocations: %{optional(atom()) => [Resource.t()]},
           attending: %{optional(atom()) => [Resource.t()]},
           score: number(),
@@ -87,7 +88,7 @@ defmodule Agenda.Arrangement do
         "#{role}: #{Enum.map_join(resources, ", ", & &1.name)}"
       end)
 
-    "#{Tempo.to_iso8601(arrangement.interval)} — #{roles}"
+    "#{Written.span(arrangement.interval)} — #{roles}"
   end
 
   @doc """

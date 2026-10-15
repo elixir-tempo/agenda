@@ -11,7 +11,7 @@ defmodule Agenda.HoldsTest do
       |> Agenda.open("2026-06-15T09:00:00/2026-06-15T17:00:00")
 
     session =
-      Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
+      Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-15")
       |> Session.needs(:room, seats: 8)
 
     {:ok, [first | _rest]} = Agenda.plan(session, [boardroom])
@@ -30,11 +30,11 @@ defmodule Agenda.HoldsTest do
 
       {:ok, free} =
         Agenda.free(context.room,
-          within: "2026-06-15/2026-06-16",
+          within: "2026-06-15/2026-06-15",
           busy: Map.get(Agenda.busy(ledger), "Boardroom", [])
         )
 
-      refute Enum.any?(IntervalSet.to_list(free), fn window ->
+      refute Enum.any?(IntervalSet.members(free), fn window ->
                Tempo.overlaps?(window, context.arrangement.interval)
              end)
     end
@@ -97,11 +97,11 @@ defmodule Agenda.HoldsTest do
 
       {:ok, free} =
         Agenda.free(context.room,
-          within: "2026-06-15/2026-06-16",
+          within: "2026-06-15/2026-06-15",
           busy: Map.get(Agenda.busy(ledger), "Boardroom", [])
         )
 
-      assert Enum.any?(IntervalSet.to_list(free), fn window ->
+      assert Enum.any?(IntervalSet.members(free), fn window ->
                Tempo.overlaps?(window, context.arrangement.interval)
              end)
     end

@@ -4,8 +4,9 @@ defmodule Agenda.ResourceWishesTest do
   alias Agenda.Arrangement
   alias Agenda.Programme
   alias Agenda.Session
+  alias Tempo.Interval
 
-  @day "2027-04-05/2027-04-06"
+  @day "2027-04-05/2027-04-05"
   @morning "2027-04-05T09:00:00/2027-04-05T12:00:00"
   @afternoon "2027-04-05T13:00:00/2027-04-05T17:00:00"
 
@@ -36,7 +37,7 @@ defmodule Agenda.ResourceWishesTest do
   end
 
   defp hours(arrangements) do
-    arrangements |> Enum.map(& &1.interval.from.time[:hour]) |> Enum.sort()
+    arrangements |> Enum.map(&Tempo.hour(Interval.from(&1.interval))) |> Enum.sort()
   end
 
   describe "avoids" do

@@ -295,6 +295,12 @@ defmodule Agenda do
   This is what a CalDAV server hands you when asked when someone is
   available. The result is a pattern for `open/2`.
 
+  Hours imported in UTC (`Z`) or in a zone are on that time line, and a
+  claim, a refinement or a session's window combined with them is written
+  on it too: a floating one beside them is a `Tempo.FrameError`, as Tempo
+  has it. A `within:` window alone may be floating, and is read on the
+  hours' clock.
+
   ### Examples
 
       iex> ics = \"\"\"
@@ -315,7 +321,7 @@ defmodule Agenda do
       ...> \"\"\"
       iex> {:ok, hours} = Agenda.from_ical(ics)
       iex> {:ok, room} = Agenda.open(Agenda.resource("Consulting room"), hours)
-      iex> {:ok, free} = Agenda.free(room, within: "2026-06-01/2026-07-01")
+      iex> {:ok, free} = Agenda.free(room, within: "2026-06-01/2026-06-30")
       iex> Tempo.IntervalSet.count(free)
       5
 
@@ -332,12 +338,12 @@ defmodule Agenda do
 
       iex> boardroom = Agenda.resource("Boardroom")
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T17:00:00")
-      iex> {:ok, free} = Agenda.free(boardroom, within: "2026-06-15/2026-06-16")
+      iex> {:ok, free} = Agenda.free(boardroom, within: "2026-06-15/2026-06-15")
       iex> Tempo.IntervalSet.count(free)
       1
 
   """
-  @spec free(Resource.t(), keyword()) :: {:ok, Tempo.IntervalSet.t()} | {:error, term()}
+  @spec free(Resource.t(), keyword()) :: {:ok, Tempo.t()} | {:error, term()}
   defdelegate free(resource, options), to: Availability
 
   @doc """
@@ -349,14 +355,14 @@ defmodule Agenda do
       iex> {:ok, room} = Agenda.open(Agenda.resource("R"), "2027-03-02T09:00:00/2027-03-02T17:00:00")
       iex> {:ok, clinic} =
       ...>   room
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03")
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02")
       ...>   |> Agenda.only_during("2027-03-02T13:00:00/2027-03-02T16:00:00")
       iex> Tempo.IntervalSet.count(clinic)
       1
 
   """
   @spec only_during(Refine.refinable(), Availability.pattern()) ::
-          {:ok, Tempo.IntervalSet.t()} | {:error, term()}
+          {:ok, Tempo.t()} | {:error, term()}
   defdelegate only_during(free, constraint), to: Refine
 
   @doc """
@@ -368,14 +374,14 @@ defmodule Agenda do
       iex> {:ok, room} = Agenda.open(Agenda.resource("R"), "2027-03-02T09:00:00/2027-03-02T17:00:00")
       iex> {:ok, staffed} =
       ...>   room
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03")
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02")
       ...>   |> Agenda.during_any(["2027-03-02T09:00:00/2027-03-02T10:00:00"])
       iex> Tempo.IntervalSet.count(staffed)
       1
 
   """
   @spec during_any(Refine.refinable(), [Availability.pattern()]) ::
-          {:ok, Tempo.IntervalSet.t()} | {:error, term()}
+          {:ok, Tempo.t()} | {:error, term()}
   defdelegate during_any(free, constraints), to: Refine
 
   @doc """
@@ -387,14 +393,14 @@ defmodule Agenda do
       iex> {:ok, room} = Agenda.open(Agenda.resource("R"), "2027-03-02T09:00:00/2027-03-02T09:30:00")
       iex> {:ok, usable} =
       ...>   room
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03")
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02")
       ...>   |> Agenda.lasting_at_least("PT1H")
-      iex> Tempo.IntervalSet.empty?(usable)
+      iex> Tempo.empty?(usable)
       true
 
   """
   @spec lasting_at_least(Refine.refinable(), Availability.pattern()) ::
-          {:ok, Tempo.IntervalSet.t()} | {:error, term()}
+          {:ok, Tempo.t()} | {:error, term()}
   defdelegate lasting_at_least(free, duration), to: Refine
 
   @doc """
@@ -422,7 +428,7 @@ defmodule Agenda do
       iex> boardroom = Agenda.resource("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T11:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-15")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> {:ok, [best | _]} = Agenda.plan(session, [boardroom])
       iex> Agenda.explain(best)
@@ -647,7 +653,7 @@ defmodule Agenda do
       ...>   allocations: %{consultant: [dana]}
       ...> }
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
-      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
+      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-16")
       iex> Agenda.Reconciliation.explain(report)
       ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/T17H0M0S"]
 
@@ -713,7 +719,7 @@ defmodule Agenda do
       %{}
 
   """
-  @spec busy(Ledger.t(), keyword()) :: %{optional(String.t()) => [Tempo.Interval.t()]}
+  @spec busy(Ledger.t(), keyword()) :: %{optional(String.t()) => [Tempo.t()]}
   defdelegate busy(ledger, options \\ []), to: Ledger
 
   @doc """
@@ -780,7 +786,7 @@ defmodule Agenda do
       iex> talk = Agenda.session("Keynote", duration: "PT1H")
       ...>         |> Agenda.Session.needs(:room, seats: 100)
       iex> programme =
-      ...>   Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+      ...>   Agenda.programme("Conf", across: "2026-09-15/2026-09-15")
       ...>   |> Agenda.Programme.add_session(talk)
       iex> {:ok, [only]} = Agenda.arrange(programme, [room])
       iex> only.session
@@ -821,7 +827,7 @@ defmodule Agenda do
       iex> room = Agenda.resource("Hall", seats: 100)
       iex> {:ok, room} = Agenda.open(room, "2026-09-15T09:00:00/2026-09-15T10:00:00")
       iex> talk = fn name ->
-      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-16")
+      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-15")
       ...>   |> Agenda.Session.needs(:room, seats: 100)
       ...> end
       iex> programme =
@@ -993,7 +999,7 @@ defmodule Agenda do
 
       iex> kim = Agenda.resource("Kim")
       iex> harbour = Agenda.resource("Harbour")
-      iex> programme = Agenda.programme("Show", across: "2027-06-15/2027-06-17")
+      iex> programme = Agenda.programme("Show", across: "2027-06-15/2027-06-16")
       iex> {:ok, programme} = Agenda.interest(programme, kim, harbour)
       iex> {:ok, programme} = Agenda.interest(programme, harbour, kim)
       iex> {:ok, programme} = Agenda.meetings(programme, [kim, harbour], duration: "PT15M")

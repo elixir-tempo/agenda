@@ -5,6 +5,7 @@ defmodule Agenda.SeriesLifecycleTest do
 
   alias Agenda.Ledger
   alias Agenda.Session
+  alias Tempo.Interval
 
   # A weekly stand-up over four weeks, in a room open every weekday
   # morning of March.
@@ -48,7 +49,7 @@ defmodule Agenda.SeriesLifecycleTest do
     end
 
     test "each occurrence has its own window, a week apart", context do
-      starts = Enum.map(context.occurrences, & &1.window.from)
+      starts = Enum.map(context.occurrences, &Interval.from(&1.window))
 
       assert Enum.uniq(starts) == starts
       assert hd(starts) == ~o"2027Y3M1DT9H0M0S"
@@ -77,7 +78,7 @@ defmodule Agenda.SeriesLifecycleTest do
     test "occurrences are booked at distinct times", context do
       ledger = book_all(context.occurrences, context.room)
 
-      starts = ledger |> Ledger.to_list() |> Enum.map(& &1.interval.from)
+      starts = ledger |> Ledger.to_list() |> Enum.map(&Interval.from(&1.interval))
 
       assert length(Enum.uniq(starts)) == 4
     end
@@ -96,7 +97,7 @@ defmodule Agenda.SeriesLifecycleTest do
       ledger = book_all(context.occurrences, context.room)
 
       one_off =
-        Agenda.session("Retro", duration: ~o"PT1H", window: "2027-03-02/2027-03-03")
+        Agenda.session("Retro", duration: ~o"PT1H", window: "2027-03-02/2027-03-02")
         |> Session.needs(:room, seats: 6)
 
       {:ok, [first | _]} = Agenda.plan(one_off, [context.room], busy: Agenda.busy(ledger))

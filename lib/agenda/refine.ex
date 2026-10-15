@@ -23,7 +23,7 @@ defmodule Agenda.Refine do
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T17:00:00")
       iex> {:ok, bookable} =
       ...>   boardroom
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03", busy: "2027-03-02T12:00:00/2027-03-02T13:00:00")
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02", busy: "2027-03-02T12:00:00/2027-03-02T13:00:00")
       ...>   |> Agenda.only_during("2027-03-02T10:00:00/2027-03-02T16:00:00")
       ...>   |> Agenda.lasting_at_least("PT2H")
       iex> Tempo.IntervalSet.members(bookable)
@@ -43,7 +43,7 @@ defmodule Agenda.Refine do
   alias Tempo.IntervalSet
 
   @typedoc "Free time, or the result of the step that produced it."
-  @type refinable :: IntervalSet.t() | {:ok, IntervalSet.t()} | {:error, term()}
+  @type refinable :: Tempo.t() | {:ok, Tempo.t()} | {:error, term()}
 
   @doc """
   Keep only the free time that falls inside `constraint`.
@@ -74,14 +74,14 @@ defmodule Agenda.Refine do
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T17:00:00")
       iex> {:ok, clinic}  =
       ...>   room
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03")
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02")
       ...>   |> Agenda.only_during("2027-03-02T13:00:00/2027-03-02T16:00:00")
       iex> Tempo.IntervalSet.members(clinic)
       [~o"2027Y3M2DT13H0M0S/T16H0M0S"]
 
   """
   @spec only_during(refinable(), Availability.pattern()) ::
-          {:ok, IntervalSet.t()} | {:error, term()}
+          {:ok, Tempo.t()} | {:error, term()}
   def only_during(free, constraint) do
     with {:ok, set} <- unwrap(free),
          {:ok, bound} <- Availability.normalise(constraint) do
@@ -119,7 +119,7 @@ defmodule Agenda.Refine do
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T17:00:00")
       iex> {:ok, staffed} =
       ...>   room
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03")
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02")
       ...>   |> Agenda.during_any([
       ...>        "2027-03-02T09:00:00/2027-03-02T10:00:00",
       ...>        "2027-03-02T15:00:00/2027-03-02T17:00:00"
@@ -130,7 +130,7 @@ defmodule Agenda.Refine do
 
   """
   @spec during_any(refinable(), [Availability.pattern()]) ::
-          {:ok, IntervalSet.t()} | {:error, term()}
+          {:ok, Tempo.t()} | {:error, term()}
   def during_any(free, []), do: unwrap(free)
 
   def during_any(free, [first | rest]) do
@@ -169,7 +169,7 @@ defmodule Agenda.Refine do
       ...>   |> Agenda.open("2027-03-02T09:00:00/2027-03-02T12:00:00")
       iex> {:ok, usable} =
       ...>   room
-      ...>   |> Agenda.free(within: "2027-03-02/2027-03-03",
+      ...>   |> Agenda.free(within: "2027-03-02/2027-03-02",
       ...>        busy: ["2027-03-02T09:20:00/2027-03-02T09:30:00",
       ...>               "2027-03-02T10:00:00/2027-03-02T10:30:00"])
       ...>   |> Agenda.lasting_at_least("PT1H")
@@ -178,7 +178,7 @@ defmodule Agenda.Refine do
 
   """
   @spec lasting_at_least(refinable(), Availability.pattern()) ::
-          {:ok, IntervalSet.t()} | {:error, term()}
+          {:ok, Tempo.t()} | {:error, term()}
   def lasting_at_least(free, duration) do
     with {:ok, set} <- unwrap(free),
          {:ok, least} <- Availability.normalise(duration) do
@@ -188,8 +188,8 @@ defmodule Agenda.Refine do
 
   # Accepting both a bare set and a previous step's result is what lets
   # these read as one sentence; an error simply falls through.
-  defp unwrap(%IntervalSet{} = set), do: {:ok, set}
-  defp unwrap({:ok, %IntervalSet{} = set}), do: {:ok, set}
+  defp unwrap(%Tempo{} = set), do: {:ok, set}
+  defp unwrap({:ok, %Tempo{} = set}), do: {:ok, set}
   defp unwrap({:error, reason}), do: {:error, reason}
 
   defp normalise_all(patterns) do

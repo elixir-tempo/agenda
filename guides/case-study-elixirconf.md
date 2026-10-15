@@ -76,7 +76,7 @@ A scheduler that treats a speaker as a label on a talk cannot see any of this. A
 A talk therefore names its room by description and its speakers by name:
 
 ```elixir
-Agenda.session("Building Careers, Balancing Life", duration: "PT40M", window: "2025-08-28/2025-08-29")
+Agenda.session("Building Careers, Balancing Life", duration: "PT40M", window: "2025-08-28/2025-08-28")
 |> Agenda.Session.needs(:room, seats: at_least(250))
 |> Agenda.Session.roster(:speaker, [savannah, anna, allison, lorena])
 ```

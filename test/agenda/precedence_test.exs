@@ -1,13 +1,15 @@
 defmodule Agenda.PrecedenceTest do
   use ExUnit.Case, async: true
 
+  import Tempo.Sigils
+
   alias Agenda.Arrangement
   alias Agenda.Fixpoint
   alias Agenda.Precedence
   alias Agenda.Programme
   alias Agenda.Session
-  alias Tempo.Compare
   alias Tempo.Duration
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   doctest Agenda.Precedence
@@ -33,21 +35,24 @@ defmodule Agenda.PrecedenceTest do
   defp job(sessions) do
     Enum.reduce(
       sessions,
-      Agenda.programme("Job", across: "2027-04-05/2027-04-06"),
+      Agenda.programme("Job", across: "2027-04-05/2027-04-05"),
       &Programme.add_session(&2, &1)
     )
   end
 
   defp starts(arrangements, name) do
-    arrangements |> Enum.find(&(&1.session == name)) |> Map.get(:interval) |> Map.get(:from)
+    arrangements
+    |> Enum.find(&(&1.session == name))
+    |> Map.get(:interval)
+    |> Interval.from()
   end
 
   defp ends(arrangements, name) do
-    arrangements |> Enum.find(&(&1.session == name)) |> Map.get(:interval) |> Map.get(:to)
+    arrangements |> Enum.find(&(&1.session == name)) |> Map.get(:interval) |> Interval.to()
   end
 
   defp at_or_after?(later, earlier) do
-    Compare.compare_endpoints(later, earlier) in [:later, :same]
+    Tempo.compare(later, earlier, by: :start) in [:gt, :eq]
   end
 
   describe "declaring an order" do
@@ -122,7 +127,7 @@ defmodule Agenda.PrecedenceTest do
 
       assert {:ok, arrangements} = Agenda.arrange(programme, [context.van])
 
-      earliest = Tempo.shift(ends(arrangements, "Survey"), Duration.new!(hour: 2))
+      earliest = Tempo.shift!(ends(arrangements, "Survey"), Duration.new!(hour: 2))
       assert at_or_after?(starts(arrangements, "Quote"), earliest)
     end
 
@@ -132,8 +137,8 @@ defmodule Agenda.PrecedenceTest do
 
       assert {:ok, arrangements} = Agenda.arrange(programme, [context.van])
 
-      latest = Tempo.shift(ends(arrangements, "Survey"), Duration.new!(hour: 1))
-      assert Compare.compare_endpoints(starts(arrangements, "Quote"), latest) in [:earlier, :same]
+      latest = Tempo.shift!(ends(arrangements, "Survey"), Duration.new!(hour: 1))
+      assert Tempo.compare(starts(arrangements, "Quote"), latest, by: :start) in [:lt, :eq]
     end
 
     test "a gap wider than the day makes the job impossible", context do
@@ -157,14 +162,15 @@ defmodule Agenda.PrecedenceTest do
       finished = ends(arrangements, "Screening")
       started = starts(arrangements, "Panel")
 
-      assert at_or_after?(started, Tempo.shift(finished, Duration.new!(hour: 1)))
+      assert at_or_after?(started, Tempo.shift!(finished, Duration.new!(hour: 1)))
 
-      assert Compare.compare_endpoints(
+      assert Tempo.compare(
                started,
-               Tempo.shift(finished, Duration.new!(hour: 3))
+               Tempo.shift!(finished, Duration.new!(hour: 3)),
+               by: :start
              ) in [
-               :earlier,
-               :same
+               :lt,
+               :eq
              ]
     end
   end
@@ -244,8 +250,8 @@ defmodule Agenda.PrecedenceTest do
     defp crowded_programme do
       open =
         IntervalSet.new!([
-          Tempo.from_iso8601!("2027-04-05T09:00/T12:00"),
-          Tempo.from_iso8601!("2027-04-05T13:00/T16:00")
+          ~o"2027-04-05T09:00/T12:00",
+          ~o"2027-04-05T13:00/T16:00"
         ])
 
       rooms =
@@ -271,7 +277,7 @@ defmodule Agenda.PrecedenceTest do
       programme =
         Enum.reduce(
           sessions,
-          Agenda.programme("Crowded", across: "2027-04-05/2027-04-06"),
+          Agenda.programme("Crowded", across: "2027-04-05/2027-04-05"),
           &Programme.add_session(&2, &1)
         )
 
@@ -301,10 +307,11 @@ defmodule Agenda.PrecedenceTest do
 
       assert {:ok, arrangements} = Agenda.arrange(programme, pool)
 
-      assert Compare.compare_endpoints(
+      assert Tempo.compare(
                starts(arrangements, "S28"),
-               ends(arrangements, "S27")
-             ) == :same
+               ends(arrangements, "S27"),
+               by: :start
+             ) == :eq
     end
   end
 end

@@ -46,7 +46,6 @@ defmodule Agenda.Limit do
 
   alias Agenda.Allocation
   alias Tempo.Duration
-  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   @periods [:day, :week, :month]
@@ -209,8 +208,8 @@ defmodule Agenda.Limit do
 
   ### Arguments
 
-  * `claims` is a `t:Tempo.IntervalSet.t/0`, a list of
-    `t:Tempo.Interval.t/0`, or a list of `t:Agenda.Allocation.t/0`.
+  * `claims` is a `t:Tempo.t/0` interval set, a list of `t:Tempo.t/0`
+    intervals, or a list of `t:Agenda.Allocation.t/0`.
     Agenda knows Tempo's types intimately, so a caller holding a set
     should not have to take it apart first.
 
@@ -253,9 +252,9 @@ defmodule Agenda.Limit do
       {2, {:ok, 7.0}}
 
   """
-  @spec sum(IntervalSet.t() | [Interval.t() | Allocation.t()]) ::
+  @spec sum(Tempo.t() | [Tempo.t() | Allocation.t()]) ::
           {non_neg_integer(), Duration.t()}
-  def sum(%IntervalSet{} = claims), do: claims |> IntervalSet.to_list() |> sum()
+  def sum(%Tempo{} = claims), do: claims |> IntervalSet.members() |> sum()
 
   def sum(claims) when is_list(claims) do
     {length(claims), claims |> Enum.flat_map(&measurable/1) |> Duration.sum()}
@@ -263,8 +262,8 @@ defmodule Agenda.Limit do
 
   defp measurable(%Allocation{interval: interval}), do: measurable(interval)
 
-  defp measurable(%Interval{} = interval) do
-    case Interval.duration(interval) do
+  defp measurable(%Tempo{} = interval) do
+    case Tempo.duration(interval) do
       %Duration{} = duration -> [duration]
       _infinite_or_unreadable -> []
     end
@@ -275,8 +274,9 @@ defmodule Agenda.Limit do
   @doc """
   Which day, week or month a moment falls in.
 
-  A bucket is `{year, month, day}` for every period — the components of
-  the period's first moment, with `day` absent for a month. Uniform by
+  A bucket is a three-element tuple for every period: `{year, month, day}`
+  for a day, `{year, month, nil}` for a month, and `{year, {:week, week},
+  nil}` for a week, as the calendar counts its weeks. Uniform by
   construction, and never compared across periods.
 
   Each is `Tempo.trunc/2` to that period, reduced to plain components:
@@ -322,17 +322,17 @@ defmodule Agenda.Limit do
   """
   @spec bucket(Tempo.t() | term(), atom()) :: tuple() | :undated
   def bucket(%Tempo{} = moment, period) do
-    with year when is_integer(year) <- Tempo.year(moment),
-         month when is_integer(month) <- Tempo.month(moment),
-         day when is_integer(day) <- Tempo.day(moment),
-         %Tempo{} = start <- Tempo.trunc(moment, period) do
-      components(start)
-    else
-      _cannot_be_placed -> :undated
-    end
+    if dated?(moment), do: moment |> Tempo.trunc(period) |> period_of(), else: :undated
   end
 
   def bucket(_other, _period), do: :undated
+
+  defp dated?(moment) do
+    Enum.all?([Tempo.year(moment), Tempo.month(moment), Tempo.day(moment)], &is_integer/1)
+  end
+
+  defp period_of({:ok, start}), do: components(start)
+  defp period_of(_cannot_be_placed), do: :undated
 
   # The start of the period, reduced to its plain components. The
   # reduction matters: a truncated value carries the zone and extended
@@ -341,8 +341,13 @@ defmodule Agenda.Limit do
   # *not* equal. Grouping on the value itself would split one week in
   # two the moment a resource mixed zoned and unzoned claims, and a
   # weekly budget would quietly stop counting.
+  # A week is its year and number, as the calendar counts its weeks: the
+  # start of a week is a week, not a date.
   defp components(%Tempo{} = start) do
-    {Tempo.year(start), Tempo.month(start), Tempo.day(start)}
+    case Tempo.resolution(start) do
+      :week -> {Tempo.year(start), {:week, Tempo.week(start)}, nil}
+      _day_or_month -> {Tempo.year(start), Tempo.month(start), Tempo.day(start)}
+    end
   end
 
   @doc """

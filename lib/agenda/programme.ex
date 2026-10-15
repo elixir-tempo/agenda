@@ -85,8 +85,8 @@ defmodule Agenda.Programme do
   ### Examples
 
       iex> programme = Agenda.Programme.new("Conf")
-      iex> Agenda.Programme.across(programme, "2026-09-15/2026-09-17").window
-      "2026-09-15/2026-09-17"
+      iex> Agenda.Programme.across(programme, "2026-09-15/2026-09-16").window
+      "2026-09-15/2026-09-16"
 
   """
   @spec across(t(), Availability.pattern()) :: t()
@@ -488,7 +488,7 @@ defmodule Agenda.Programme do
 
       iex> kim = Agenda.resource("Kim")
       iex> harbour = Agenda.resource("Harbour Tours")
-      iex> programme = Agenda.programme("Trade Show", across: "2027-06-15/2027-06-17")
+      iex> programme = Agenda.programme("Trade Show", across: "2027-06-15/2027-06-16")
       iex> {:ok, programme} = Agenda.Programme.interest(programme, kim, harbour)
       iex> {:ok, programme} = Agenda.Programme.interest(programme, harbour, kim)
       iex> {:ok, programme} = Agenda.Programme.meetings(programme, [kim, harbour], duration: "PT15M")

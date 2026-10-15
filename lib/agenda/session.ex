@@ -50,7 +50,7 @@ defmodule Agenda.Session do
   * `:duration` is how long the session runs, a `t:Tempo.Duration.t/0`.
 
   * `:window` is the interval it must fall inside, a
-    `t:Tempo.Interval.t/0`.
+    `t:Tempo.t/0` interval.
 
   ### Returns
 
@@ -179,7 +179,7 @@ defmodule Agenda.Session do
 
   * `session` is a `t:t/0`.
 
-  * `window` is a `t:Tempo.Interval.t/0`.
+  * `window` is a `t:Tempo.t/0` interval.
 
   ### Returns
 
@@ -189,8 +189,8 @@ defmodule Agenda.Session do
 
       iex> import Tempo.Sigils
       iex> session = Agenda.Session.new("Review")
-      iex> Agenda.Session.window(session, ~o"2026-06-15/2026-06-20").window
-      ~o"2026-06-15/2026-06-20"
+      iex> Agenda.Session.window(session, ~o"2026-06-15/2026-06-19").window
+      ~o"2026-06-15/2026-06-19"
 
   """
   @spec window(t(), Availability.pattern()) :: t()

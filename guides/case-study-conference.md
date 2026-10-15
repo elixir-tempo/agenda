@@ -84,7 +84,7 @@ The word is deliberately **track** and not "stream". Elixir's `Stream` owns that
 
 ```elixir
 programme =
-  Agenda.programme("ElixirConf 2027", across: ~o"2027-05-13/2027-05-15")
+  Agenda.programme("ElixirConf 2027", across: ~o"2027-05-13/2027-05-14")
   |> Agenda.Programme.add_session(keynote.("Day 1 keynote", day1_morning))
   |> Agenda.Programme.add_session(keynote.("Day 2 keynote", day2_morning))
   |> Agenda.Programme.add_track(core)
@@ -194,7 +194,7 @@ When a programme genuinely cannot be laid out, `arrange/3` names *a* session tha
 
 ```elixir
 tight =
-  Agenda.programme("Overbooked", across: ~o"2027-05-13/2027-05-14")
+  Agenda.programme("Overbooked", across: ~o"2027-05-13/2027-05-13")
   |> Agenda.Programme.add_session(keynote.("Keynote A", day1_morning))
   |> Agenda.Programme.add_session(keynote.("Keynote B", day1_morning))
 
@@ -226,7 +226,7 @@ Zero because both Core talks now sit in the same room. Preferences count *violat
 count_late_keynotes = fn arrangements, _programme ->
   Enum.count(arrangements, fn arrangement ->
     String.contains?(arrangement.session, "Keynote") and
-      Tempo.compare(arrangement.interval.from, ~o"2027-05-13T12:00") == :gt
+      Tempo.compare(arrangement.interval, ~o"2027-05-13T12:00", by: :start) == :gt
   end)
 end
 

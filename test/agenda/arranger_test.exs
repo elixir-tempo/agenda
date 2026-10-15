@@ -4,10 +4,11 @@ defmodule Agenda.ArrangerTest do
   import Tempo.Sigils
 
   alias Agenda.Arranger
+  alias Agenda.Hours
   alias Agenda.Programme
   alias Agenda.Session
   alias Agenda.Track
-  alias Tempo.Compare
+  alias Tempo.Interval
 
   doctest Agenda.Arranger
   doctest Agenda.Track
@@ -47,7 +48,7 @@ defmodule Agenda.ArrangerTest do
   defp conf(tracks_or_sessions) do
     Enum.reduce(
       tracks_or_sessions,
-      Agenda.programme("Conf", across: "2026-09-15/2026-09-16"),
+      Agenda.programme("Conf", across: "2026-09-15/2026-09-15"),
       fn
         %Track{} = track, programme -> Programme.add_track(programme, track)
         session, programme -> Programme.add_session(programme, session)
@@ -57,8 +58,8 @@ defmodule Agenda.ArrangerTest do
 
   defp starts(arrangements) do
     arrangements
-    |> Enum.map(& &1.interval.from)
-    |> Enum.sort(&(Compare.compare_endpoints(&1, &2) in [:earlier, :same]))
+    |> Enum.map(&Interval.from(&1.interval))
+    |> Enum.sort(&(Tempo.compare(&1, &2, by: :start) in [:lt, :eq]))
   end
 
   describe "arrange/3 — a placement for every session" do
@@ -106,7 +107,7 @@ defmodule Agenda.ArrangerTest do
 
       {:ok, [only]} = Arranger.arrange(conf([session]), [context.hall])
 
-      assert Tempo.within?(only.interval, ~o"2026-09-15/2026-09-16")
+      assert Tempo.within?(only.interval, ~o"2026-09-15/2026-09-15")
     end
   end
 
@@ -264,7 +265,7 @@ defmodule Agenda.ArrangerTest do
 
       {:ok, room} =
         Agenda.resource("Room", within: venue, seats: 100)
-        |> Agenda.open("2026-09-15T09:00:00/2026-09-15T#{9 + hours}:00:00")
+        |> Agenda.open(Hours.on({2026, 9, 15}, 9, 9 + hours))
 
       programme =
         conf([Agenda.track("T", of: Enum.map(1..count, &talk("S#{&1}")))])
@@ -279,7 +280,10 @@ defmodule Agenda.ArrangerTest do
       assert length(arrangements) == 6
 
       # Every hour used exactly once.
-      assert arrangements |> Enum.map(& &1.interval.from) |> Enum.uniq() |> length() == 6
+      assert arrangements
+             |> Enum.map(&Interval.from(&1.interval))
+             |> Enum.uniq()
+             |> length() == 6
     end
 
     test "an impossible packing is proven impossible, not merely given up on" do
@@ -314,7 +318,7 @@ defmodule Agenda.ArrangerTest do
       assert {:ok, arrangements} = Arranger.arrange(programme, [room])
       assert length(arrangements) == 2
 
-      assert Enum.all?(arrangements, &Tempo.within?(&1.interval, ~o"2026-09-15/2026-09-16"))
+      assert Enum.all?(arrangements, &Tempo.within?(&1.interval, ~o"2026-09-15/2026-09-15"))
     end
 
     test "look-alike sessions in different tracks are independent" do
@@ -402,7 +406,7 @@ defmodule Agenda.ArrangerTest do
     test "an interval is not a duration either", context do
       {:ok, track} =
         Agenda.track("T", of: [talk("First")])
-        |> Track.reachable(within: "2026-09-15/2026-09-16")
+        |> Track.reachable(within: "2026-09-15/2026-09-15")
 
       assert {:error, reason} = Arranger.arrange(conf([track]), [context.hall])
       assert Agenda.explain(reason) =~ "which is not a duration"
@@ -414,7 +418,7 @@ defmodule Agenda.ArrangerTest do
       # An hour apart and told to be immediate, so only the ordering
       # can refuse it — the room is free either way.
       programme =
-        Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+        Agenda.programme("Conf", across: "2026-09-15/2026-09-15")
         |> Programme.add_session(fixed("Setup", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
         |> Programme.add_session(fixed("Briefing", "2026-09-15T11:00:00/2026-09-15T12:00:00"))
 
@@ -433,7 +437,7 @@ defmodule Agenda.ArrangerTest do
       # every placement is refused by ordering — but by a different
       # predecessor each time, and naming either one would be wrong.
       programme =
-        Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+        Agenda.programme("Conf", across: "2026-09-15/2026-09-15")
         |> Programme.add_session(fixed("A", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
         |> Programme.add_session(fixed("B", "2026-09-15T10:00:00/2026-09-15T11:00:00"))
         |> Programme.add_session(fixed("C", "2026-09-15T09:00:00/2026-09-15T12:00:00"))
@@ -452,7 +456,7 @@ defmodule Agenda.ArrangerTest do
 
     test "a genuine resource clash still reads as one", context do
       programme =
-        Agenda.programme("Conf", across: "2026-09-15/2026-09-16")
+        Agenda.programme("Conf", across: "2026-09-15/2026-09-15")
         |> Programme.add_session(fixed("A", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
         |> Programme.add_session(fixed("B", "2026-09-15T09:00:00/2026-09-15T10:00:00"))
 
@@ -489,12 +493,12 @@ defmodule Agenda.ArrangerTest do
         )
 
       programme =
-        Enum.reduce(1..2, Agenda.programme("Roster", across: "2027-04-05/2027-04-06"), fn index,
+        Enum.reduce(1..2, Agenda.programme("Roster", across: "2027-04-05/2027-04-05"), fn index,
                                                                                           acc ->
           Programme.add_session(
             acc,
             "S#{index}"
-            |> Agenda.session(duration: "PT1H", window: "2027-04-05/2027-04-06")
+            |> Agenda.session(duration: "PT1H", window: "2027-04-05/2027-04-05")
             |> Session.needs(:staff, qualified: true)
           )
         end)

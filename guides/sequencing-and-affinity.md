@@ -107,7 +107,7 @@ three =
 {:ok, arrangements} = Agenda.arrange(chained, rooms)
 
 arrangements
-|> Enum.sort_by(& &1.interval.from, Tempo)
+|> Enum.sort(Agenda.Arrangement)
 |> Enum.map(& &1.session)
 #=> ["Setup", "Talk", "Teardown"]
 ```
@@ -125,7 +125,7 @@ loose =
 
 {:ok, parallel} = Agenda.arrange(loose, rooms)
 
-parallel |> Enum.map(& &1.interval.from) |> Enum.uniq() |> length()
+parallel |> Enum.map(&Tempo.Interval.from(&1.interval)) |> Enum.uniq() |> length()
 #=> 1
 ```
 
@@ -140,7 +140,7 @@ tracked = Agenda.Programme.add_track(Agenda.programme("Tracked", across: day), c
 
 {:ok, sequence} = Agenda.arrange(tracked, rooms)
 
-sequence |> Enum.map(& &1.interval.from) |> Enum.uniq() |> length()
+sequence |> Enum.map(&Tempo.Interval.from(&1.interval)) |> Enum.uniq() |> length()
 #=> 3
 ```
 
@@ -167,7 +167,7 @@ pair = [closes_at_ten, open_all_day]
 {:ok, bouncing} = Agenda.arrange(tracked, pair)
 
 bouncing
-|> Enum.sort_by(& &1.interval.from, Tempo)
+|> Enum.sort(Agenda.Arrangement)
 |> Enum.map(fn arrangement ->
   arrangement |> Agenda.Arrangement.resource(:room) |> Map.get(:name)
 end)
@@ -182,9 +182,9 @@ Room A, Room B, Room A — out and back, because Room A is shut at ten and the s
 {:ok, stays_put} = Agenda.arrange(prefer_same_room, pair)
 
 stays_put
-|> Enum.sort_by(& &1.interval.from, Tempo)
+|> Enum.sort(Agenda.Arrangement)
 |> Enum.map(fn arrangement ->
-  {arrangement.interval.from, arrangement |> Agenda.Arrangement.resource(:room) |> Map.get(:name)}
+  {Tempo.Interval.from(arrangement.interval), arrangement |> Agenda.Arrangement.resource(:room) |> Map.get(:name)}
 end)
 #=> [{~o"2027Y3M1DT9H0M0S", "Room A"},
 #=>  {~o"2027Y3M1DT11H0M0S", "Room A"},
@@ -216,7 +216,7 @@ far_apart = fn arrangements, %{programme: programme} ->
     journeys =
       arrangements
       |> Enum.filter(&MapSet.member?(names, &1.session))
-      |> Enum.sort_by(& &1.interval.from, Tempo)
+      |> Enum.sort(Agenda.Arrangement)
       |> Enum.map(&Agenda.Arrangement.resource(&1, :room))
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.count(fn [from, to] ->
@@ -262,8 +262,8 @@ held = fn within ->
     |> Agenda.arrange([morning_only, upstairs])
 
   arrangements
-  |> Enum.sort_by(& &1.interval.from, Tempo)
-  |> Enum.map(fn a -> {a.interval.from, a |> Agenda.Arrangement.resource(:room) |> Map.get(:name)} end)
+  |> Enum.sort(Agenda.Arrangement)
+  |> Enum.map(fn a -> {Tempo.Interval.from(a.interval), a |> Agenda.Arrangement.resource(:room) |> Map.get(:name)} end)
 end
 
 {held.(~o"PT15M"), held.(~o"PT1M")}

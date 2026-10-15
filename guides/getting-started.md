@@ -18,18 +18,21 @@ end
 Tempo treats **every date and time as a bounded interval, never an instant.** A day is not a point; it is the span from one midnight to the next:
 
 ```elixir
-Tempo.to_interval!(~o"2027-03-02") |> Tempo.to_iso8601()
-#=> "2027Y3M2D/3D"
+Tempo.duration(~o"2027-03-02")
+#=> ~o"P1D"
 
-Tempo.to_interval!(~o"2027-03") |> Tempo.to_iso8601()
-#=> "2027Y3M/4M"
+Tempo.to_interval!(~o"2027-03-02") |> Tempo.to_iso8601!()
+#=> "2027Y3M2D/2027Y3M2D"
+
+Tempo.to_interval!(~o"2027-03") |> Tempo.to_iso8601!()
+#=> "2027Y3M/2027Y3M"
 ```
 
-> *"The second of March is the span from the second to the third; March is the span from March to April."* An interval end drops whatever it shares with its start, so `/3D` is the third of the same month.
+> *"The second of March lasts a day; as an interval it is the second through the second. March is March through March."* An end written as a date or a month is read *through*, as it is said aloud, so `2027-03-02/2027-03-06` is five days and holds the sixth. An end written as a time of day is a boundary, so `T09/T17` is eight hours and ends as five o'clock begins.
 
 A value's span is one unit of its finest *stated* field, so `~o"2027-03"` is the whole of March. Two consequences matter here:
 
-* **Every interval is half-open** — `[from, to)`, including the start and excluding the end. Adjacent bookings therefore join cleanly with no overlap and no gap: `[9am, 10am)` followed by `[10am, 11am)` is exactly `[9am, 11am)`.
+* **Every interval is half-open underneath** — `[from, to)`, including the first instant and excluding the last, whichever way its ends were written. Adjacent bookings therefore join cleanly with no overlap and no gap: `[9am, 10am)` followed by `[10am, 11am)` covers exactly `[9am, 11am)`.
 
 * **Free time is set algebra.** Free is open minus busy; mutual free time is the intersection of everyone's. Agenda does not reimplement any of that — it delegates to Tempo, which is calendar-, timezone-, and DST-correct in ways nothing hand-rolled will be.
 
@@ -65,7 +68,7 @@ Describe what you want:
 import Agenda.Predicate
 
 review =
-  Agenda.session("Sprint review", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-03")
+  Agenda.session("Sprint review", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-02")
   |> Agenda.Session.needs(:room, seats: at_least(4), video_conferencing: true)
 ```
 
@@ -140,7 +143,7 @@ You do not have to go through `plan/3`. When you just want the gaps:
 ```elixir
 {:ok, free} =
   Agenda.free(room,
-    within: "2027-03-02/2027-03-03",
+    within: "2027-03-02/2027-03-02",
     busy: "2027-03-02T10:00:00/2027-03-02T11:00:00")
 
 Tempo.IntervalSet.members(free)
@@ -212,7 +215,7 @@ END:VCALENDAR
 {:ok, hours} = Agenda.from_ical(vavailability)
 clinic = Agenda.open!(Agenda.resource("Clinic"), hours)
 
-{:ok, week} = Agenda.free(clinic, within: ~o"2026-06-01/2026-06-08")
+{:ok, week} = Agenda.free(clinic, within: ~o"2026-06-01/2026-06-07")
 length(Tempo.IntervalSet.members(week))
 #=> 5
 ```
@@ -231,8 +234,8 @@ room_2 =
 
 rooms = [room, room_2]
 
-survey = Agenda.session("Survey", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-03")
-installation = Agenda.session("Installation", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-03")
+survey = Agenda.session("Survey", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-02")
+installation = Agenda.session("Installation", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-02")
 
 programme =
   Agenda.programme("Field work")

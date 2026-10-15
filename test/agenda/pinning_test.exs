@@ -6,7 +6,7 @@ defmodule Agenda.PinningTest do
   alias Agenda.Programme
   alias Agenda.Session
   alias Agenda.Track
-  alias Tempo.Compare
+  alias Tempo.Interval
 
   setup do
     venue = Agenda.place("Convention Centre")
@@ -34,7 +34,7 @@ defmodule Agenda.PinningTest do
   defp conf(tracks_or_sessions) do
     Enum.reduce(
       tracks_or_sessions,
-      Agenda.programme("Conf", across: "2026-09-15/2026-09-16"),
+      Agenda.programme("Conf", across: "2026-09-15/2026-09-15"),
       fn
         %Track{} = track, programme -> Programme.add_track(programme, track)
         session, programme -> Programme.add_session(programme, session)
@@ -43,10 +43,13 @@ defmodule Agenda.PinningTest do
   end
 
   defp starting_at(arrangements, session) do
-    arrangements |> Enum.find(&(&1.session == session)) |> Map.get(:interval) |> Map.get(:from)
+    arrangements
+    |> Enum.find(&(&1.session == session))
+    |> Map.get(:interval)
+    |> Interval.from()
   end
 
-  defp same_moment?(a, b), do: Compare.compare_endpoints(a, b) == :same
+  defp same_moment?(a, b), do: Tempo.compare(a, b, by: :start) == :eq
 
   # A placement for `session` at the `nth` slot the search would offer.
   defp placement(programme, pool, session, nth) do
@@ -69,7 +72,7 @@ defmodule Agenda.PinningTest do
 
       assert {:ok, arrangements} = Arranger.arrange(programme, [context.hall], pinned: [pin])
 
-      assert same_moment?(starting_at(arrangements, "Keynote"), pin.interval.from)
+      assert same_moment?(starting_at(arrangements, "Keynote"), Interval.from(pin.interval))
     end
 
     test "the pinned session is returned alongside the searched ones", context do
@@ -117,7 +120,7 @@ defmodule Agenda.PinningTest do
       assert {:ok, arrangements} = Arranger.arrange(programme, [context.hall], pinned: [pin])
 
       moved = starting_at(arrangements, "Deep dive")
-      refute same_moment?(moved, pin.interval.from)
+      refute same_moment?(moved, Interval.from(pin.interval))
     end
 
     test "a pin counts against a track's reachability", context do
@@ -202,7 +205,7 @@ defmodule Agenda.PinningTest do
 
       assert {:ok, [pin]} = Ledger.arrangements(ledger, pool)
       assert pin.session == first.session
-      assert same_moment?(pin.interval.from, first.interval.from)
+      assert same_moment?(Interval.from(pin.interval), Interval.from(first.interval))
 
       assert {:ok, arrangements} =
                Arranger.arrange(programme, pool,
@@ -210,7 +213,10 @@ defmodule Agenda.PinningTest do
                  busy: Ledger.busy(ledger, except: [pin.session])
                )
 
-      assert same_moment?(starting_at(arrangements, pin.session), first.interval.from)
+      assert same_moment?(
+               starting_at(arrangements, pin.session),
+               Interval.from(first.interval)
+             )
     end
 
     test "a resource the pool no longer has is reported, not guessed at", context do

@@ -5,10 +5,11 @@ defmodule Agenda.BufferTest do
 
   alias Agenda.Availability
   alias Agenda.Session
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   @day "2027-03-02T09:00:00/2027-03-02T17:00:00"
-  @window "2027-03-02/2027-03-03"
+  @window "2027-03-02/2027-03-02"
 
   defp room(options) do
     {:ok, room} = Agenda.open(Agenda.resource("Room", options), @day)
@@ -18,7 +19,7 @@ defmodule Agenda.BufferTest do
   defp free(room, busy) do
     {:ok, free} = Availability.free(room, within: @window, busy: busy)
 
-    free |> IntervalSet.to_list() |> Enum.map(&Tempo.to_iso8601/1)
+    free |> IntervalSet.members() |> Enum.map(&Tempo.to_iso8601!/1)
   end
 
   describe "turnaround blocks more than the claim itself" do
@@ -119,7 +120,7 @@ defmodule Agenda.BufferTest do
       cleaned = room(buffer_after: ~o"PT30M")
 
       session =
-        Agenda.session("Meeting", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-03")
+        Agenda.session("Meeting", duration: ~o"PT1H", window: ~o"2027-03-02/2027-03-02")
         |> Session.needs(:room, [])
 
       {:ok, options} =
@@ -127,7 +128,7 @@ defmodule Agenda.BufferTest do
           busy: %{"Room" => ["2027-03-02T10:00:00/2027-03-02T11:00:00"]}
         )
 
-      starts = Enum.map(options, & &1.interval.from)
+      starts = Enum.map(options, &Interval.from(&1.interval))
 
       # 11:00 would be free without the buffer; the first slot after the
       # claim is 11:30.

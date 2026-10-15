@@ -84,7 +84,7 @@ defmodule Agenda.LimitTest do
           ~o"2026-06-16T13:00:00/2026-06-16T17:00:00"
         ])
 
-      assert Limit.sum(set) == Limit.sum(IntervalSet.to_list(set))
+      assert Limit.sum(set) == Limit.sum(IntervalSet.members(set))
       assert {2, duration} = Limit.sum(set)
       assert Duration.to_unit(duration, :hour) == {:ok, 7.0}
     end
@@ -204,12 +204,22 @@ defmodule Agenda.LimitTest do
         day_of_week: Calendrical.sunday()
     end
 
-    defp on(date, calendar), do: Tempo.from_iso8601!(date <> "T09:00:00", calendar)
+    defp on(%Date{} = date, calendar) do
+      Tempo.new!(
+        year: date.year,
+        month: date.month,
+        day: date.day,
+        hour: 9,
+        minute: 0,
+        second: 0,
+        calendar: calendar
+      )
+    end
 
     test "an ISO calendar puts Sunday with the week that preceded it" do
-      friday = on("2026-08-14", Calendrical.Gregorian)
-      sunday = on("2026-08-16", Calendrical.Gregorian)
-      monday = on("2026-08-17", Calendrical.Gregorian)
+      friday = on(~D[2026-08-14], Calendrical.Gregorian)
+      sunday = on(~D[2026-08-16], Calendrical.Gregorian)
+      monday = on(~D[2026-08-17], Calendrical.Gregorian)
 
       assert Limit.bucket(sunday, :week) == Limit.bucket(friday, :week)
       refute Limit.bucket(sunday, :week) == Limit.bucket(monday, :week)
@@ -219,17 +229,17 @@ defmodule Agenda.LimitTest do
       # The bug this replaced: the week boundary was hard-coded to
       # Monday, so a Sunday-start contract counted the wrong seven days
       # and a Sunday shift was charged to the previous week.
-      friday = on("2026-08-14", SundayStart)
-      sunday = on("2026-08-16", SundayStart)
-      monday = on("2026-08-17", SundayStart)
+      friday = on(~D[2026-08-14], SundayStart)
+      sunday = on(~D[2026-08-16], SundayStart)
+      monday = on(~D[2026-08-17], SundayStart)
 
       assert Limit.bucket(sunday, :week) == Limit.bucket(monday, :week)
       refute Limit.bucket(sunday, :week) == Limit.bucket(friday, :week)
     end
 
     test "days and months do not depend on the week convention" do
-      gregorian = on("2026-08-16", Calendrical.Gregorian)
-      sunday_start = on("2026-08-16", SundayStart)
+      gregorian = on(~D[2026-08-16], Calendrical.Gregorian)
+      sunday_start = on(~D[2026-08-16], SundayStart)
 
       assert Limit.bucket(gregorian, :day) == Limit.bucket(sunday_start, :day)
       assert Limit.bucket(gregorian, :month) == Limit.bucket(sunday_start, :month)
@@ -239,12 +249,14 @@ defmodule Agenda.LimitTest do
       # The convention comes from the calendar, so this needs no
       # territory and no option. Under an ISO week these would split
       # after Sunday rather than before it.
-      hebrew = fn day -> Tempo.from_iso8601!("5786-10-#{day}", Calendrical.Hebrew) end
+      hebrew = fn day ->
+        Tempo.new!(year: 5786, month: 10, day: day, calendar: Calendrical.Hebrew)
+      end
 
-      sunday = hebrew.(22)
-      saturday = hebrew.(28)
-      next_sunday = hebrew.(29)
-      next_monday = hebrew.(30)
+      sunday = hebrew.(20)
+      saturday = hebrew.(26)
+      next_sunday = hebrew.(27)
+      next_monday = hebrew.(28)
 
       assert Limit.bucket(sunday, :week) == Limit.bucket(saturday, :week)
       refute Limit.bucket(saturday, :week) == Limit.bucket(next_sunday, :week)
@@ -255,14 +267,12 @@ defmodule Agenda.LimitTest do
     end
 
     test "and a Gregorian week runs Monday to Sunday in the same span" do
-      gregorian = fn date -> Tempo.from_iso8601!(date) end
+      # 2026-07-12 is the Sunday that 5786-10-27 falls on.
+      assert Limit.bucket(~o"2026-07-11", :week) ==
+               Limit.bucket(~o"2026-07-12", :week)
 
-      # 2026-06-14 is the Sunday that 5786-10-29 falls on.
-      assert Limit.bucket(gregorian.("2026-06-13"), :week) ==
-               Limit.bucket(gregorian.("2026-06-14"), :week)
-
-      refute Limit.bucket(gregorian.("2026-06-14"), :week) ==
-               Limit.bucket(gregorian.("2026-06-15"), :week)
+      refute Limit.bucket(~o"2026-07-12", :week) ==
+               Limit.bucket(~o"2026-07-13", :week)
     end
 
     test "a value too coarse to place is undated" do

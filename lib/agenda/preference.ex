@@ -45,8 +45,7 @@ defmodule Agenda.Preference do
   alias Agenda.Programme
   alias Agenda.Resource
   alias Agenda.Track
-  alias Tempo.Compare
-  alias Tempo.IntervalSet
+  alias Tempo.Interval
 
   @typedoc "The information a preference may consult beyond the placements."
   @type context :: %{programme: Programme.t(), pool: list()}
@@ -212,16 +211,18 @@ defmodule Agenda.Preference do
   defp overlaps?(nil, _interval), do: false
 
   defp overlaps?(pattern, interval) do
+    pattern |> shared(interval) |> occupied?()
+  end
+
+  defp shared(pattern, interval) do
     with {:ok, value} <- Availability.normalise(pattern),
-         {:ok, materialised} <- Tempo.to_interval(value, bound: interval),
-         {:ok, shared} <- Tempo.intersection(materialised, interval) do
-      not empty?(shared)
-    else
-      _unreadable -> false
+         {:ok, materialised} <- Tempo.to_interval(value, within: interval) do
+      Tempo.intersection(materialised, interval)
     end
   end
 
-  defp empty?(%IntervalSet{} = set), do: IntervalSet.count(set) == 0
+  defp occupied?({:ok, shared}), do: not Tempo.empty?(shared)
+  defp occupied?(_unreadable), do: false
 
   # A delegate following a track would rather stay put. Counts the
   # consecutive pairs within each track that sit in different rooms —
@@ -238,7 +239,7 @@ defmodule Agenda.Preference do
 
     arrangements
     |> Enum.filter(&MapSet.member?(names, &1.session))
-    |> Enum.sort_by(& &1.interval.from, &earlier_or_same/2)
+    |> Enum.sort_by(&Interval.from(&1.interval), &earlier_or_same/2)
     |> Enum.map(&rooms_of/1)
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.count(fn [before, after_it] -> before != after_it end)
@@ -270,6 +271,6 @@ defmodule Agenda.Preference do
   end
 
   defp earlier_or_same(a, b) do
-    Compare.compare_endpoints(a, b) in [:earlier, :same]
+    Tempo.compare(a, b, by: :start) in [:lt, :eq]
   end
 end

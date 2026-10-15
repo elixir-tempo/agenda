@@ -54,7 +54,7 @@ defmodule Agenda.Allocation do
           session: String.t(),
           role: atom(),
           resource: String.t(),
-          interval: Tempo.Interval.t(),
+          interval: Tempo.t(),
           series: String.t() | nil,
           held_until: Tempo.t() | nil,
           tag: tag() | nil

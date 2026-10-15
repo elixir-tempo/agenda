@@ -14,10 +14,12 @@ defmodule Agenda.FixpointTest do
 
   alias Agenda.Arrangement
   alias Agenda.Fixpoint
+  alias Agenda.Hours
   alias Agenda.Limit
   alias Agenda.Programme
   alias Agenda.Session
   alias Agenda.Track
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   doctest Agenda.Fixpoint
@@ -41,12 +43,12 @@ defmodule Agenda.FixpointTest do
 
   defp talk(name) do
     name
-    |> Agenda.session(duration: "PT1H", window: "2026-09-15/2026-09-16")
+    |> Agenda.session(duration: "PT1H", window: "2026-09-15/2026-09-15")
     |> Session.needs(:room, seats: 100)
   end
 
   defp conf(items) do
-    Enum.reduce(items, Agenda.programme("Conf", across: "2026-09-15/2026-09-16"), fn
+    Enum.reduce(items, Agenda.programme("Conf", across: "2026-09-15/2026-09-15"), fn
       %Track{} = track, programme -> Programme.add_track(programme, track)
       session, programme -> Programme.add_session(programme, session)
     end)
@@ -157,7 +159,7 @@ defmodule Agenda.FixpointTest do
 
     test "a session nothing satisfies is reported before the solver runs", context do
       lecture =
-        Agenda.session("Lecture", duration: "PT1H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Lecture", duration: "PT1H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, seats: 500)
 
       assert {:error, reason} = Fixpoint.solve(conf([lecture]), [context.hall])
@@ -255,7 +257,7 @@ defmodule Agenda.FixpointTest do
       slots =
         Enum.map(arrangements, fn arrangement ->
           room = arrangement |> Arrangement.resources() |> hd() |> Map.get(:name)
-          {room, arrangement.interval.from.time[:hour]}
+          {room, Tempo.hour(Interval.from(arrangement.interval))}
         end)
 
       assert length(Enum.uniq(slots)) == 9
@@ -270,7 +272,7 @@ defmodule Agenda.FixpointTest do
       hours =
         IntervalSet.new!(
           for day <- 5..7 do
-            Tempo.from_iso8601!("2027-04-0#{day}T09:00:00/2027-04-0#{day}T11:00:00")
+            Hours.on({2027, 4, day}, 9, 11)
           end
         )
 
@@ -281,11 +283,11 @@ defmodule Agenda.FixpointTest do
     defp shifts(count) do
       Enum.reduce(
         1..count,
-        Agenda.programme("Roster", across: "2027-04-05/2027-04-08"),
+        Agenda.programme("Roster", across: "2027-04-05/2027-04-07"),
         fn index, programme ->
           session =
             "S#{index}"
-            |> Agenda.session(duration: "PT1H", window: "2027-04-05/2027-04-08")
+            |> Agenda.session(duration: "PT1H", window: "2027-04-05/2027-04-07")
             |> Session.needs(:staff, qualified: true)
 
           Programme.add_session(programme, session)
@@ -296,7 +298,7 @@ defmodule Agenda.FixpointTest do
     defp respects?(arrangements, resource) do
       Enum.all?(resource.limits, fn limit ->
         arrangements
-        |> Enum.group_by(&Limit.bucket(&1.interval.from, limit.period))
+        |> Enum.group_by(&Limit.bucket(Interval.from(&1.interval), limit.period))
         |> Enum.all?(fn {_bucket, held} ->
           {count, duration} = Limit.sum(held)
           Limit.permits?(limit, count, duration)
@@ -314,7 +316,8 @@ defmodule Agenda.FixpointTest do
       assert respects?(arrangements, ann)
 
       # One a day, so one on each of the three days.
-      assert arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort() == [5, 6, 7]
+      assert arrangements |> Enum.map(&Tempo.day(Interval.from(&1.interval))) |> Enum.sort() ==
+               [5, 6, 7]
     end
 
     test "a duration limit is enforced rather than ignored" do
@@ -327,7 +330,8 @@ defmodule Agenda.FixpointTest do
       assert respects?(arrangements, ann)
 
       # One hour a day and one-hour shifts, so one on each day.
-      assert arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort() == [5, 6, 7]
+      assert arrangements |> Enum.map(&Tempo.day(Interval.from(&1.interval))) |> Enum.sort() ==
+               [5, 6, 7]
     end
 
     test "a programme that cannot fit inside the limit is proved impossible" do
@@ -375,12 +379,14 @@ defmodule Agenda.FixpointTest do
       ann = days(day: 1)
 
       # Ann already has the 5th. One more shift must go elsewhere.
-      busy = %{"Ann" => [Tempo.from_iso8601!("2027-04-05T09:00:00/2027-04-05T10:00:00")]}
+      busy = %{"Ann" => [~o"2027-04-05T09:00:00/2027-04-05T10:00:00"]}
 
       assert {:ok, arrangements} =
                Fixpoint.solve(shifts(2), [ann], busy: busy, timeout: 5_000)
 
-      days_used = arrangements |> Enum.map(& &1.interval.from.time[:day]) |> Enum.sort()
+      days_used =
+        arrangements |> Enum.map(&Tempo.day(Interval.from(&1.interval))) |> Enum.sort()
+
       refute 5 in days_used
     end
   end

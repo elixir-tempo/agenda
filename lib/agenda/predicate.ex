@@ -24,8 +24,6 @@ defmodule Agenda.Predicate do
 
   """
 
-  alias Tempo.Compare
-
   @typedoc "A comparison a resource attribute must satisfy."
   @type t :: t(op())
 
@@ -254,13 +252,8 @@ defmodule Agenda.Predicate do
   # maps field by field, which has nothing to do with chronology.
   # Everything else falls back to the standard term ordering, which is
   # what integers, atoms, and strings want.
-  defp compare(%Tempo{} = value, %Tempo{} = operand) do
-    case Compare.compare_endpoints(value, operand) do
-      :earlier -> :lt
-      :same -> :eq
-      :later -> :gt
-    end
-  end
+  defp compare(%Tempo{} = value, %Tempo{} = operand),
+    do: Tempo.compare(value, operand, by: :start)
 
   defp compare(value, operand) when value < operand, do: :lt
   defp compare(value, operand) when value > operand, do: :gt

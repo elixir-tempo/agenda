@@ -28,7 +28,7 @@ defmodule Agenda.Reconciliation do
       Agenda.reconcile(ledger, dana, within: quarter, excluding: holidays)
 
   `agenda` does not know what a public holiday is, and does not resolve
-  one. Holidays arrive as an ordinary `t:Tempo.IntervalSet.t/0` from
+  one. Holidays arrive as an ordinary `t:Tempo.t/0` interval set from
   wherever the caller keeps them — a jurisdiction library, a CalDAV
   feed through `Agenda.from_ical/1`, or a hand-written list.
 
@@ -53,6 +53,7 @@ defmodule Agenda.Reconciliation do
   alias Agenda.Ledger
   alias Agenda.Limit
   alias Agenda.Resource
+  alias Agenda.Written
   alias Tempo.Duration
   alias Tempo.Interval
   alias Tempo.IntervalSet
@@ -74,12 +75,12 @@ defmodule Agenda.Reconciliation do
   """
   @type t :: %__MODULE__{
           resource: String.t(),
-          within: Tempo.Interval.t(),
-          expected: IntervalSet.t(),
-          claimed: IntervalSet.t(),
-          unaccounted: IntervalSet.t(),
-          overclaimed: IntervalSet.t(),
-          by_tag: %{optional(Allocation.tag() | nil) => IntervalSet.t()},
+          within: Tempo.t(),
+          expected: Tempo.t(),
+          claimed: Tempo.t(),
+          unaccounted: Tempo.t(),
+          overclaimed: Tempo.t(),
+          by_tag: %{optional(Allocation.tag() | nil) => Tempo.t()},
           breaches: [breach()]
         }
 
@@ -110,13 +111,13 @@ defmodule Agenda.Reconciliation do
     and have no materialisation without one.
 
   * `:excluding` is time the resource did not owe — public holidays, a
-    shutdown — as an `t:Tempo.IntervalSet.t/0`, any Tempo value that
+    shutdown — as a `t:Tempo.t/0` interval set, any Tempo value that
     denotes a span (a bare day, `~o"2026-08-12"`, is the natural way to
     write a holiday), a string, or a list of any of those. Subtracted from the expectation before any claim is
     compared against it. The default is none.
 
   * `:expected` states the owed time outright, as an
-    `t:Tempo.IntervalSet.t/0`, instead of deriving it from the
+    `t:Tempo.t/0` interval set, instead of deriving it from the
     resource's open hours. `:excluding` still applies to it.
 
   ### Returns
@@ -136,7 +137,7 @@ defmodule Agenda.Reconciliation do
       ...>   allocations: %{consultant: [dana]}
       ...> }
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
-      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
+      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-16")
       iex> Tempo.IntervalSet.members(report.unaccounted)
       [~o"2026Y6M16DT12H0M0S/T17H0M0S"]
 
@@ -190,28 +191,21 @@ defmodule Agenda.Reconciliation do
   # claim straddling the boundary contributes only its part inside.
   defp set(nil, _window), do: {:ok, IntervalSet.new!([])}
 
-  defp set(%IntervalSet{} = given, window), do: clip(given, window)
-
   defp set(given, window) do
-    with {:ok, as_set} <- spans(given) do
-      clip(as_set, window)
-    end
+    with {:ok, as_set} <- spans(given), do: clip(as_set, window)
   end
 
   # One value or many, each materialised to the spans it denotes. A
   # holiday is naturally written as the day it falls on — `~o"2026-08-12"`
-  # — and requiring the caller to spell that as `2026-08-12/2026-08-13`
-  # is asking them to do the library's half-open arithmetic by hand.
+  # — and the day is already the span it denotes; requiring the caller to
+  # spell it as an interval would ask for a second form of the same thing.
+  defp spans(%Tempo{} = given), do: {:ok, given}
+
   defp spans(values) do
     values
     |> List.wrap()
     |> Enum.reduce_while({:ok, []}, fn value, {:ok, acc} ->
-      with {:ok, normalised} <- Availability.normalise(value),
-           {:ok, set} <- bounds(normalised) do
-        {:cont, {:ok, acc ++ IntervalSet.members(set)}}
-      else
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
+      continued(spans_of(value), &(acc ++ IntervalSet.members(&1)))
     end)
     |> case do
       {:ok, intervals} -> IntervalSet.new(intervals)
@@ -219,28 +213,24 @@ defmodule Agenda.Reconciliation do
     end
   end
 
-  defp clip(%IntervalSet{} = set, window) do
-    with {:ok, bounds} <- bounds(window) do
-      Tempo.intersection(set, bounds)
-    end
+  defp spans_of(value) do
+    with {:ok, normalised} <- Availability.normalise(value), do: bounds(normalised)
+  end
+
+  # One step of a fold that stops at the first error, handing it back.
+  defp continued({:ok, result}, accumulate), do: {:cont, {:ok, accumulate.(result)}}
+  defp continued(error, _accumulate), do: {:halt, error}
+
+  defp clip(set, window) do
+    with {:ok, bounds} <- bounds(window), do: Tempo.intersection(set, bounds)
   end
 
   # A window may arrive as any Tempo value that denotes a span, not
-  # only as an interval — `~o"2026Y3Q"`, or an ISO 8601-2 quarter
-  # designator resolved in a fiscal calendar. Materialising it here is
-  # what lets a caller name a period the way their calendar names it
-  # rather than having to spell out its endpoints.
-  defp bounds(%IntervalSet{} = set), do: {:ok, set}
-
-  defp bounds(%Interval{} = interval), do: IntervalSet.new([interval])
-
-  defp bounds(%Tempo{} = tempo) do
-    case Tempo.to_interval(tempo) do
-      {:ok, %Interval{} = interval} -> IntervalSet.new([interval])
-      {:ok, %IntervalSet{} = set} -> {:ok, set}
-      {:error, reason} -> {:error, reason}
-    end
-  end
+  # only as an interval — `~o"2026Y3q"`, or an ISO 8601-2 quarter
+  # designator resolved in a fiscal calendar: the set operations take
+  # any of them, so a caller names a period the way their calendar
+  # names it rather than having to spell out its endpoints.
+  defp bounds(%Tempo{} = window), do: {:ok, window}
 
   # Anything else — an imported VAVAILABILITY handle, a bare duration —
   # denotes no span, so it cannot bound a reconciliation.
@@ -252,7 +242,7 @@ defmodule Agenda.Reconciliation do
     |> Enum.filter(&(&1.resource == resource.name and overlaps?(&1.interval, window)))
   end
 
-  defp overlaps?(%Interval{} = interval, window) do
+  defp overlaps?(%Tempo{} = interval, window) do
     Tempo.overlaps?(interval, window) == true
   end
 
@@ -273,12 +263,7 @@ defmodule Agenda.Reconciliation do
     allocations
     |> Enum.group_by(& &1.tag)
     |> Enum.reduce_while({:ok, %{}}, fn {tag, held}, {:ok, acc} ->
-      with {:ok, set} <- held |> Enum.map(& &1.interval) |> IntervalSet.new(),
-           {:ok, clipped} <- clip(set, window) do
-        {:cont, {:ok, Map.put(acc, tag, clipped)}}
-      else
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
+      continued(claimed(held, window), &Map.put(acc, tag, &1))
     end)
   end
 
@@ -292,7 +277,7 @@ defmodule Agenda.Reconciliation do
 
   defp breached_buckets(%Limit{} = limit, allocations) do
     allocations
-    |> Enum.group_by(&Limit.bucket(&1.interval.from, limit.period))
+    |> Enum.group_by(&Limit.bucket(Interval.from(&1.interval), limit.period))
     |> Enum.sort_by(fn {bucket, _held} -> bucket end)
     |> Enum.flat_map(&breached_bucket(limit, &1))
   end
@@ -329,15 +314,15 @@ defmodule Agenda.Reconciliation do
       ...>   allocations: %{consultant: [dana]}
       ...> }
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
-      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
+      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-16")
       iex> Agenda.Reconciliation.balanced?(report)
       true
 
   """
   @spec balanced?(t()) :: boolean()
   def balanced?(%__MODULE__{} = reconciliation) do
-    IntervalSet.empty?(reconciliation.unaccounted) and
-      IntervalSet.empty?(reconciliation.overclaimed) and
+    Tempo.empty?(reconciliation.unaccounted) and
+      Tempo.empty?(reconciliation.overclaimed) and
       reconciliation.breaches == []
   end
 
@@ -367,7 +352,7 @@ defmodule Agenda.Reconciliation do
       ...>   allocations: %{consultant: [dana]}
       ...> }
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
-      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-17")
+      iex> {:ok, report} = Agenda.reconcile(ledger, dana, within: ~o"2026-06-16/2026-06-16")
       iex> Agenda.Reconciliation.explain(report)
       ["Dana: 5 hours unaccounted — 2026Y6M16DT12H0M0S/T17H0M0S"]
 
@@ -382,13 +367,13 @@ defmodule Agenda.Reconciliation do
   defp gaps(_reconciliation, set, _what) when set == nil, do: []
 
   defp gaps(reconciliation, set, what) do
-    case IntervalSet.to_list(set) do
+    case IntervalSet.members(set) do
       [] ->
         []
 
       intervals ->
         {_count, duration} = Limit.sum(intervals)
-        spans = Enum.map_join(intervals, ", ", &Tempo.to_iso8601/1)
+        spans = Enum.map_join(intervals, ", ", &Written.span/1)
         ["#{reconciliation.resource}: #{hours(duration)} #{what} — #{spans}"]
     end
   end
@@ -402,11 +387,14 @@ defmodule Agenda.Reconciliation do
   defp describe({:over, {:duration, most}}), do: "more than #{hours(most)}"
   defp describe({:under, {:duration, least}}), do: "less than #{hours(least)}"
 
-  defp label({year, month, day}), do: "#{year}-#{pad(month)}-#{pad(day)}"
-  defp label({year, month}), do: "#{year}-#{pad(month)}"
+  # A period is written as Tempo writes it, built from its parts, as the
+  # spans in the same sentences are.
+  defp label({year, {:week, week}, nil}), do: written(year: year, week: week)
+  defp label({year, month, nil}), do: written(year: year, month: month)
+  defp label({year, month, day}), do: written(year: year, month: month, day: day)
   defp label(other), do: inspect(other)
 
-  defp pad(number), do: String.pad_leading("#{number}", 2, "0")
+  defp written(units), do: units |> Tempo.new!() |> Tempo.to_iso8601!()
 
   defp hours(duration) do
     case Duration.to_unit(duration, :hour) do

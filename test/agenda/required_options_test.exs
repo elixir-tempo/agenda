@@ -41,13 +41,13 @@ defmodule Agenda.RequiredOptionsTest do
   end
 
   test "each still works when the option is given", context do
-    assert {:ok, _} = Agenda.free(context.hall, within: ~o"2026-09-15/2026-09-16")
+    assert {:ok, _} = Agenda.free(context.hall, within: ~o"2026-09-15/2026-09-15")
 
     assert {:ok, _} =
              Agenda.hold(context.ledger, context.arrangement, until: ~o"2026-09-15T09:05")
 
     assert {:ok, _} =
-             Agenda.reconcile(context.ledger, context.hall, within: ~o"2026-09-15/2026-09-16")
+             Agenda.reconcile(context.ledger, context.hall, within: ~o"2026-09-15/2026-09-15")
 
     assert {:ok, _} = Agenda.reachable(Agenda.track("Core"), within: ~o"PT10M")
   end

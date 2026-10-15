@@ -3,9 +3,17 @@ defmodule Agenda.VAvailabilityTest do
 
   alias Agenda.Availability
   alias Agenda.Session
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
-  @june "2026-06-01/2026-06-08"
+  @june "2026-06-01/2026-06-07"
+
+  # The hours below are imported in UTC, and a window or a claim combined
+  # with them by set algebra is on the same line (law 4): a floating one
+  # beside them is a `Tempo.FrameError`. `:within` alone reads a floating
+  # window on the clock of what it bounds, so `@june` serves where nothing
+  # else is combined with the hours.
+  @june_in_utc "2026-06-01T00:00:00Z/2026-06-08T00:00:00Z"
 
   defp calendar(components) do
     """
@@ -40,8 +48,8 @@ defmodule Agenda.VAvailabilityTest do
 
   defp days(free) do
     free
-    |> IntervalSet.to_list()
-    |> Enum.map(& &1.from.time[:day])
+    |> IntervalSet.members()
+    |> Enum.map(&Tempo.day(Interval.from(&1)))
     |> Enum.sort()
   end
 
@@ -59,7 +67,7 @@ defmodule Agenda.VAvailabilityTest do
       room = room_open_from(weekdays())
 
       {:ok, whole_week} = Agenda.free(room, within: @june)
-      {:ok, two_days} = Agenda.free(room, within: "2026-06-01/2026-06-03")
+      {:ok, two_days} = Agenda.free(room, within: "2026-06-01/2026-06-02")
 
       assert length(days(whole_week)) == 5
       assert days(two_days) == [1, 2]
@@ -70,8 +78,8 @@ defmodule Agenda.VAvailabilityTest do
 
       assert {:ok, free} =
                Agenda.free(room,
-                 within: @june,
-                 busy: "2026-06-02T09:00:00/2026-06-02T17:00:00"
+                 within: @june_in_utc,
+                 busy: "2026-06-02T09:00:00Z/2026-06-02T17:00:00Z"
                )
 
       assert days(free) == [1, 3, 4, 5]
@@ -112,8 +120,10 @@ defmodule Agenda.VAvailabilityTest do
         """)
 
       assert {:ok, free} = Agenda.free(room, within: @june)
-      assert [window] = IntervalSet.to_list(free)
-      assert {window.from.time[:hour], window.to.time[:hour]} == {9, 12}
+      assert [window] = IntervalSet.members(free)
+
+      assert {Tempo.hour(Interval.from(window)), Tempo.hour(Interval.to(window))} ==
+               {9, 12}
     end
 
     test "VEVENTs in the same document are not treated as open hours" do
@@ -145,12 +155,12 @@ defmodule Agenda.VAvailabilityTest do
       room = room_open_from(weekdays(), "Clinic")
 
       session =
-        Agenda.session("Review", duration: "PT1H", window: @june)
+        Agenda.session("Review", duration: "PT1H", window: @june_in_utc)
         |> Session.needs(:room, seats: 8)
 
       assert {:ok, [best | _rest]} = Agenda.plan(session, [room])
       assert best.session == "Review"
-      assert best.interval.from.time[:hour] == 9
+      assert Tempo.hour(Interval.from(best.interval)) == 9
     end
 
     test "refinements apply to imported availability" do
@@ -159,7 +169,7 @@ defmodule Agenda.VAvailabilityTest do
       assert {:ok, mornings} =
                room
                |> Agenda.free(within: @june)
-               |> Agenda.only_during("2026-06-01T09:00:00/2026-06-01T12:00:00")
+               |> Agenda.only_during("2026-06-01T09:00:00Z/2026-06-01T12:00:00Z")
 
       assert IntervalSet.count(mornings) == 1
     end
@@ -170,7 +180,7 @@ defmodule Agenda.VAvailabilityTest do
       room = room_open_from("")
 
       assert {:ok, free} = Agenda.free(room, within: @june)
-      assert IntervalSet.empty?(free)
+      assert Tempo.empty?(free)
     end
 
     test "unreadable data is an error, not a crash" do
@@ -178,7 +188,7 @@ defmodule Agenda.VAvailabilityTest do
       {:ok, room} = Agenda.open(Agenda.resource("Room"), hours)
 
       assert {:ok, free} = Agenda.free(room, within: @june)
-      assert IntervalSet.empty?(free)
+      assert Tempo.empty?(free)
     end
 
     test "normalise/1 accepts an imported pattern unchanged" do

@@ -139,7 +139,7 @@ defmodule Agenda.Arranger do
   alias Agenda.Resource
   alias Agenda.Session
   alias Agenda.Track
-  alias Tempo.Compare
+  alias Tempo.Allen
   alias Tempo.Duration
   alias Tempo.Interval
 
@@ -265,7 +265,7 @@ defmodule Agenda.Arranger do
       iex> room = Agenda.resource("Hall", seats: 100)
       iex> {:ok, room} = Agenda.open(room, "2026-09-15T09:00:00/2026-09-15T12:00:00")
       iex> talk = fn name ->
-      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-16")
+      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-15")
       ...>   |> Agenda.Session.needs(:room, seats: 100)
       ...> end
       iex> programme =
@@ -331,7 +331,7 @@ defmodule Agenda.Arranger do
       iex> room = Agenda.resource("Hall", seats: 100)
       iex> {:ok, room} = Agenda.open(room, "2026-09-15T09:00:00/2026-09-15T10:00:00")
       iex> talk = fn name ->
-      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-16")
+      ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-15")
       ...>   |> Agenda.Session.needs(:room, seats: 100)
       ...> end
       iex> programme =
@@ -967,7 +967,7 @@ defmodule Agenda.Arranger do
   end
 
   defp placement_key(%Arrangement{} = arrangement) do
-    {arrangement.interval.from, arrangement.interval.to,
+    {Interval.from(arrangement.interval), Interval.to(arrangement.interval),
      arrangement |> Arrangement.resources() |> Enum.map(& &1.name) |> Enum.sort()}
   end
 
@@ -1109,12 +1109,12 @@ defmodule Agenda.Arranger do
   defp holdable([{_name, concurrency, _interval} | _rest] = held) do
     held
     |> Enum.map(&elem(&1, 2))
-    |> Enum.sort(&(Compare.compare_endpoints(&1.to, &2.to) != :later))
+    |> Enum.sort(&(Tempo.compare(Interval.to(&1), Interval.to(&2), by: :start) != :gt))
     |> Enum.reduce({0, nil}, fn interval, {count, busy_until} ->
-      if busy_until && Compare.compare_endpoints(interval.from, busy_until) == :earlier do
+      if busy_until && Tempo.compare(Interval.from(interval), busy_until, by: :start) == :lt do
         {count, busy_until}
       else
-        {count + 1, interval.to}
+        {count + 1, Interval.to(interval)}
       end
     end)
     |> elem(0)
@@ -1305,7 +1305,11 @@ defmodule Agenda.Arranger do
         true
 
       {earlier, _key} ->
-        Compare.compare_endpoints(earlier.interval.from, candidate.interval.from) != :later
+        Tempo.compare(
+          Interval.from(earlier.interval),
+          Interval.from(candidate.interval),
+          by: :start
+        ) != :gt
     end
   end
 
@@ -1542,23 +1546,27 @@ defmodule Agenda.Arranger do
   # end of the predecessor, so a predecessor that runs long pushes its
   # successor rather than eating the allowance.
   defp follows?(later, earlier, %Precedence{} = precedence) do
-    earliest = shifted(earlier.interval.to, precedence.gap)
+    earliest = shifted(Interval.to(earlier.interval), precedence.gap)
 
-    not_before?(later.interval.from, earliest) and
-      within_limit?(later.interval.from, earlier.interval.to, precedence.within)
+    not_before?(Interval.from(later.interval), earliest) and
+      within_limit?(
+        Interval.from(later.interval),
+        Interval.to(earlier.interval),
+        precedence.within
+      )
   end
 
   defp shifted(moment, nil), do: moment
-  defp shifted(moment, duration), do: Tempo.shift(moment, duration)
+  defp shifted(moment, duration), do: Tempo.shift!(moment, duration)
 
   defp not_before?(moment, earliest) do
-    Compare.compare_endpoints(moment, earliest) in [:later, :same]
+    Tempo.compare(moment, earliest, by: :start) in [:gt, :eq]
   end
 
   defp within_limit?(_moment, _from, nil), do: true
 
   defp within_limit?(moment, from, within) do
-    Compare.compare_endpoints(moment, Tempo.shift(from, within)) in [:earlier, :same]
+    Tempo.compare(moment, Tempo.shift!(from, within), by: :start) in [:lt, :eq]
   end
 
   # Capacity is a question about the whole set of placements, not about
@@ -1589,19 +1597,19 @@ defmodule Agenda.Arranger do
   # the separation in either direction.
   defp turnaround(interval, %Resource{buffer_before: nil, buffer_after: nil}), do: interval
 
-  defp turnaround(%Interval{} = interval, %Resource{} = resource) do
-    %{
-      interval
-      | from: earlier_by(interval.from, resource.buffer_before),
-        to: later_by(interval.to, resource.buffer_after)
-    }
+  defp turnaround(%Tempo{} = interval, %Resource{} = resource) do
+    Interval.new!(
+      from: earlier_by(Interval.from(interval), resource.buffer_before),
+      to: later_by(Interval.to(interval), resource.buffer_after),
+      metadata: Tempo.metadata(interval)
+    )
   end
 
   defp earlier_by(moment, nil), do: moment
-  defp earlier_by(moment, duration), do: Tempo.shift(moment, Duration.negate(duration))
+  defp earlier_by(moment, duration), do: Tempo.shift!(moment, Duration.negate(duration))
 
   defp later_by(moment, nil), do: moment
-  defp later_by(moment, duration), do: Tempo.shift(moment, duration)
+  defp later_by(moment, duration), do: Tempo.shift!(moment, duration)
 
   defp holds_at?({arrangement, _symmetry}, %Resource{} = resource, interval) do
     Enum.any?(Arrangement.resources(arrangement), &(&1.name == resource.name)) and
@@ -1637,13 +1645,13 @@ defmodule Agenda.Arranger do
   # would reject every layout before the last placement. `Limit.permits?/3`
   # ignores floors, and `Agenda.reconcile/3` is where they are checked.
   defp claims(resource, candidate, placed, period, options) do
-    bucket = Limit.bucket(candidate.interval.from, period)
+    bucket = Limit.bucket(Interval.from(candidate.interval), period)
 
     already =
       placed
       |> Enum.filter(fn {arrangement, _symmetry} ->
         Enum.any?(Arrangement.resources(arrangement), &(&1.name == resource.name)) and
-          Limit.bucket(arrangement.interval.from, period) == bucket
+          Limit.bucket(Interval.from(arrangement.interval), period) == bucket
       end)
       |> Enum.map(fn {arrangement, _symmetry} -> arrangement.interval end)
 
@@ -1657,7 +1665,7 @@ defmodule Agenda.Arranger do
     Limit.sum([candidate.interval | already] ++ booked)
   end
 
-  defp interval_start(%Interval{from: from}), do: from
+  defp interval_start(%Tempo{form: {:span, _from, _to}} = interval), do: Interval.from(interval)
   defp interval_start(other), do: other
 
   defp track_ok?(a, b, programme, options) do
@@ -1688,7 +1696,7 @@ defmodule Agenda.Arranger do
   end
 
   defp in_time_order(a, b) do
-    if Tempo.before?(a.interval, b.interval) or Tempo.meets?(a.interval, b.interval) do
+    if Tempo.before?(a.interval, b.interval) or Allen.meets?(a.interval, b.interval) do
       {a, b}
     else
       {b, a}
@@ -1699,7 +1707,7 @@ defmodule Agenda.Arranger do
   # Sessions that meet leave no space at all, so only a journey of no
   # distance fits.
   defp fits_the_gap?(earlier, later, journey) do
-    case Interval.new(from: earlier.interval.to, to: later.interval.from) do
+    case Interval.new(from: Interval.to(earlier.interval), to: Interval.from(later.interval)) do
       {:ok, gap} -> Tempo.at_least?(gap, journey)
       {:error, _no_gap} -> no_longer_than?(journey, ~o"PT0S")
     end
@@ -1715,10 +1723,11 @@ defmodule Agenda.Arranger do
   @origin ~o"2000-01-01T00:00:00"
 
   defp no_longer_than?(duration, limit) do
-    Compare.compare_endpoints(
-      Tempo.shift(@origin, duration),
-      Tempo.shift(@origin, limit)
-    ) in [:earlier, :same]
+    Tempo.compare(
+      Tempo.shift!(@origin, duration),
+      Tempo.shift!(@origin, limit),
+      by: :start
+    ) in [:lt, :eq]
   end
 
   # The slowest journey between any *located* resource of one session

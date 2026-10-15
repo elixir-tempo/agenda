@@ -26,7 +26,7 @@ defmodule Agenda.Ledger do
       iex> boardroom = Agenda.resource("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T11:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-15")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> ledger = Agenda.Ledger.new()
       iex> {:ok, [best | _]} = Agenda.plan(session, [boardroom], busy: Agenda.busy(ledger))
@@ -44,7 +44,8 @@ defmodule Agenda.Ledger do
   alias Agenda.Availability
   alias Agenda.Infeasible
   alias Agenda.Resource
-  alias Tempo.Compare
+  alias Agenda.Written
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   @typedoc "Allocations held against the sessions that hold them."
@@ -294,7 +295,7 @@ defmodule Agenda.Ledger do
 
   defp holding(resource, interval, options) do
     %Arrangement{
-      session: Keyword.get(options, :session, Tempo.to_iso8601(interval)),
+      session: Keyword.get(options, :session, Written.span(interval)),
       interval: interval,
       allocations: %{Keyword.get(options, :role, :resource) => [resource]}
     }
@@ -314,10 +315,10 @@ defmodule Agenda.Ledger do
          {:ok, unopen} <- Tempo.difference(interval, open),
          {:ok, unfree} <- Tempo.difference(interval, free) do
       cond do
-        not IntervalSet.empty?(unopen) ->
+        not Tempo.empty?(unopen) ->
           {:error, refusal(resource, "not open", unopen)}
 
-        not IntervalSet.empty?(unfree) ->
+        not Tempo.empty?(unfree) ->
           {:error, refusal(resource, "already claimed", unfree)}
 
         true ->
@@ -329,8 +330,8 @@ defmodule Agenda.Ledger do
   defp refusal(resource, why, set) do
     spans =
       set
-      |> IntervalSet.to_list()
-      |> Enum.map_join(", ", &Tempo.to_iso8601/1)
+      |> IntervalSet.members()
+      |> Enum.map_join(", ", &Written.span/1)
 
     "#{resource.name} is #{why} for #{spans}"
   end
@@ -505,7 +506,7 @@ defmodule Agenda.Ledger do
   defp lapsed?([], _now), do: false
 
   defp lapsed?([%Allocation{held_until: until} | _rest], now) do
-    Compare.compare_endpoints(until, now) in [:earlier, :same]
+    Tempo.compare(until, now, by: :start) in [:lt, :eq]
   end
 
   @doc """
@@ -620,10 +621,10 @@ defmodule Agenda.Ledger do
   defp at_or_after?(_allocation, nil), do: true
 
   defp at_or_after?(allocation, cutoff) do
-    Compare.compare_endpoints(allocation.interval.from, start_of(cutoff)) != :earlier
+    Tempo.compare(Interval.from(allocation.interval), start_of(cutoff), by: :start) != :lt
   end
 
-  defp start_of(%Tempo.Interval{from: from}), do: from
+  defp start_of(%Tempo{form: {:span, _from, _to}} = interval), do: Interval.from(interval)
   defp start_of(point), do: point
 
   @doc """
@@ -855,7 +856,7 @@ defmodule Agenda.Ledger do
       %{}
 
   """
-  @spec busy(t(), keyword()) :: %{optional(String.t()) => [Tempo.Interval.t()]}
+  @spec busy(t(), keyword()) :: %{optional(String.t()) => [Tempo.t()]}
   def busy(%__MODULE__{} = ledger, options \\ []) do
     except = options |> Keyword.get(:except, []) |> List.wrap() |> MapSet.new()
 

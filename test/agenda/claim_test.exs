@@ -9,7 +9,7 @@ defmodule Agenda.ClaimTest do
   @shift [~o"T09/T12", ~o"T13/T17"]
 
   defp dana do
-    {:ok, workdays} = Tempo.select(~o"2026-08-01/2026-09-01", Tempo.workdays(:AU))
+    {:ok, workdays} = Tempo.select(~o"2026-08-01/2026-08-31", Tempo.workdays(:AU))
     {:ok, hours} = Tempo.select(workdays, @shift)
     {:ok, dana} = Agenda.open(Agenda.resource("Dana"), hours)
     dana
@@ -48,7 +48,7 @@ defmodule Agenda.ClaimTest do
       span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
 
       assert {:ok, ledger} = Agenda.claim(Agenda.ledger(), resource, span)
-      assert {:ok, released} = Agenda.release(ledger, Tempo.to_iso8601(span))
+      assert {:ok, released} = Agenda.release(ledger, Tempo.to_iso8601!(span))
       assert Agenda.count(released) == 0
     end
 
@@ -74,14 +74,14 @@ defmodule Agenda.ClaimTest do
                Agenda.claim(Agenda.ledger(), dana(), ~o"2026-08-10T16:00:00/2026-08-10T19:00:00")
 
       # 16:00-17:00 is open; only 17:00-19:00 is refused.
-      assert reason == "Dana is not open for 2026Y8M10DT17H0M0S/T19H0M0S"
+      assert reason == "Dana is not open for 2026Y8M10DT17H/T19H0M0S"
     end
 
     test "the lunch break is not open time" do
       assert {:error, reason} =
                Agenda.claim(Agenda.ledger(), dana(), ~o"2026-08-10T09:00:00/2026-08-10T14:00:00")
 
-      assert reason == "Dana is not open for 2026Y8M10DT12H0M0S/T13H0M0S"
+      assert reason == "Dana is not open for 2026Y8M10DT12H/T13H"
     end
 
     test "an hour already claimed" do
@@ -165,7 +165,7 @@ defmodule Agenda.ClaimTest do
                  tag: {:project, "ACME"}
                )
 
-      assert {:ok, report} = Agenda.reconcile(ledger, resource, within: ~o"2026-08-15/2026-08-16")
+      assert {:ok, report} = Agenda.reconcile(ledger, resource, within: ~o"2026-08-15/2026-08-15")
       refute Reconciliation.balanced?(report)
     end
 

@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+* Agenda runs on Tempo 2.0. A date written as an interval's end is read through, as it is said: `"2026-06-15/2026-06-19"` is Monday to Friday.
+
+* A claim, a refinement or a session's window combined with hours in UTC or a zone is written on that time line; a floating one beside them is a `Tempo.FrameError`. A `within:` window may still be floating.
+
+* `Agenda.Limit.bucket/2` gives a week as `{year, {:week, week}, nil}`, the week as its calendar counts it, where it gave the date the week began on.
+
+* A period in a reconciliation's sentences is written as Tempo writes it (`2026Y6M15D`), and a span of a fiscal calendar as the Gregorian dates it falls on.
+
+### Fixed
+
+* A month in a reconciliation's breach sentence is named in full, where it was written `"2026-06-"`.
+
 ## [v0.1.0] — 2026-09-03
 
 First release. Resource-constrained scheduling on top of [Tempo](https://hexdocs.pm/ex_tempo): Tempo answers *when is this free?*, Agenda answers *what should I book, and where?*

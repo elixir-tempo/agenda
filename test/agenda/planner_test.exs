@@ -7,6 +7,7 @@ defmodule Agenda.PlannerTest do
   alias Agenda.Arrangement
   alias Agenda.Planner
   alias Agenda.Session
+  alias Tempo.Allen
   alias Tempo.Interval
   alias Tempo.IntervalSet
 
@@ -44,7 +45,7 @@ defmodule Agenda.PlannerTest do
 
   defp review(context, extra \\ []) do
     "Review"
-    |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+    |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
     |> Session.needs(:room, Keyword.get(extra, :room, seats: at_least(8)))
     |> Session.roster(:attendees, Keyword.get(extra, :attendees, [context.alice, context.bob]))
   end
@@ -76,7 +77,7 @@ defmodule Agenda.PlannerTest do
 
       assert arrangements
              |> Enum.chunk_every(2, 1, :discard)
-             |> Enum.all?(fn [a, b] -> Tempo.meets?(a.interval, b.interval) end)
+             |> Enum.all?(fn [a, b] -> Allen.meets?(a.interval, b.interval) end)
     end
 
     test "the earliest slot comes first — ordering is chronological, not lexicographic",
@@ -84,8 +85,8 @@ defmodule Agenda.PlannerTest do
       {:ok, arrangements} = Planner.plan(review(context), [context.boardroom])
 
       # Sorted as ISO strings, "10:00" would precede "9:00".
-      assert List.first(arrangements).interval.from == ~o"2026Y6M15DT9H0M0S"
-      assert List.last(arrangements).interval.from == ~o"2026Y6M15DT16H0M0S"
+      assert Interval.from(List.first(arrangements).interval) == ~o"2026Y6M15DT9H0M0S"
+      assert Interval.from(List.last(arrangements).interval) == ~o"2026Y6M15DT16H0M0S"
     end
 
     test "every arrangement lasts exactly the session's duration", context do
@@ -95,7 +96,7 @@ defmodule Agenda.PlannerTest do
     end
 
     test "every arrangement falls within the session's window", context do
-      window = ~o"2026-06-15/2026-06-16"
+      window = ~o"2026-06-15/2026-06-15"
 
       {:ok, arrangements} = Planner.plan(review(context), [context.boardroom])
 
@@ -107,19 +108,19 @@ defmodule Agenda.PlannerTest do
     test "each arrangement names every resource whose free time produced it", context do
       {:ok, [first | _]} = Planner.plan(review(context), [context.boardroom])
 
-      assert %{free: contributors} = Interval.metadata(first.interval)
+      assert %{free: contributors} = Tempo.metadata(first.interval)
       assert Enum.sort(contributors) == ["Alice", "Boardroom", "Bob"]
     end
 
     test "a session with no roster still names the chosen room", context do
       session =
         "Solo"
-        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
         |> Session.needs(:room, seats: at_least(8))
 
       {:ok, [first | _]} = Planner.plan(session, [context.boardroom])
 
-      assert Interval.metadata(first.interval) == %{free: ["Boardroom"]}
+      assert Tempo.metadata(first.interval) == %{free: ["Boardroom"]}
     end
   end
 
@@ -136,7 +137,7 @@ defmodule Agenda.PlannerTest do
     test "a session with only named resources still allocates them", context do
       session =
         "Standup"
-        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
         |> Session.roster(:attendees, [context.bob])
 
       {:ok, [first | _]} = Planner.plan(session, [])
@@ -147,7 +148,7 @@ defmodule Agenda.PlannerTest do
     test "roster members appear once, not twice, in the provenance", context do
       {:ok, [first | _]} = Planner.plan(review(context), [context.boardroom])
 
-      %{free: contributors} = Interval.metadata(first.interval)
+      %{free: contributors} = Tempo.metadata(first.interval)
 
       assert length(contributors) == length(Enum.uniq(contributors))
     end
@@ -160,7 +161,7 @@ defmodule Agenda.PlannerTest do
       {:ok, arrangements} = Planner.plan(review(context), [context.boardroom], busy: busy)
 
       assert length(arrangements) == 5
-      assert List.first(arrangements).interval.from == ~o"2026Y6M15DT12H0M0S"
+      assert Interval.from(List.first(arrangements).interval) == ~o"2026Y6M15DT12H0M0S"
     end
 
     test "a busy attendee removes the slot even when the room is free", context do
@@ -169,7 +170,7 @@ defmodule Agenda.PlannerTest do
       {:ok, arrangements} = Planner.plan(review(context), [context.boardroom], busy: busy)
 
       assert length(arrangements) == 1
-      assert List.first(arrangements).interval.from == ~o"2026Y6M15DT16H0M0S"
+      assert Interval.from(List.first(arrangements).interval) == ~o"2026Y6M15DT16H0M0S"
     end
 
     test "no arrangement overlaps the busy period", context do
@@ -182,7 +183,7 @@ defmodule Agenda.PlannerTest do
     end
 
     test "everyone busy is infeasible, with a reason", context do
-      busy = %{"Alice" => "2026-06-15/2026-06-16"}
+      busy = %{"Alice" => "2026-06-15/2026-06-15"}
 
       assert {:error, reason} = Planner.plan(review(context), [context.boardroom], busy: busy)
       assert Agenda.explain(reason) =~ "Review cannot be held"
@@ -292,8 +293,8 @@ defmodule Agenda.PlannerTest do
           "Capped" =>
             Enum.take(
               [
-                Tempo.from_iso8601!("2026-06-15T09:00:00/2026-06-15T10:00:00"),
-                Tempo.from_iso8601!("2026-06-15T10:00:00/2026-06-15T11:00:00")
+                ~o"2026-06-15T09:00:00/2026-06-15T10:00:00",
+                ~o"2026-06-15T10:00:00/2026-06-15T11:00:00"
               ],
               count
             )
@@ -305,7 +306,7 @@ defmodule Agenda.PlannerTest do
 
     defp booking(name) do
       name
-      |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+      |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
       |> Session.needs(:room, seats: at_least(8))
     end
 
@@ -326,8 +327,8 @@ defmodule Agenda.PlannerTest do
     test "an uncapped resource is unaffected by what it already holds", context do
       busy = %{
         "Uncapped" => [
-          Tempo.from_iso8601!("2026-06-15T09:00:00/2026-06-15T10:00:00"),
-          Tempo.from_iso8601!("2026-06-15T10:00:00/2026-06-15T11:00:00")
+          ~o"2026-06-15T09:00:00/2026-06-15T10:00:00",
+          ~o"2026-06-15T10:00:00/2026-06-15T11:00:00"
         ]
       }
 
@@ -361,21 +362,24 @@ defmodule Agenda.PlannerTest do
         Agenda.open(
           Agenda.resource("Room", seats: 8),
           IntervalSet.new!([
-            Tempo.from_iso8601!("2026-06-15T09:00:00/2026-06-15T17:00:00"),
-            Tempo.from_iso8601!("2026-06-16T09:00:00/2026-06-16T17:00:00")
+            ~o"2026-06-15T09:00:00/2026-06-15T17:00:00",
+            ~o"2026-06-16T09:00:00/2026-06-16T17:00:00"
           ])
         )
 
       session =
         "Booking"
-        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-17")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
         |> Session.needs(:room, seats: at_least(8))
 
       %{room: room, session: session}
     end
 
     defp days_offered(options) do
-      options |> Enum.map(& &1.interval.from.time[:day]) |> Enum.uniq() |> Enum.sort()
+      options
+      |> Enum.map(&Tempo.day(Interval.from(&1.interval)))
+      |> Enum.uniq()
+      |> Enum.sort()
     end
 
     test "a truncated spread samples the whole window, not one end", context do
@@ -431,7 +435,7 @@ defmodule Agenda.PlannerTest do
 
     defp review_with(_context, invitees) do
       "Review"
-      |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+      |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
       |> Session.needs(:room, seats: at_least(8))
       |> Session.invite(:optional, invitees)
     end
@@ -477,7 +481,7 @@ defmodule Agenda.PlannerTest do
 
       rostered =
         "Review"
-        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
         |> Session.needs(:room, seats: at_least(8))
         |> Session.roster(:attendees, [context.bob])
 
@@ -511,7 +515,7 @@ defmodule Agenda.PlannerTest do
     test "a session with no invitees is unchanged", context do
       session =
         "Review"
-        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-16")
+        |> Agenda.session(duration: "PT1H", window: "2026-06-15/2026-06-15")
         |> Session.needs(:room, seats: at_least(8))
 
       {:ok, options} = Planner.plan(session, [context.room], limit: 10)

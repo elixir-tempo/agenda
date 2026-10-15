@@ -39,8 +39,8 @@ defmodule Agenda.Planner do
   alias Agenda.Requirement
   alias Agenda.Resource
   alias Agenda.Session
-  alias Tempo.Compare
   alias Tempo.Duration
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   @default_limit 20
@@ -93,7 +93,7 @@ defmodule Agenda.Planner do
       iex> boardroom = Agenda.Resource.new("Boardroom", seats: 8)
       iex> {:ok, boardroom} = Agenda.open(boardroom, "2026-06-15T09:00:00/2026-06-15T12:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-15")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> {:ok, arrangements} = Agenda.Planner.plan(session, [boardroom])
       iex> length(arrangements)
@@ -180,7 +180,7 @@ defmodule Agenda.Planner do
       iex> big = Agenda.resource("Barn", seats: 40, video_conferencing: false)
       iex> {:ok, big} = Agenda.open(big, "2026-06-15T09:00:00/2026-06-15T12:00:00")
       iex> session =
-      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-16")
+      ...>   Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-15")
       ...>   |> Agenda.Session.needs(:room, seats: at_least(8), video_conferencing: true)
       iex> Agenda.Planner.conflict(session, [small, big])
       {:ok, [needs: {:room, :seats}, needs: {:room, :video_conferencing}]}
@@ -294,7 +294,7 @@ defmodule Agenda.Planner do
   # imposes no constraint, which is `base` unchanged.
   defp co_free(resources, base, window, options) do
     with {:ok, sets} <- tagged_free(resources, window, options) do
-      Tempo.intersection(base, sets, metadata: {:merge, &accumulate/2})
+      Tempo.intersection(base, sets, metadata: &accumulate/2)
     end
   end
 
@@ -311,7 +311,7 @@ defmodule Agenda.Planner do
 
   defp tag(free, resource) do
     free
-    |> IntervalSet.to_list()
+    |> IntervalSet.members()
     |> Enum.map(&%{&1 | metadata: %{free: [resource.name]}})
     |> IntervalSet.new!()
   end
@@ -366,10 +366,8 @@ defmodule Agenda.Planner do
   defp placements(session, allocation, roster_free, window, duration, options) do
     chosen = allocation |> Map.values() |> List.flatten()
 
-    case co_free(chosen, roster_free, window, options) do
-      {:ok, free} -> {:ok, slots(session, allocation, free, duration, options)}
-      {:error, _reason} = error -> error
-    end
+    with {:ok, free} <- co_free(chosen, roster_free, window, options),
+         do: slots(session, allocation, free, duration, options)
   end
 
   # The arrangement records the named resources alongside the chosen
@@ -381,18 +379,21 @@ defmodule Agenda.Planner do
   defp slots(session, allocation, free, duration, options) do
     allocations = Map.merge(allocation, rosters_of(session))
 
-    free
-    |> IntervalSet.slots(duration, every: step(duration, allocations, options))
-    |> IntervalSet.to_list()
-    |> Enum.map(fn interval ->
-      %Arrangement{
-        session: session.name,
-        interval: interval,
-        allocations: allocations,
-        score: 0,
-        series: session.series
-      }
-    end)
+    with {:ok, slots} <-
+           IntervalSet.slots(free, duration, every: step(duration, allocations, options)) do
+      {:ok,
+       slots
+       |> IntervalSet.members()
+       |> Enum.map(fn interval ->
+         %Arrangement{
+           session: session.name,
+           interval: interval,
+           allocations: allocations,
+           score: 0,
+           series: session.series
+         }
+       end)}
+    end
   end
 
   # Candidate start times step by the session's own length, which packs
@@ -461,7 +462,7 @@ defmodule Agenda.Planner do
   end
 
   defp fits?(%Limit{} = limit, %Arrangement{} = arrangement, held) do
-    bucket = Limit.bucket(arrangement.interval.from, limit.period)
+    bucket = Limit.bucket(Interval.from(arrangement.interval), limit.period)
 
     same_period =
       Enum.filter(held, fn claim ->
@@ -478,15 +479,15 @@ defmodule Agenda.Planner do
   defp claimed(busy, name) do
     case Map.get(busy, name) do
       nil -> []
-      %IntervalSet{} = set -> IntervalSet.to_list(set)
+      %Tempo{} = claims -> IntervalSet.members(claims)
       claims when is_list(claims) -> claims
       one -> [one]
     end
   end
 
   # An allocation carries its interval; an interval is its own.
-  defp moment(%{interval: %{from: from}}), do: from
-  defp moment(%{from: from}), do: from
+  defp moment(%{interval: %Tempo{} = interval}), do: moment(interval)
+  defp moment(%Tempo{form: {:span, _from, _to}} = interval), do: Interval.from(interval)
   defp moment(_unreadable), do: nil
 
   # --- stage 5: ranking -------------------------------------------
@@ -587,14 +588,34 @@ defmodule Agenda.Planner do
 
   defp take(scored, limit, true) do
     scored
-    |> Enum.group_by(&Compare.to_utc_seconds(&1.interval.from))
-    |> Enum.sort_by(fn {moment, _group} -> moment end)
-    |> Enum.map(fn {_moment, group} -> group end)
+    |> by_start_moment()
     |> across(limit)
     |> round_robin([])
     |> Enum.take(limit)
     |> Enum.sort(&better?/2)
   end
+
+  # The placements grouped by the moment each starts, in order of that
+  # moment: sorted by where each begins (a stable sort, so each group keeps
+  # its rank order), and each run that begins together one group.
+  defp by_start_moment(scored) do
+    scored
+    |> Enum.sort(&(starts(&1, &2) != :gt))
+    |> Enum.chunk_while([], &together/2, &last_group/1)
+  end
+
+  defp together(placement, [last | _] = group) do
+    if starts(placement, last) == :eq,
+      do: {:cont, [placement | group]},
+      else: {:cont, Enum.reverse(group), [placement]}
+  end
+
+  defp together(placement, []), do: {:cont, [placement]}
+
+  defp last_group([]), do: {:cont, []}
+  defp last_group(group), do: {:cont, Enum.reverse(group), []}
+
+  defp starts(a, b), do: Tempo.compare(a.interval, b.interval, by: :start)
 
   # Which *moments* to offer when there are more of them than the cap
   # allows. Taking the first `limit` of them would cover the front of
@@ -638,7 +659,10 @@ defmodule Agenda.Planner do
   # chronologically, never as their ISO strings — lexicographically
   # "10:00" sorts before "9:00".
   defp better?(%Arrangement{score: same} = a, %Arrangement{score: same} = b) do
-    Compare.compare_endpoints(a.interval.from, b.interval.from) in [:earlier, :same]
+    Tempo.compare(Interval.from(a.interval), Interval.from(b.interval), by: :start) in [
+      :lt,
+      :eq
+    ]
   end
 
   defp better?(%Arrangement{} = a, %Arrangement{} = b), do: a.score > b.score

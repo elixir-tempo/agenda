@@ -137,6 +137,7 @@ if Code.ensure_loaded?(CPSolver) do
     alias CPSolver.Constraint.Sum
     alias CPSolver.IntVariable
     alias CPSolver.Model
+    alias Tempo.Interval
 
     @default_candidates 40
 
@@ -187,7 +188,7 @@ if Code.ensure_loaded?(CPSolver) do
         iex> room = Agenda.resource("Hall", seats: 100)
         iex> {:ok, room} = Agenda.open(room, "2026-09-15T09:00:00/2026-09-15T12:00:00")
         iex> talk = fn name ->
-        ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-16")
+        ...>   Agenda.session(name, duration: "PT1H", window: "2026-09-15/2026-09-15")
         ...>   |> Agenda.Session.needs(:room, seats: 100)
         ...> end
         iex> programme =
@@ -372,7 +373,9 @@ if Code.ensure_loaded?(CPSolver) do
     defp contribution(placement, resource, limit) do
       if Enum.any?(Arrangement.resources(placement), &(&1.name == resource.name)) do
         {_count, duration} = Limit.sum([placement.interval])
-        {Limit.bucket(placement.interval.from, limit.period), Limit.measure(limit, 1, duration)}
+
+        {Limit.bucket(Interval.from(placement.interval), limit.period),
+         Limit.measure(limit, 1, duration)}
       else
         {nil, 0}
       end
@@ -466,7 +469,9 @@ if Code.ensure_loaded?(CPSolver) do
       max(0, Limit.ceiling(limit) - Limit.measure(limit, count, duration))
     end
 
-    defp interval_start(%Tempo.Interval{from: from}), do: from
+    defp interval_start(%Tempo{form: {:span, _from, _to}} = interval),
+      do: Interval.from(interval)
+
     defp interval_start(other), do: other
 
     # `1` where the two placements cannot both stand. The predicate is

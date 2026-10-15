@@ -52,8 +52,9 @@ defmodule Agenda.Series do
 
   ### Options
 
-  * `:bound` bounds an otherwise unbounded recurrence. Required when
-    `pattern` does not state its own count or end.
+  * `:bound` bounds an otherwise unbounded recurrence: the occurrences
+    that overlap it are expanded. Required when `pattern` does not state
+    its own count or end.
 
   ### Returns
 
@@ -81,7 +82,7 @@ defmodule Agenda.Series do
          {:ok, occurrences} <- materialise(recurrence, options) do
       {:ok,
        occurrences
-       |> IntervalSet.to_list()
+       |> IntervalSet.members()
        |> Enum.with_index(1)
        |> Enum.map(&occurrence(session, &1))}
     end
@@ -89,15 +90,10 @@ defmodule Agenda.Series do
 
   defp materialise(recurrence, options) do
     case Keyword.fetch(options, :bound) do
-      {:ok, bound} -> Tempo.to_interval(recurrence, bound: bound)
+      {:ok, bound} -> Tempo.to_interval(recurrence, within: bound)
       :error -> Tempo.to_interval(recurrence)
     end
-    |> as_set()
   end
-
-  defp as_set({:ok, %IntervalSet{} = set}), do: {:ok, set}
-  defp as_set({:ok, interval}), do: {:ok, IntervalSet.new!([interval])}
-  defp as_set({:error, reason}), do: {:error, reason}
 
   # Each occurrence keeps the original's requirements and length, and
   # takes the repetition's span as its window. The series name is what

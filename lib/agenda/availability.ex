@@ -22,7 +22,7 @@ defmodule Agenda.Availability do
 
       iex> boardroom = Agenda.Resource.new("Boardroom")
       iex> {:ok, boardroom} = Agenda.Availability.open(boardroom, "R5/2026-06-15/P1D")
-      iex> {:ok, free} = Agenda.Availability.free(boardroom, within: "2026-06-15/2026-06-17")
+      iex> {:ok, free} = Agenda.Availability.free(boardroom, within: "2026-06-15/2026-06-16")
       iex> Tempo.IntervalSet.count(free)
       2
 
@@ -38,7 +38,7 @@ defmodule Agenda.Availability do
   alias Tempo.RRule
 
   @typedoc "A Tempo value that already denotes a span."
-  @type span :: Tempo.t() | Tempo.Interval.t() | Tempo.Duration.t() | IntervalSet.t()
+  @type span :: Tempo.t() | Tempo.t() | Tempo.Duration.t() | Tempo.t()
 
   @typedoc """
   Availability imported from an RFC 7953 `VAVAILABILITY`, held
@@ -156,18 +156,16 @@ defmodule Agenda.Availability do
   ### Examples
 
       iex> {:ok, value} = Agenda.Availability.normalise("R5/2026-06-15/P1D")
-      iex> value.recurrence
+      iex> value |> Tempo.to_interval!() |> Tempo.IntervalSet.count()
       5
 
       iex> {:ok, value} = Agenda.Availability.normalise("FREQ=DAILY;COUNT=3")
-      iex> value.recurrence
-      3
+      iex> Tempo.to_iso8601!(value)
+      "R3/../P1D"
 
   """
   @spec normalise(term()) :: {:ok, span() | imported()} | {:error, :unreadable_pattern}
   def normalise({:vavailability, _calendar} = imported), do: {:ok, imported}
-  def normalise(%IntervalSet{} = value), do: {:ok, value}
-  def normalise(%Interval{} = value), do: {:ok, value}
   def normalise(%Duration{} = value), do: {:ok, value}
   def normalise(%Tempo{} = value), do: {:ok, value}
 
@@ -226,7 +224,7 @@ defmodule Agenda.Availability do
       ...> \"\"\"
       iex> {:ok, hours} = Agenda.Availability.from_ical(ics)
       iex> {:ok, clinic} = Agenda.open(Agenda.resource("Clinic"), hours)
-      iex> {:ok, free} = Agenda.free(clinic, within: "2026-06-01/2026-06-08")
+      iex> {:ok, free} = Agenda.free(clinic, within: "2026-06-01/2026-06-07")
       iex> Tempo.IntervalSet.count(free)
       5
 
@@ -264,7 +262,7 @@ defmodule Agenda.Availability do
     one.
 
   * `:busy` is what already claims the resource — a Tempo value, a
-    string, an `t:Tempo.IntervalSet.t/0`, or a list of them. The
+    string, a `t:Tempo.t/0` interval set, or a list of them. The
     default is `[]`.
 
   ### Returns
@@ -279,7 +277,7 @@ defmodule Agenda.Availability do
       iex> boardroom = Agenda.Resource.new("Boardroom")
       iex> {:ok, boardroom} = Agenda.Availability.open(boardroom, "2026-06-15T09:00:00/2026-06-15T17:00:00")
       iex> {:ok, free} = Agenda.Availability.free(boardroom,
-      ...>   within: "2026-06-15/2026-06-16",
+      ...>   within: "2026-06-15/2026-06-15",
       ...>   busy: "2026-06-15T12:00:00/2026-06-15T13:00:00")
       iex> Tempo.IntervalSet.members(free)
       [~o"2026Y6M15DT9H0M0S/T12H0M0S",
@@ -288,12 +286,12 @@ defmodule Agenda.Availability do
   A resource with no open hours is never free:
 
       iex> Agenda.Resource.new("Boardroom")
-      ...> |> Agenda.Availability.free(within: "2026-06-15/2026-06-16")
-      ...> |> then(fn {:ok, free} -> Tempo.IntervalSet.empty?(free) end)
+      ...> |> Agenda.Availability.free(within: "2026-06-15/2026-06-15")
+      ...> |> then(fn {:ok, free} -> Tempo.empty?(free) end)
       true
 
   """
-  @spec free(Resource.t(), keyword()) :: {:ok, IntervalSet.t()} | {:error, term()}
+  @spec free(Resource.t(), keyword()) :: {:ok, Tempo.t()} | {:error, term()}
   def free(%Resource{open: nil}, _options), do: {:ok, IntervalSet.new!([])}
 
   def free(%Resource{} = resource, options) do
@@ -301,11 +299,9 @@ defmodule Agenda.Availability do
          {:ok, within} <- required(options, :within),
          {:ok, window} <- normalise(within),
          {:ok, open} <- within(resource.open, window),
-         {:ok, busy} <- busy_set(Keyword.get(options, :busy, []), window) do
-      busy
-      |> with_turnaround(resource)
-      |> saturated(resource.concurrency)
-      |> then(&Tempo.difference(open, &1))
+         {:ok, busy} <- busy_set(Keyword.get(options, :busy, []), window),
+         {:ok, saturated} <- busy |> with_turnaround(resource) |> saturated(resource.concurrency) do
+      Tempo.difference(open, saturated)
     end
   end
 
@@ -343,27 +339,25 @@ defmodule Agenda.Availability do
     |> IntervalSet.new!()
   end
 
-  defp widen(%Interval{} = claim, %Resource{} = resource) do
-    %{
-      claim
-      | from: earlier_by(claim.from, resource.buffer_before),
-        to: later_by(claim.to, resource.buffer_after)
-    }
+  defp widen(%Tempo{} = claim, %Resource{} = resource) do
+    Interval.new!(
+      from: earlier_by(Interval.from(claim), resource.buffer_before),
+      to: later_by(Interval.to(claim), resource.buffer_after),
+      metadata: Tempo.metadata(claim)
+    )
   end
 
   defp earlier_by(point, nil), do: point
-  defp earlier_by(point, duration), do: Tempo.shift(point, Duration.negate(duration))
+  defp earlier_by(point, duration), do: Tempo.shift!(point, Duration.negate(duration))
 
   defp later_by(point, nil), do: point
-  defp later_by(point, duration), do: Tempo.shift(point, duration)
+  defp later_by(point, duration), do: Tempo.shift!(point, duration)
 
   # A resource is only unavailable where enough claims overlap to use
   # it up. At the default concurrency of one that is anywhere it is
   # claimed at all; a bank of twenty lockers stays free until the
   # twenty-first person wants one.
-  defp saturated(busy, concurrency) do
-    IntervalSet.overlapping(busy, at_least: concurrency)
-  end
+  defp saturated(busy, concurrency), do: IntervalSet.covered(busy, at_least: concurrency)
 
   # An imported `VAVAILABILITY` states availability directly, so
   # materialising it *is* asking what it offers over the window —
@@ -380,7 +374,7 @@ defmodule Agenda.Availability do
   # An unbounded recurrence needs the window as its bound; a plain
   # interval needs no materialisation at all.
   defp within(open, window) do
-    case Tempo.to_interval(open, bound: window) do
+    case Tempo.to_interval(open, within: window) do
       {:ok, materialised} -> Tempo.intersection(materialised, window)
       {:error, _reason} -> Tempo.intersection(open, window)
     end
@@ -410,7 +404,7 @@ defmodule Agenda.Availability do
   defp claimed_intervals(one, window) do
     with {:ok, value} <- normalise(one),
          {:ok, materialised} <- within(value, window) do
-      {:ok, IntervalSet.to_list(materialised)}
+      {:ok, IntervalSet.members(materialised)}
     end
   end
 end

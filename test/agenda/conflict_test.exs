@@ -5,6 +5,7 @@ defmodule Agenda.ConflictTest do
 
   alias Agenda.Arranger
   alias Agenda.Conflict
+  alias Agenda.Hours
   alias Agenda.Planner
   alias Agenda.Programme
   alias Agenda.Session
@@ -15,7 +16,7 @@ defmodule Agenda.ConflictTest do
   defp room(name, hours, attributes \\ []) do
     {:ok, room} =
       Agenda.resource(name, [{:seats, 100} | attributes])
-      |> Agenda.open("2026-09-15T09:00:00/2026-09-15T#{9 + hours}:00:00")
+      |> Agenda.open(Hours.on({2026, 9, 15}, 9, 9 + hours))
 
     room
   end
@@ -29,7 +30,7 @@ defmodule Agenda.ConflictTest do
   defp conf(tracks_or_sessions) do
     Enum.reduce(
       tracks_or_sessions,
-      Agenda.programme("Conf", across: "2026-09-15/2026-09-16"),
+      Agenda.programme("Conf", across: "2026-09-15/2026-09-15"),
       fn
         %Track{} = track, programme -> Programme.add_track(programme, track)
         session, programme -> Programme.add_session(programme, session)
@@ -175,7 +176,7 @@ defmodule Agenda.ConflictTest do
       boardroom = room("Boardroom", 3, video_conferencing: true)
 
       session =
-        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, seats: at_least(8), video_conferencing: true)
 
       assert Planner.conflict(session, [boardroom]) == :none
@@ -187,7 +188,7 @@ defmodule Agenda.ConflictTest do
       barn = room("Barn", 3, seats: 40, video_conferencing: false)
 
       session =
-        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, seats: at_least(8), video_conferencing: true)
 
       assert {:ok, conflict} = Planner.conflict(session, [snug, barn])
@@ -202,7 +203,7 @@ defmodule Agenda.ConflictTest do
       barn = room("Barn", 3, seats: 40, video_conferencing: true)
 
       session =
-        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, seats: at_least(500), video_conferencing: true)
 
       assert Planner.conflict(session, [barn]) == {:ok, [needs: {:room, :seats}]}
@@ -220,7 +221,7 @@ defmodule Agenda.ConflictTest do
       {:ok, alice} = Agenda.open(alice, "2026-09-15T09:00:00/2026-09-15T12:00:00")
 
       session =
-        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, video_conferencing: true)
         |> Session.roster(:attendees, [alice])
 
@@ -238,7 +239,7 @@ defmodule Agenda.ConflictTest do
       snug = room("Snug", 1, video_conferencing: true)
 
       session =
-        Agenda.session("Review", duration: "PT3H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Review", duration: "PT3H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, seats: at_least(8), video_conferencing: true)
 
       assert Planner.conflict(session, [snug]) == {:ok, []}
@@ -255,7 +256,7 @@ defmodule Agenda.ConflictTest do
 
     test "a session" do
       session =
-        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-16")
+        Agenda.session("Review", duration: "PT1H", window: "2026-09-15/2026-09-15")
         |> Session.needs(:room, seats: at_least(500))
 
       assert Agenda.conflict(session, [room("Hall", 3)]) == {:ok, [needs: {:room, :seats}]}
