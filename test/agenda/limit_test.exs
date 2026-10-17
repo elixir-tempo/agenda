@@ -198,10 +198,9 @@ defmodule Agenda.LimitTest do
   describe "bucket/2 takes its week from the value's own calendar" do
     # A Gregorian week runs Monday..Sunday; this one runs Sunday..Saturday.
     defmodule SundayStart do
-      use Calendrical.Base.Month,
-        month_of_year: 1,
-        min_days_in_first_week: 1,
-        day_of_week: Calendrical.sunday()
+      use Calendrical.Calendar.Shifted,
+        year_begins: {1, 1},
+        weeks: [first_day: 7, min_days_in_first_week: 1]
     end
 
     defp on(%Date{} = date, calendar) do

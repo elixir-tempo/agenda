@@ -30,9 +30,9 @@ Everything in this talk runs. The data is the real ElixirConf US 2025 programme,
 
 ## Locale
 
-Every date and time on these slides is rendered by Localize from a *named width* — `:short`, `:medium` — rather than a format string, so the output follows the locale rather than a pattern someone typed. Change it here and the whole deck follows.
+* Every date and time on these slides is rendered by Localize from a *named width* — `:short`, `:medium` — rather than a format string, so the output follows the locale rather than a pattern someone typed. Change it here and the whole deck follows.
 
-`en-AU` is not bundled with Localize, so this also lets it fetch the locale on demand. Run this cell once before presenting and it is cached; without the download the deck falls back to `en` and renders American dates.
+* `en-AU` is not bundled with Localize, so this also lets it fetch the locale on demand. Run this cell once before presenting and it is cached; without the download the deck falls back to `en` and renders American dates.
 
 <!-- slide: code -->
 
@@ -45,36 +45,39 @@ to_string(locale)
 
 ## What we keep rebuilding
 
-Every scheduling system I have worked on rebuilds the same three things above the calendar, and none of them is the interesting part of the product.
+* Common scheduling systems rebuild the same three things above the calendar, and none of them is the interesting part of the product.
 
-* A map of resources, and hand-rolled filters over its keys
-* A travel matrix, hard-coded, usually wrong
-* Free/busy state stored somewhere, and slowly going stale
+  * A map of resources, and hand-rolled filters over its keys
+  * A travel matrix, hard-coded, usually wrong
+  * Free/busy state stored somewhere, and slowly going stale
 
-The third one is the killer. Once availability is *stored* rather than *derived*, every code path that books something has to remember to release it, and one that forgets leaves a room permanently missing.
+* The third one is the killer. Once availability is *stored* rather than *derived*, every code path that books something has to remember to release it, and one that forgets leaves a room permanently missing.
 
 ## The five nouns
 
-Five nouns, and the last three are a sequence: you describe a **session**, `plan/3` returns every **arrangement** that would satisfy it, and accepting one writes **allocations**. One want, many candidates, one booking.
+* Five nouns, and the last three are a sequence: you describe a **session**, `plan/3` returns every **arrangement** that would satisfy it, and accepting one writes **allocations**. One want, many candidates, one booking.
 
 * **Resource** — a named thing that can be allocated: a room, a person, a projector
+
 * **Place** — a container of resources and other places, so travel time is *derived* rather than configured
+
 * **Session** — *one thing you want held*: how long, inside what window, what it needs
+
 * **Arrangement** — *one of the many ways that session could be held*: a time, plus a resource for each thing it needs
+
 * **Allocation** — *what accepting one arrangement leaves behind*: a resource booked to a session
 
 ## How they constrain each other
 
-The five nouns say what *exists*; these say what *limits what*. Each line holds two words that most schedulers merge into one, and every merge is a bug — so Agenda keeps them apart.
-
-* A resource is **open** when it could be used, **busy** where something holds it, **free** where open remains — *Biscayne: open all morning, busy for the panel, free either side*.
-* A resource's **concurrency** is how many sessions may hold it at one moment; its **limit** is how many across a stretch of calendar — *one talk at a time, but at most two a day*.
-* A session's **needs** *describe* a resource for Agenda to choose — *any room seating 250*; its **roster** *names* one exactly — *Anna Sherman, nobody else*.
-* A **session** is one thing to be held; a **track** is sessions sharing an audience, so no two may run at once — *one talk, versus everything one delegate plans to attend*.
+* The five nouns say what *exists*; these say what *limits what*. Each line holds two words that most schedulers merge into one, and every merge is a bug — so Agenda keeps them apart.
+  * A resource is **open** when it could be used, **busy** where something holds it, **free** where open remains — *Biscayne: open all morning, busy for the panel, free either side*.
+  * A resource's **concurrency** is how many sessions may hold it at one moment; its **limit** is how many across a stretch of calendar — *one talk at a time, but at most two a day*.
+  * A session's **needs** *describe* a resource for Agenda to choose — *any room seating 250*; its **roster** *names* one exactly — *Anna Sherman, nobody else*.
+  * A **session** is one thing to be held; a **track** is sessions sharing an audience, so no two may run at once — *one talk, versus everything one delegate plans to attend*.
 
 ## The conference
 
-Two days at the Renaissance Orlando at SeaWorld, three parallel rooms, and a fourth room used for registration, coffee, lunch and the reception rather than for talks.
+* Two days at the Renaissance Orlando at SeaWorld, three parallel rooms, and a fourth room used for registration, coffee, lunch and the reception rather than for talks.
 
 | What            | ElixirConf US 2025                    |
 | --------------- | ------------------------------------- |
@@ -87,9 +90,9 @@ Two days at the Renaissance Orlando at SeaWorld, three parallel rooms, and a fou
 
 ## Breaks are not constraints
 
-The first thing to model is when the rooms are *open*, and it is not a range — talks run 10:45 to 12:45, break for lunch, resume at 13:45, break again for coffee.
+* The first thing to model is when the rooms are *open*, and it is not a range — talks run 10:45 to 12:45, break for lunch, resume at 13:45, break again for coffee.
 
-Lunch is not a rule to enforce. It is simply time the rooms are not open, and every calculation downstream inherits that for free.
+* Lunch is not a rule to enforce. It is simply time the rooms are not open, and every calculation downstream inherits that for free.
 
 <!-- slide: code -->
 
@@ -114,7 +117,7 @@ Tempo.IntervalSet.count(talk_hours)
 
 ## The rooms
 
-Peninsula 4-7 is also the plenary room, so it opens earlier and closes later than the other two.
+* Peninsula 4-7 is also the plenary room, so it opens earlier and closes later than the other two.
 
 <!-- slide: code -->
 
@@ -165,7 +168,9 @@ I did not plan this example around the constraint. I loaded the real programme a
 
 ## Forty-five speakers
 
-One resource each, open for the hours of the conference. Nothing about them is speaker-specific: `role: :speaker` is an ordinary attribute of the kind you would put on a room. `Agenda.Resource.fetch_all/2` is how a talk names the people who must be in it — all or nothing, so a misspelled name fails the call instead of quietly dropping the speaker.
+* One resource each, open for the hours of the conference.
+* Nothing about them is speaker-specific: `role: :speaker` is an ordinary attribute of the kind you would put on a room.
+* `Agenda.Resource.fetch_all/2` is how a talk names the people who must be in it — all or nothing, so a misspelled name fails the call instead of quietly dropping the speaker.
 
 <!-- slide: code -->
 
@@ -190,21 +195,13 @@ speakers =
 length(speakers)
 ```
 
-## A role is one demand
-
-Preparing this talk found a bug, which is why this slide exists — naming a role twice used to keep only the last call, so a panel built up one speaker at a time silently lost three of its four people.
-
-* `roster(:speaker, [a, b, c])` and three calls of `roster(:speaker, [a])` now mean the same thing
-* Same for `needs/3`: two calls describing one role combine into one description
-* An arrangement fills each role once, so two requirements for a role could never both be honoured
-
 ## The programme
 
-Forty-two talks, each naming its duration, the kind of room it needs and the people who must be there — and nothing about when. Agenda has the two days from the programme and the open hours from the rooms; which talk lands on which day is its problem, not the data's.
+* Forty-two talks, each naming its duration, the kind of room it needs and the people who must be there — and nothing about when. Agenda has the two days from the programme and the open hours from the rooms; which talk lands on which day is its problem, not the data's.
 
-That makes the layout **repeatable but not predetermined**. The same input gives the same answer every time, but nothing in it says a given talk belongs on Thursday — add a room, reorder the list, or change the library, and it may land on Friday instead. Any one placement below is *an* answer, not *the* answer.
+* That makes the layout **repeatable but not predetermined**. The same input gives the same answer every time, but nothing in it says a given talk belongs on Thursday — add a room, reorder the list, or change the library, and it may land on Friday instead. Any one placement below is *an* answer, not *the* answer.
 
-`needs/3` **describes** and lets the planner choose — any room seating 250 will do. `roster/3` **names** and accepts no substitutes — these four people. Both bind the same way once the search starts, which is what lets a room and a person clash for the same reason.
+* `needs/3` **describes** and lets the planner choose — any room seating 250 will do. `roster/3` **names** and accepts no substitutes — these four people. Both bind the same way once the search starts, which is what lets a room and a person clash for the same reason.
 
 <!-- slide: code -->
 
@@ -269,9 +266,9 @@ length(sessions)
 
 ## Keynotes are pins
 
-A keynote is published months ahead. It is not a decision left to the scheduler — it is a fixed point the scheduler has to work around.
+* A keynote is published months ahead. It is not a decision left to the scheduler — it is a fixed point the scheduler has to work around.
 
-A pin is not a special kind of value. It is an ordinary arrangement, so you build one by planning the session against the slot it was announced for and keeping the answer.
+* A pin is not a special kind of value. It is an ordinary arrangement, so you build one by planning the session against the slot it was announced for and keeping the answer.
 
 <!-- slide: code -->
 
@@ -310,9 +307,9 @@ length(pinned)
 
 ## One session, or all of them
 
-Both verbs have now appeared — `plan/3` produced the keynote pins, and `arrange/3` is about to lay out the whole programme. They answer different questions, which is worth a moment because their output can look identical.
+* Both verbs have now appeared — `plan/3` produced the keynote pins, and `arrange/3` is about to lay out the whole programme. They answer different questions, which is worth a moment because their output can look identical.
 
-Three one-hour sessions and one room open nine to twelve. `plan/3` returns three placements for **one** session and you pick one of them. `arrange/3` returns three placements for **three** sessions and you take them all. Same three lines, opposite meanings.
+* Three one-hour sessions and one room open nine to twelve. `plan/3` returns three placements for **one** session and you pick one of them. `arrange/3` returns three placements for **three** sessions and you take them all. Same three lines, opposite meanings.
 
 |                | `plan/3`                          | `arrange/3`                        |
 | -------------- | --------------------------------- | ---------------------------------- |
@@ -325,7 +322,7 @@ Arranging is built on planning: it asks `plan/3` for each session's candidates, 
 
 ## Laying it out
 
-Forty-two talks and four plenaries, against three rooms and forty-five speakers.
+* Forty-two talks and four plenaries, against three rooms and forty-five speakers.
 
 <!-- slide: code -->
 
@@ -364,7 +361,7 @@ end)
 
 ## The constraint held
 
-There is no rule saying Allison Randal cannot be on a panel during her own keynote. It follows from her being a resource with a concurrency of one — and it would have followed identically for a room, a projector or a customer site.
+* There is no rule saying Allison Randal cannot be on a panel during her own keynote. It follows from her being a resource with a concurrency of one — and it would have followed identically for a room, a projector or a customer site.
 
 <!-- slide: code -->
 
@@ -384,9 +381,9 @@ end
 
 ## When it cannot hold
 
-Force the panel into the keynote slot and the programme stops being satisfiable.
+* Force the panel into the keynote slot and the programme stops being satisfiable.
 
-*Everyone free* is the operative phrase. Both other rooms are empty at 09:15 — the session still cannot be held, because one of the four people it names is on stage next door.
+* *Everyone free* is the operative phrase. Both other rooms are empty at 09:15 — the session still cannot be held, because one of the four people it names is on stage next door.
 
 <!-- slide: code -->
 
@@ -425,11 +422,10 @@ end
 
 ## Failures are sentences
 
-This is the feature that saves the most time in practice, and it is a design decision rather than a nicety: eligibility and its explanation are computed *together*, so the reason can never drift out of step with the answer.
-
-* Not `false`, not "no availability" — the resource, and what was wrong with it
-* Every failing reason, not just the first one found
-* The same call answers the positive case
+* This is the feature that saves the most time in practice, and it is a design decision rather than a nicety: eligibility and its explanation are computed *together*, so the reason can never drift out of step with the answer.
+  * Not `false`, not "no availability" — the resource, and what was wrong with it
+  * Every failing reason, not just the first one found
+  * The same call answers the positive case
 
 <!-- slide: code -->
 
@@ -454,9 +450,9 @@ end)
 
 ## Which one moves
 
-`conflict/3` goes further than a reason. When a programme will not hold, it returns the *minimal* set of sessions in tension — remove any one member and the rest fit.
+* `conflict/3` goes further than a reason. When a programme will not hold, it returns the *minimal* set of sessions in tension — remove any one member and the rest fit.
 
-Three forty-minute talks, and Canaveral open for the eighty minutes after lunch. Any two of them fit; all three do not, and no single talk is at fault.
+* Three forty-minute talks, and Canaveral open for the eighty minutes after lunch. Any two of them fit; all three do not, and no single talk is at fault.
 
 <!-- slide: code -->
 
@@ -477,9 +473,9 @@ in_tension
 
 ## Changeover
 
-Agenda placed talks back to back. The real conference left ten minutes between them — one speaker unplugging while the next sets up — and Agenda did not invent that, because nothing asked for it.
+* Agenda placed talks back to back. The real conference left ten minutes between them — one speaker unplugging while the next sets up — and Agenda did not invent that, because nothing asked for it.
 
-Declared on the room, it holds between every pair the search places. These are four of the conference's own twenty-minute talks, in Peninsula 4-7's Thursday block.
+* Declared on the room, it holds between every pair the search places. These are four of the conference's own twenty-minute talks, in Peninsula 4-7's Thursday block.
 
 <!-- slide: code -->
 
@@ -512,16 +508,15 @@ end)
 
 ## Model the gap, or carve it out
 
-Turnaround is real time the room is unavailable, so it holds against a booking that already exists *and* against another talk in the same programme.
-
-* `buffer_after` shifts the candidate starts too — 9:00, 9:50, 10:40, 11:30
-* The published windows already spend those minutes: 40 + 10, 40 + 10, 20 fills 10:45–12:45 exactly
-* Declaring it as well asks for the same ten minutes twice
-* Model the changeover **or** carve it out of the hours — never both
+* Turnaround is real time the room is unavailable, so it holds against a booking that already exists *and* against another talk in the same programme.
+  * `buffer_after` shifts the candidate starts too — 9:00, 9:50, 10:40, 11:30
+  * The published windows already spend those minutes: 40 + 10, 40 + 10, 20 fills 10:45–12:45 exactly
+  * Declaring it as well asks for the same ten minutes twice
+  * Model the changeover **or** carve it out of the hours — never both
 
 ## Scale
 
-Shape matters more than size. 1,200 sessions across twenty days take about four times as long as 200 competing for a single day — six times the work for four times the time, because sessions that cannot interact are solved separately and concurrently.
+* Shape matters more than size. 1,200 sessions across twenty days take about four times as long as 200 competing for a single day — six times the work for four times the time, because sessions that cannot interact are solved separately and concurrently.
 
 | Programme                                | Time    |
 | ---------------------------------------- | ------- |
@@ -532,22 +527,20 @@ Shape matters more than size. 1,200 sessions across twenty days take about four 
 
 ## Two days is not two problems
 
-I assumed a two-day conference would split cleanly down the middle. It does not, and the reason is a person.
-
-* Anna Sherman speaks on Thursday **and** Friday
-* One shared speaker links both days into a single component
-* One shared room, or one precedence, would do the same
-* Worth knowing before assuming a long conference decomposes
+* You might assume a two-day conference would split cleanly down the middle. It does not, and the reason is a person.
+  * Anna Sherman speaks on Thursday **and** Friday
+  * One shared speaker links both days into a single component
+  * One shared room, or one precedence, would do the same
+  * Worth knowing before assuming a long conference decomposes
 
 ## Where this stops
 
-Agenda is a scheduler. Timetabling — a school or university week — is a different problem that shares the vocabulary.
-
-* A timetable is a repeating *grid* of periods, not dated intervals
-* A lesson splits: "five periods a week, at most two a day, one double"
-* Feasibility is easy there; minimising student gaps is the whole job
-* Every teacher and cohort recurs daily, so nothing decomposes
-* `Timetable` could be a sibling library, its definitely no in scope for this one
+* Agenda is a scheduler. Timetabling — a school or university week — is a different problem that shares the vocabulary.
+  * A timetable is a repeating *grid* of periods, not dated intervals
+  * A lesson splits: "five periods a week, at most two a day, one double"
+  * Feasibility is easy there; minimising student gaps is the whole job
+  * Every teacher and cohort recurs daily, so nothing decomposes
+  * `Timetable` could be a sibling library, its definitely no in scope for this one
 
 ## Thank you
 

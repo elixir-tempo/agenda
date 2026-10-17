@@ -113,7 +113,7 @@ defmodule Agenda.MixProject do
       {:stream_data, "~> 1.0", only: [:dev, :test], runtime: false},
       # A real IANA database, so tests exercise zone and DST arithmetic
       # rather than Elixir's UTC-only default. Consumers pick their own.
-      {:tz, "~> 0.28", only: [:dev, :test]}
+      {:tz, "~> 0.28"}
     ]
   end
 
