@@ -55,7 +55,7 @@ defmodule Agenda.HoldsTest do
 
       assert [allocation] = Agenda.holds(ledger)
       assert allocation.session == "Review"
-      assert allocation.held_until != nil
+      refute is_nil(allocation.held_until)
     end
 
     test "a firm allocation is not a hold", context do

@@ -349,7 +349,7 @@ if Code.ensure_loaded?(CPSolver) do
         Enum.flat_map(placements, &Arrangement.resources/1)
       end)
       |> Enum.uniq_by(& &1.name)
-      |> Enum.filter(fn resource -> Enum.any?(resource.limits, &(&1.at_most != nil)) end)
+      |> Enum.filter(fn resource -> Enum.any?(resource.limits, &(not is_nil(&1.at_most))) end)
     end
 
     defp periods(_resource, %Limit{at_most: nil}, _candidates, _variables, _busy) do
@@ -404,7 +404,7 @@ if Code.ensure_loaded?(CPSolver) do
         |> Enum.reject(fn {_variable, array} -> Enum.all?(array, &(&1 == 0)) end)
 
       cond do
-        arrays == [] -> []
+        Enum.empty?(arrays) -> []
         worst_case(arrays) <= budget -> []
         true -> [bound(arrays, budget, resource, limit, bucket)]
       end

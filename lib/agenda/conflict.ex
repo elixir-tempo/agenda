@@ -116,8 +116,10 @@ defmodule Agenda.Conflict do
       true ->
         {first, second} = Enum.split(constraints, div(length(constraints), 2))
 
-        from_second = narrow(background ++ first, first != [], second, satisfiable?)
-        from_first = narrow(background ++ from_second, from_second != [], first, satisfiable?)
+        from_second = narrow(background ++ first, match?([_ | _], first), second, satisfiable?)
+
+        from_first =
+          narrow(background ++ from_second, match?([_ | _], from_second), first, satisfiable?)
 
         from_first ++ from_second
     end

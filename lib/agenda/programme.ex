@@ -367,7 +367,7 @@ defmodule Agenda.Programme do
         tracks:
           programme.tracks
           |> Enum.map(&%{&1 | sessions: kept.(&1.sessions)})
-          |> Enum.reject(&(&1.sessions == [])),
+          |> Enum.reject(&Enum.empty?(&1.sessions)),
         # A precedence needs both its ends. One whose predecessor was
         # dropped is not a weaker constraint, it is no constraint —
         # keeping it would let `conflict/3` blame an ordering that

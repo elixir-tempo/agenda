@@ -253,10 +253,9 @@ defmodule Agenda.Planner do
   end
 
   defp eligible_by_role(session, roles, pool) do
-    roles
-    |> Enum.map(&{&1, Requirement.eligible(&1, pool)})
-    |> Enum.split_with(fn {_role, eligible} -> eligible != [] end)
-    |> case do
+    candidates = Enum.map(roles, &{&1, Requirement.eligible(&1, pool)})
+
+    case Enum.split_with(candidates, fn {_role, eligible} -> match?([_ | _], eligible) end) do
       {filled, []} -> {:ok, filled}
       {_filled, empty} -> {:error, no_candidates(session, empty, pool)}
     end
@@ -428,15 +427,17 @@ defmodule Agenda.Planner do
   end
 
   defp longest_turnaround(allocations) do
-    allocations
-    |> Map.values()
-    |> List.flatten()
-    |> Enum.flat_map(fn %Resource{} = resource ->
-      Enum.reject([resource.buffer_before, resource.buffer_after], &is_nil/1)
-    end)
-    |> case do
+    buffers =
+      allocations
+      |> Map.values()
+      |> List.flatten()
+      |> Enum.flat_map(fn %Resource{} = resource ->
+        Enum.reject([resource.buffer_before, resource.buffer_after], &is_nil/1)
+      end)
+
+    case buffers do
       [] -> nil
-      buffers -> Enum.max(buffers, Duration)
+      [_ | _] -> Enum.max(buffers, Duration)
     end
   end
 
@@ -481,10 +482,8 @@ defmodule Agenda.Planner do
 
     same_period =
       Enum.filter(held, fn claim ->
-        case moment(claim) do
-          nil -> false
-          from -> Limit.bucket(from, limit.period) == bucket
-        end
+        from = moment(claim)
+        not is_nil(from) and Limit.bucket(from, limit.period) == bucket
       end)
 
     {count, duration} = Limit.sum([arrangement.interval | same_period])
@@ -696,8 +695,11 @@ defmodule Agenda.Planner do
   defp round_robin(buckets, taken) do
     {heads, rest} =
       Enum.reduce(buckets, {[], []}, fn
+        [head], {heads, rest} ->
+          {[head | heads], rest}
+
         [head | tail], {heads, rest} ->
-          {[head | heads], (tail == [] && rest) || [tail | rest]}
+          {[head | heads], [tail | rest]}
       end)
 
     round_robin(Enum.reverse(rest), heads ++ taken)

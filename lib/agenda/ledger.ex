@@ -543,7 +543,7 @@ defmodule Agenda.Ledger do
   def holds(%__MODULE__{} = ledger) do
     ledger
     |> to_list()
-    |> Enum.filter(&(&1.held_until != nil))
+    |> Enum.reject(&is_nil(&1.held_until))
   end
 
   @doc """

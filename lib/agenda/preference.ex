@@ -217,7 +217,7 @@ defmodule Agenda.Preference do
 
   defp unwilling?(%Resource{} = resource, interval) do
     overlaps?(resource.avoids, interval) or
-      (resource.prefers != nil and not overlaps?(resource.prefers, interval))
+      (not is_nil(resource.prefers) and not overlaps?(resource.prefers, interval))
   end
 
   # A wish may be written as a recurrence — "any Tuesday" — so it is
@@ -276,14 +276,16 @@ defmodule Agenda.Preference do
   # and least-busy room *in use* — comparing against unused rooms
   # would punish merely having a large pool.
   defp room_spread(arrangements, _context) do
-    arrangements
-    |> Enum.flat_map(&MapSet.to_list(rooms_of(&1)))
-    |> Enum.frequencies()
-    |> Map.values()
-    |> case do
+    uses =
+      arrangements
+      |> Enum.flat_map(&MapSet.to_list(rooms_of(&1)))
+      |> Enum.frequencies()
+      |> Map.values()
+
+    case uses do
       [] -> 0
       [_only] -> 0
-      uses -> Enum.max(uses) - Enum.min(uses)
+      [_ | _] -> Enum.max(uses) - Enum.min(uses)
     end
   end
 

@@ -337,9 +337,11 @@ defmodule Agenda.Availability do
   end
 
   defp usable_buffers(%Resource{} = resource) do
-    [before: resource.buffer_before, after: resource.buffer_after]
-    |> Enum.reject(fn {_which, value} -> value == nil or is_struct(value, Tempo.Duration) end)
-    |> case do
+    invalid =
+      [before: resource.buffer_before, after: resource.buffer_after]
+      |> Enum.reject(fn {_which, value} -> is_nil(value) or is_struct(value, Tempo.Duration) end)
+
+    case invalid do
       [] -> :ok
       [{which, value} | _rest] -> {:error, {:invalid_buffer, resource.name, which, value}}
     end
@@ -417,14 +419,15 @@ defmodule Agenda.Availability do
   # would pay hundreds of passes over its own open hours. One set is
   # one sweep, and the cost stops tracking the size of the ledger.
   defp busy_set(busy, window) when is_list(busy) do
-    busy
-    |> Enum.reduce_while({:ok, []}, fn one, {:ok, acc} ->
-      case claimed_intervals(one, window) do
-        {:ok, intervals} -> {:cont, {:ok, acc ++ intervals}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-    |> case do
+    claimed =
+      Enum.reduce_while(busy, {:ok, []}, fn one, {:ok, acc} ->
+        case claimed_intervals(one, window) do
+          {:ok, intervals} -> {:cont, {:ok, acc ++ intervals}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case claimed do
       {:ok, intervals} -> IntervalSet.new(intervals)
       {:error, reason} -> {:error, reason}
     end

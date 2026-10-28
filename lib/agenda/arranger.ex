@@ -412,14 +412,15 @@ defmodule Agenda.Arranger do
   # is read once here rather than reaching `Tempo.shift/2` as a
   # `FunctionClauseError` several frames down.
   defp with_readable_precedences(%Programme{} = programme) do
-    programme.precedences
-    |> Enum.reduce_while({:ok, []}, fn precedence, {:ok, acc} ->
-      case readable_spans(precedence) do
-        {:ok, resolved} -> {:cont, {:ok, acc ++ [resolved]}}
-        {:error, reason} -> {:halt, {:error, Infeasible.new(programme.name, [reason])}}
-      end
-    end)
-    |> case do
+    read =
+      Enum.reduce_while(programme.precedences, {:ok, []}, fn precedence, {:ok, acc} ->
+        case readable_spans(precedence) do
+          {:ok, resolved} -> {:cont, {:ok, acc ++ [resolved]}}
+          {:error, reason} -> {:halt, {:error, Infeasible.new(programme.name, [reason])}}
+        end
+      end)
+
+    case read do
       {:ok, precedences} -> {:ok, %{programme | precedences: precedences}}
       {:error, _reason} = error -> error
     end
@@ -449,14 +450,15 @@ defmodule Agenda.Arranger do
   end
 
   defp readable_reaches(%Programme{} = programme) do
-    programme.tracks
-    |> Enum.reduce_while({:ok, []}, fn track, {:ok, acc} ->
-      case readable_reach(track) do
-        {:ok, track} -> {:cont, {:ok, acc ++ [track]}}
-        {:error, reason} -> {:halt, {:error, Infeasible.new(programme.name, [reason])}}
-      end
-    end)
-    |> case do
+    read =
+      Enum.reduce_while(programme.tracks, {:ok, []}, fn track, {:ok, acc} ->
+        case readable_reach(track) do
+          {:ok, track} -> {:cont, {:ok, acc ++ [track]}}
+          {:error, reason} -> {:halt, {:error, Infeasible.new(programme.name, [reason])}}
+        end
+      end)
+
+    case read do
       {:ok, tracks} -> {:ok, %{programme | tracks: tracks}}
       {:error, reason} -> {:error, reason}
     end
@@ -512,14 +514,16 @@ defmodule Agenda.Arranger do
   end
 
   defp one_per_session(pinned, programme) do
-    pinned
-    |> Enum.frequencies_by(& &1.session)
-    |> Enum.filter(fn {_session, count} -> count > 1 end)
-    |> case do
+    repeated =
+      pinned
+      |> Enum.frequencies_by(& &1.session)
+      |> Enum.filter(fn {_session, count} -> count > 1 end)
+
+    case repeated do
       [] ->
         :ok
 
-      repeated ->
+      [_ | _] ->
         {:error,
          Infeasible.new(
            programme.name,
@@ -533,18 +537,20 @@ defmodule Agenda.Arranger do
   # Pins are checked against each other with the same rules the search
   # applies, so an impossible set is reported before any work is done.
   defp pins_agree(pinned, programme, options) do
-    Enum.reduce_while(pinned, {:ok, []}, fn pin, {:ok, settled} ->
-      if compatible?(pin, settled, programme, options) do
-        {:cont, {:ok, [{pin, exempt(pin)} | settled]}}
-      else
-        {:halt,
-         {:error,
-          Infeasible.new(programme.name, [
-            "#{pin.session} is pinned to a placement that clashes with another pin"
-          ])}}
-      end
-    end)
-    |> case do
+    agreed =
+      Enum.reduce_while(pinned, {:ok, []}, fn pin, {:ok, settled} ->
+        if compatible?(pin, settled, programme, options) do
+          {:cont, {:ok, [{pin, exempt(pin)} | settled]}}
+        else
+          {:halt,
+           {:error,
+            Infeasible.new(programme.name, [
+              "#{pin.session} is pinned to a placement that clashes with another pin"
+            ])}}
+        end
+      end)
+
+    case agreed do
       {:ok, settled} ->
         {:ok,
          settled
@@ -797,35 +803,37 @@ defmodule Agenda.Arranger do
     # Every component sees the pins: a pin outside this component still
     # occupies its resources, and dropping it would let the search
     # place a session on top of one.
-    components
-    |> Enum.zip(shares)
-    |> in_parallel(
-      fn {component, share} ->
-        resolve(
-          component,
-          programme,
-          pinned,
-          unplaceable,
-          Keyword.put(options, :nodes, share),
-          starvation(component)
-        )
-      end,
-      options,
-      @parallel_components
-    )
-    |> Enum.reduce_while({:ok, [], [], true}, fn
-      {:ok, arrangements}, {:ok, placed, skipped, minimal?} ->
-        {:cont, {:ok, placed ++ own(arrangements, pinned), skipped, minimal?}}
+    solved =
+      components
+      |> Enum.zip(shares)
+      |> in_parallel(
+        fn {component, share} ->
+          resolve(
+            component,
+            programme,
+            pinned,
+            unplaceable,
+            Keyword.put(options, :nodes, share),
+            starvation(component)
+          )
+        end,
+        options,
+        @parallel_components
+      )
+      |> Enum.reduce_while({:ok, [], [], true}, fn
+        {:ok, arrangements}, {:ok, placed, skipped, minimal?} ->
+          {:cont, {:ok, placed ++ own(arrangements, pinned), skipped, minimal?}}
 
-      {:partial, layout}, {:ok, placed, skipped, minimal?} ->
-        {:cont,
-         {:ok, placed ++ own(layout.placed, pinned), skipped ++ layout.unplaced,
-          minimal? and layout.minimal?}}
+        {:partial, layout}, {:ok, placed, skipped, minimal?} ->
+          {:cont,
+           {:ok, placed ++ own(layout.placed, pinned), skipped ++ layout.unplaced,
+            minimal? and layout.minimal?}}
 
-      {:error, _reason} = error, {:ok, _placed, _skipped, _minimal?} ->
-        {:halt, error}
-    end)
-    |> case do
+        {:error, _reason} = error, {:ok, _placed, _skipped, _minimal?} ->
+          {:halt, error}
+      end)
+
+    case solved do
       {:ok, placed, [], _minimal?} ->
         {:ok, pinned ++ placed}
 
@@ -900,9 +908,12 @@ defmodule Agenda.Arranger do
   defp groups_by_track(indexed, programme) do
     indexed
     |> Enum.reduce(%{}, fn {{session, _symmetry, _placements}, i}, acc ->
-      case Programme.track_of(programme, session.name) do
-        nil -> acc
-        track -> Map.update(acc, track.name, [i], &[i | &1])
+      track = Programme.track_of(programme, session.name)
+
+      if is_nil(track) do
+        acc
+      else
+        Map.update(acc, track.name, [i], &[i | &1])
       end
     end)
     |> Map.values()
@@ -915,7 +926,7 @@ defmodule Agenda.Arranger do
     for precedence <- precedences,
         first = Map.get(positions, precedence.first),
         then = Map.get(positions, precedence.then),
-        first != nil and then != nil,
+        not is_nil(first) and not is_nil(then),
         do: [first, then]
   end
 
@@ -984,7 +995,7 @@ defmodule Agenda.Arranger do
   defp resolve(candidates, programme, pinned, unplaceable, options, starved) do
     allow? = allow_unplaced?(options)
 
-    if not allow? and unplaceable != [] do
+    if not allow? and match?([_ | _], unplaceable) do
       {:error, hd(unplaceable)}
     else
       candidates
@@ -1120,9 +1131,10 @@ defmodule Agenda.Arranger do
     # Minimality was settled by the first pass and cannot be unsettled
     # by the second, whose exhaustion says only that a better *score*
     # may exist.
-    case scored.best do
-      nil -> proven
-      _found -> %{scored | floor: proven.floor, count_proven?: minimal?(proven)}
+    if is_nil(scored.best) do
+      proven
+    else
+      %{scored | floor: proven.floor, count_proven?: minimal?(proven)}
     end
   end
 
@@ -1196,7 +1208,7 @@ defmodule Agenda.Arranger do
     cond do
       settled?(state) -> state
       state.budget <= 0 -> %{state | exhausted?: true}
-      remaining == [] -> record(state, placed, skipped)
+      Enum.empty?(remaining) -> record(state, placed, skipped)
       hopeless?(skipped, state) -> state
       true -> descend(remaining, context, placed, skipped, state)
     end
@@ -1308,7 +1320,7 @@ defmodule Agenda.Arranger do
   end
 
   defp hopeless?(skipped, %{best: {count, _score, _placed, _skipped}} = state) do
-    if state.preferences == [] do
+    if Enum.empty?(state.preferences) do
       length(skipped) >= count
     else
       length(skipped) > count

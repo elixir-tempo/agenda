@@ -214,9 +214,12 @@ defmodule Agenda.Requirement do
   end
 
   defp phrase(name, predicate, resource) do
-    case Resource.attribute(resource, name) do
-      nil -> "no #{name} — needs #{Predicate.describe(predicate)}"
-      value -> "#{name} is #{inspect(value)} — needs #{Predicate.describe(predicate)}"
+    value = Resource.attribute(resource, name)
+
+    if is_nil(value) do
+      "no #{name} — needs #{Predicate.describe(predicate)}"
+    else
+      "#{name} is #{inspect(value)} — needs #{Predicate.describe(predicate)}"
     end
   end
 
@@ -244,7 +247,7 @@ defmodule Agenda.Requirement do
   """
   @spec eligible?(t(), Resource.t()) :: boolean()
   def eligible?(%__MODULE__{} = requirement, %Resource{} = resource) do
-    unmet(requirement, resource) == []
+    Enum.empty?(unmet(requirement, resource))
   end
 
   @doc """

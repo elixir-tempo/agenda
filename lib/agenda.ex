@@ -1109,9 +1109,12 @@ defmodule Agenda do
   @spec travel_time(Resource.t(), Resource.t(), keyword()) ::
           {:ok, Tempo.Duration.t()} | {:error, :unknown}
   def travel_time(%Resource{} = from, %Resource{} = to, options \\ []) do
-    case override(options, from.name, to.name) do
-      nil -> from_separation(Resource.separation(from, to), options)
-      duration -> {:ok, duration}
+    duration = override(options, from.name, to.name)
+
+    if is_nil(duration) do
+      from_separation(Resource.separation(from, to), options)
+    else
+      {:ok, duration}
     end
   end
 

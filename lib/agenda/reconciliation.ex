@@ -180,9 +180,12 @@ defmodule Agenda.Reconciliation do
   end
 
   defp owed(resource, window, options) do
-    case Keyword.get(options, :expected) do
-      nil -> Availability.free(resource, within: window)
-      given -> set(given, window)
+    given = Keyword.get(options, :expected)
+
+    if is_nil(given) do
+      Availability.free(resource, within: window)
+    else
+      set(given, window)
     end
   end
 
@@ -206,12 +209,14 @@ defmodule Agenda.Reconciliation do
   end
 
   defp spans(values) do
-    values
-    |> List.wrap()
-    |> Enum.reduce_while({:ok, []}, fn value, {:ok, acc} ->
-      continued(spans_of(value), &(acc ++ IntervalSet.members(&1)))
-    end)
-    |> case do
+    collected =
+      values
+      |> List.wrap()
+      |> Enum.reduce_while({:ok, []}, fn value, {:ok, acc} ->
+        continued(spans_of(value), &(acc ++ IntervalSet.members(&1)))
+      end)
+
+    case collected do
       {:ok, intervals} -> IntervalSet.new(intervals)
       {:error, reason} -> {:error, reason}
     end
@@ -303,9 +308,12 @@ defmodule Agenda.Reconciliation do
   defp breached_bucket(%Limit{} = limit, {bucket, held}) do
     {count, duration} = Limit.sum(held)
 
-    case Limit.breach(limit, count, duration) do
-      nil -> []
-      breach -> [%{period: limit.period, bucket: bucket, breach: breach}]
+    breach = Limit.breach(limit, count, duration)
+
+    if is_nil(breach) do
+      []
+    else
+      [%{period: limit.period, bucket: bucket, breach: breach}]
     end
   end
 
@@ -341,7 +349,7 @@ defmodule Agenda.Reconciliation do
   def balanced?(%__MODULE__{} = reconciliation) do
     Tempo.empty?(reconciliation.unaccounted) and
       Tempo.empty?(reconciliation.overclaimed) and
-      reconciliation.breaches == []
+      Enum.empty?(reconciliation.breaches)
   end
 
   @doc """
@@ -382,7 +390,7 @@ defmodule Agenda.Reconciliation do
       Enum.map(reconciliation.breaches, &breach_sentence(reconciliation.resource, &1))
   end
 
-  defp gaps(_reconciliation, set, _what) when set == nil do
+  defp gaps(_reconciliation, nil, _what) do
     []
   end
 

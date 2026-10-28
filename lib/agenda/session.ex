@@ -154,20 +154,20 @@ defmodule Agenda.Session do
   # contradiction rather than a pair of demands, and merging them
   # would answer it by ignoring one.
   defp add(%__MODULE__{} = session, requirement) do
-    case Enum.find_index(session.requirements, &combinable?(&1, requirement)) do
-      nil ->
-        %{session | requirements: session.requirements ++ [requirement]}
+    index = Enum.find_index(session.requirements, &combinable?(&1, requirement))
 
-      index ->
-        combined =
-          List.update_at(session.requirements, index, &Requirement.merge(&1, requirement))
+    if is_nil(index) do
+      %{session | requirements: session.requirements ++ [requirement]}
+    else
+      combined =
+        List.update_at(session.requirements, index, &Requirement.merge(&1, requirement))
 
-        %{session | requirements: combined}
+      %{session | requirements: combined}
     end
   end
 
   defp combinable?(%Requirement{name: name, roster: held}, %Requirement{name: name, roster: added}) do
-    (held == [] and added == []) or (held != [] and added != [])
+    Enum.empty?(held) == Enum.empty?(added)
   end
 
   defp combinable?(_requirement, _addition) do
@@ -278,7 +278,7 @@ defmodule Agenda.Session do
   """
   @spec rosters(t()) :: [Requirement.t()]
   def rosters(%__MODULE__{requirements: requirements}) do
-    Enum.filter(requirements, &(&1.roster != []))
+    Enum.filter(requirements, &match?([_ | _], &1.roster))
   end
 
   @doc """
@@ -305,7 +305,7 @@ defmodule Agenda.Session do
   """
   @spec open_roles(t()) :: [Requirement.t()]
   def open_roles(%__MODULE__{requirements: requirements}) do
-    Enum.filter(requirements, &(&1.roster == []))
+    Enum.filter(requirements, &Enum.empty?(&1.roster))
   end
 
   @doc """

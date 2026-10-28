@@ -107,13 +107,15 @@ defmodule Agenda.Limit do
   """
   @spec parse(keyword()) :: {:ok, [t()]} | {:error, term()}
   def parse(limits) when is_list(limits) do
-    Enum.reduce_while(limits, {:ok, []}, fn {period, spec}, {:ok, acc} ->
-      case one(period, spec) do
-        {:ok, limit} -> {:cont, {:ok, [limit | acc]}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-    |> case do
+    read =
+      Enum.reduce_while(limits, {:ok, []}, fn {period, spec}, {:ok, acc} ->
+        case one(period, spec) do
+          {:ok, limit} -> {:cont, {:ok, [limit | acc]}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    case read do
       {:ok, parsed} -> {:ok, Enum.reverse(parsed)}
       {:error, reason} -> {:error, reason}
     end

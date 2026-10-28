@@ -176,12 +176,14 @@ defmodule Agenda.Place do
   """
   @spec common_ancestor(t(), t()) :: t() | nil
   def common_ancestor(%__MODULE__{} = a, %__MODULE__{} = b) do
-    a
-    |> path()
-    |> Enum.zip(path(b))
-    |> Enum.take_while(fn {x, y} -> same?(x, y) end)
-    |> List.last()
-    |> case do
+    deepest =
+      a
+      |> path()
+      |> Enum.zip(path(b))
+      |> Enum.take_while(fn {x, y} -> same?(x, y) end)
+      |> List.last()
+
+    case deepest do
       nil -> nil
       {shared, _} -> shared
     end
@@ -225,9 +227,12 @@ defmodule Agenda.Place do
   """
   @spec separation(t(), t()) :: separation()
   def separation(%__MODULE__{} = a, %__MODULE__{} = b) do
-    case common_ancestor(a, b) do
-      nil -> :disjoint
-      shared -> max(depth_below(a, shared), depth_below(b, shared))
+    shared = common_ancestor(a, b)
+
+    if is_nil(shared) do
+      :disjoint
+    else
+      max(depth_below(a, shared), depth_below(b, shared))
     end
   end
 
