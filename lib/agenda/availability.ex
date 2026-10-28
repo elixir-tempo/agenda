@@ -156,7 +156,9 @@ defmodule Agenda.Availability do
   ### Examples
 
       iex> {:ok, value} = Agenda.Availability.normalise("R5/2026-06-15/P1D")
-      iex> value |> Tempo.to_interval!() |> Tempo.IntervalSet.count()
+      iex> value
+      ...> |> Tempo.to_interval!()
+      ...> |> Tempo.IntervalSet.count()
       5
 
       iex> {:ok, value} = Agenda.Availability.normalise("FREQ=DAILY;COUNT=3")
@@ -165,9 +167,17 @@ defmodule Agenda.Availability do
 
   """
   @spec normalise(term()) :: {:ok, span() | imported()} | {:error, :unreadable_pattern}
-  def normalise({:vavailability, _calendar} = imported), do: {:ok, imported}
-  def normalise(%Duration{} = value), do: {:ok, value}
-  def normalise(%Tempo{} = value), do: {:ok, value}
+  def normalise({:vavailability, _calendar} = imported) do
+    {:ok, imported}
+  end
+
+  def normalise(%Duration{} = value) do
+    {:ok, value}
+  end
+
+  def normalise(%Tempo{} = value) do
+    {:ok, value}
+  end
 
   def normalise(pattern) when is_binary(pattern) do
     with {:error, _iso} <- Tempo.from_iso8601(pattern),
@@ -176,7 +186,9 @@ defmodule Agenda.Availability do
     end
   end
 
-  def normalise(_pattern), do: {:error, :unreadable_pattern}
+  def normalise(_pattern) do
+    {:error, :unreadable_pattern}
+  end
 
   @doc """
   Read a resource's open hours from an RFC 7953 `VAVAILABILITY`.
@@ -292,7 +304,9 @@ defmodule Agenda.Availability do
 
   """
   @spec free(Resource.t(), keyword()) :: {:ok, Tempo.t()} | {:error, term()}
-  def free(%Resource{open: nil}, _options), do: {:ok, IntervalSet.new!([])}
+  def free(%Resource{open: nil}, _options) do
+    {:ok, IntervalSet.new!([])}
+  end
 
   def free(%Resource{} = resource, options) do
     with :ok <- usable_buffers(resource),
@@ -300,7 +314,10 @@ defmodule Agenda.Availability do
          {:ok, window} <- normalise(within),
          {:ok, open} <- within(resource.open, window),
          {:ok, busy} <- busy_set(Keyword.get(options, :busy, []), window),
-         {:ok, saturated} <- busy |> with_turnaround(resource) |> saturated(resource.concurrency) do
+         {:ok, saturated} <-
+           busy
+           |> with_turnaround(resource)
+           |> saturated(resource.concurrency) do
       Tempo.difference(open, saturated)
     end
   end
@@ -332,7 +349,9 @@ defmodule Agenda.Availability do
   # up before and reset afterwards. Widening each claim by the
   # resource's turnaround makes that time genuinely unavailable rather
   # than something the caller has to remember to leave free.
-  defp with_turnaround(busy, %Resource{buffer_before: nil, buffer_after: nil}), do: busy
+  defp with_turnaround(busy, %Resource{buffer_before: nil, buffer_after: nil}) do
+    busy
+  end
 
   defp with_turnaround(busy, %Resource{} = resource) do
     IntervalSet.map(busy, &widen(&1, resource))
@@ -347,17 +366,29 @@ defmodule Agenda.Availability do
     )
   end
 
-  defp earlier_by(point, nil), do: point
-  defp earlier_by(point, duration), do: Tempo.shift!(point, Duration.negate(duration))
+  defp earlier_by(point, nil) do
+    point
+  end
 
-  defp later_by(point, nil), do: point
-  defp later_by(point, duration), do: Tempo.shift!(point, duration)
+  defp earlier_by(point, duration) do
+    Tempo.shift!(point, Duration.negate(duration))
+  end
+
+  defp later_by(point, nil) do
+    point
+  end
+
+  defp later_by(point, duration) do
+    Tempo.shift!(point, duration)
+  end
 
   # A resource is only unavailable where enough claims overlap to use
   # it up. At the default concurrency of one that is anywhere it is
   # claimed at all; a bank of twenty lockers stays free until the
   # twenty-first person wants one.
-  defp saturated(busy, concurrency), do: IntervalSet.covered(busy, at_least: concurrency)
+  defp saturated(busy, concurrency) do
+    IntervalSet.covered(busy, at_least: concurrency)
+  end
 
   # An imported `VAVAILABILITY` states availability directly, so
   # materialising it *is* asking what it offers over the window —
@@ -399,7 +430,9 @@ defmodule Agenda.Availability do
     end
   end
 
-  defp busy_set(busy, window), do: busy_set([busy], window)
+  defp busy_set(busy, window) do
+    busy_set([busy], window)
+  end
 
   defp claimed_intervals(one, window) do
     with {:ok, value} <- normalise(one),

@@ -13,9 +13,17 @@ level_2 = Agenda.place("Level 2", within: venue)
 
 day = ~o"2027-03-01T09:00:00/2027-03-01T13:00:00"
 
-room_a = Agenda.resource("Room A", within: level_1, seats: 100) |> Agenda.open!(day)
-room_b = Agenda.resource("Room B", within: level_1, seats: 100) |> Agenda.open!(day)
-room_c = Agenda.resource("Room C", within: level_2, seats: 100) |> Agenda.open!(day)
+room_a =
+  Agenda.resource("Room A", within: level_1, seats: 100)
+  |> Agenda.open!(day)
+
+room_b =
+  Agenda.resource("Room B", within: level_1, seats: 100)
+  |> Agenda.open!(day)
+
+room_c =
+  Agenda.resource("Room C", within: level_2, seats: 100)
+  |> Agenda.open!(day)
 
 rooms = [room_a, room_b, room_c]
 
@@ -42,11 +50,19 @@ Same level is free; a level away is five minutes. Every constraint below that me
 ordered =
   Agenda.programme("Day", across: day)
   |> Agenda.Programme.add_session(
-    Agenda.session("Setup", duration: ~o"PT1H", window: ~o"2027-03-01T09:00:00/2027-03-01T10:00:00")
-    |> Agenda.Session.needs(:room, seats: at_least(10)))
+    Agenda.session("Setup",
+      duration: ~o"PT1H",
+      window: ~o"2027-03-01T09:00:00/2027-03-01T10:00:00"
+    )
+    |> Agenda.Session.needs(:room, seats: at_least(10))
+  )
   |> Agenda.Programme.add_session(
-    Agenda.session("Briefing", duration: ~o"PT1H", window: ~o"2027-03-01T11:00:00/2027-03-01T12:00:00")
-    |> Agenda.Session.needs(:room, seats: at_least(10)))
+    Agenda.session("Briefing",
+      duration: ~o"PT1H",
+      window: ~o"2027-03-01T11:00:00/2027-03-01T12:00:00"
+    )
+    |> Agenda.Session.needs(:room, seats: at_least(10))
+  )
 
 {:ok, after_setup} = Agenda.precede(ordered, "Setup", "Briefing")
 {:ok, [_ | _]} = Agenda.arrange(after_setup, rooms)
@@ -125,7 +141,10 @@ loose =
 
 {:ok, parallel} = Agenda.arrange(loose, rooms)
 
-parallel |> Enum.map(&Tempo.Interval.from(&1.interval)) |> Enum.uniq() |> length()
+parallel
+|> Enum.map(&Tempo.Interval.from(&1.interval))
+|> Enum.uniq()
+|> length()
 #=> 1
 ```
 
@@ -140,7 +159,10 @@ tracked = Agenda.Programme.add_track(Agenda.programme("Tracked", across: day), c
 
 {:ok, sequence} = Agenda.arrange(tracked, rooms)
 
-sequence |> Enum.map(&Tempo.Interval.from(&1.interval)) |> Enum.uniq() |> length()
+sequence
+|> Enum.map(&Tempo.Interval.from(&1.interval))
+|> Enum.uniq()
+|> length()
 #=> 3
 ```
 
@@ -159,8 +181,13 @@ patchy =
     ~o"2027-03-01T11:00:00/2027-03-01T13:00:00"
   ])
 
-closes_at_ten = Agenda.resource("Room A", within: level_1, seats: 100) |> Agenda.open!(patchy)
-open_all_day = Agenda.resource("Room B", within: level_1, seats: 100) |> Agenda.open!(day)
+closes_at_ten =
+  Agenda.resource("Room A", within: level_1, seats: 100)
+  |> Agenda.open!(patchy)
+
+open_all_day =
+  Agenda.resource("Room B", within: level_1, seats: 100)
+  |> Agenda.open!(day)
 
 pair = [closes_at_ten, open_all_day]
 
@@ -169,7 +196,9 @@ pair = [closes_at_ten, open_all_day]
 bouncing
 |> Enum.sort(Agenda.Arrangement)
 |> Enum.map(fn arrangement ->
-  arrangement |> Agenda.Arrangement.resource(:room) |> Map.get(:name)
+  arrangement
+  |> Agenda.Arrangement.resource(:room)
+  |> Map.get(:name)
 end)
 #=> ["Room A", "Room B", "Room A"]
 ```
@@ -184,7 +213,10 @@ Room A, Room B, Room A — out and back, because Room A is shut at ten and the s
 stays_put
 |> Enum.sort(Agenda.Arrangement)
 |> Enum.map(fn arrangement ->
-  {Tempo.Interval.from(arrangement.interval), arrangement |> Agenda.Arrangement.resource(:room) |> Map.get(:name)}
+  {Tempo.Interval.from(arrangement.interval),
+   arrangement
+   |> Agenda.Arrangement.resource(:room)
+   |> Map.get(:name)}
 end)
 #=> [{~o"2027Y3M1DT9H0M0S", "Room A"},
 #=>  {~o"2027Y3M1DT11H0M0S", "Room A"},
@@ -247,9 +279,13 @@ Two room changes, no journeys. Neither number is wrong — they answer different
 When the walk genuinely has to be possible rather than merely preferred, it belongs on the track. `reachable/2` reads the same place tree and asks whether consecutive sessions can actually be got between:
 
 ```elixir
-morning_only = Agenda.resource("Room A", within: level_1, seats: 100)
+morning_only =
+  Agenda.resource("Room A", within: level_1, seats: 100)
   |> Agenda.open!(~o"2027-03-01T09:00:00/2027-03-01T10:00:00")
-upstairs = Agenda.resource("Room C", within: level_2, seats: 100) |> Agenda.open!(day)
+
+upstairs =
+  Agenda.resource("Room C", within: level_2, seats: 100)
+  |> Agenda.open!(day)
 
 held = fn within ->
   {:ok, track} =
@@ -263,7 +299,12 @@ held = fn within ->
 
   arrangements
   |> Enum.sort(Agenda.Arrangement)
-  |> Enum.map(fn a -> {Tempo.Interval.from(a.interval), a |> Agenda.Arrangement.resource(:room) |> Map.get(:name)} end)
+  |> Enum.map(fn a ->
+    {Tempo.Interval.from(a.interval),
+     a
+     |> Agenda.Arrangement.resource(:room)
+     |> Map.get(:name)}
+  end)
 end
 
 {held.(~o"PT15M"), held.(~o"PT1M")}

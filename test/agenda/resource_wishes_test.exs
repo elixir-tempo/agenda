@@ -37,7 +37,9 @@ defmodule Agenda.ResourceWishesTest do
   end
 
   defp hours(arrangements) do
-    arrangements |> Enum.map(&Tempo.hour(Interval.from(&1.interval))) |> Enum.sort()
+    arrangements
+    |> Enum.map(&Tempo.hour(Interval.from(&1.interval)))
+    |> Enum.sort()
   end
 
   describe "avoids" do

@@ -145,7 +145,9 @@ defmodule Agenda.Layout do
 
   """
   @spec unplaced_sessions(t()) :: [String.t()]
-  def unplaced_sessions(%__MODULE__{unplaced: unplaced}), do: Enum.map(unplaced, & &1.session)
+  def unplaced_sessions(%__MODULE__{unplaced: unplaced}) do
+    Enum.map(unplaced, & &1.session)
+  end
 
   @doc """
   The layout as a sentence — how much was placed, and why the rest was
@@ -181,7 +183,9 @@ defmodule Agenda.Layout do
     "#{layout.programme}: #{placed} of #{total} sessions placed#{caveat(layout)}. #{left_out}"
   end
 
-  defp caveat(%__MODULE__{minimal?: true}), do: ""
+  defp caveat(%__MODULE__{minimal?: true}) do
+    ""
+  end
 
   defp caveat(%__MODULE__{minimal?: false}) do
     ", and the search stopped at its node limit before proving that is " <>

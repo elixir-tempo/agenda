@@ -154,7 +154,11 @@ defmodule Agenda.LimitsTest do
                Agenda.arrange(roster(20), [ann], unplaced: :allow, busy: busy)
 
       # Two of the first week's three are gone, so only one more there.
-      first_week = layout.placed |> days() |> Enum.filter(&(&1 <= 11))
+      first_week =
+        layout.placed
+        |> days()
+        |> Enum.filter(&(&1 <= 11))
+
       assert length(first_week) == 1
     end
   end

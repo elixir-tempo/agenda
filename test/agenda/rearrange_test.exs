@@ -12,10 +12,21 @@ defmodule Agenda.RearrangeTest do
   setup do
     day = ~o"2027-03-01T09:00/T17:00"
 
-    {:ok, priya} = Agenda.resource("Priya") |> Agenda.open(day)
-    {:ok, tom} = Agenda.resource("Tom") |> Agenda.open(day)
-    {:ok, boardroom} = Agenda.resource("Boardroom", seats: 14) |> Agenda.open(day)
-    {:ok, annexe} = Agenda.resource("Annexe", seats: 12) |> Agenda.open(day)
+    {:ok, priya} =
+      Agenda.resource("Priya")
+      |> Agenda.open(day)
+
+    {:ok, tom} =
+      Agenda.resource("Tom")
+      |> Agenda.open(day)
+
+    {:ok, boardroom} =
+      Agenda.resource("Boardroom", seats: 14)
+      |> Agenda.open(day)
+
+    {:ok, annexe} =
+      Agenda.resource("Annexe", seats: 12)
+      |> Agenda.open(day)
 
     review =
       Agenda.session("Quarterly review", duration: ~o"PT1H", window: ~o"2027-03-01/2027-03-01")

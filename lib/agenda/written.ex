@@ -10,12 +10,23 @@ defmodule Agenda.Written do
   alias Tempo.Iso8601EncodeError
 
   @spec span(Tempo.t()) :: String.t()
-  def span(%Tempo{} = span), do: span |> Tempo.to_iso8601() |> written(span)
+  def span(%Tempo{} = span) do
+    span
+    |> Tempo.to_iso8601()
+    |> written(span)
+  end
 
-  defp written({:ok, text}, _span), do: text
+  defp written({:ok, text}, _span) do
+    text
+  end
 
-  defp written({:error, %Iso8601EncodeError{reason: {:calendar, _calendar}}}, span),
-    do: span |> Tempo.to_calendar!(Calendar.ISO) |> Tempo.to_iso8601!()
+  defp written({:error, %Iso8601EncodeError{reason: {:calendar, _calendar}}}, span) do
+    span
+    |> Tempo.to_calendar!(Calendar.ISO)
+    |> Tempo.to_iso8601!()
+  end
 
-  defp written({:error, exception}, _span), do: raise(exception)
+  defp written({:error, exception}, _span) do
+    raise(exception)
+  end
 end

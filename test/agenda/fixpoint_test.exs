@@ -256,7 +256,12 @@ defmodule Agenda.FixpointTest do
       # Every room-hour used exactly once.
       slots =
         Enum.map(arrangements, fn arrangement ->
-          room = arrangement |> Arrangement.resources() |> hd() |> Map.get(:name)
+          room =
+            arrangement
+            |> Arrangement.resources()
+            |> hd()
+            |> Map.get(:name)
+
           {room, Tempo.hour(Interval.from(arrangement.interval))}
         end)
 
@@ -316,7 +321,9 @@ defmodule Agenda.FixpointTest do
       assert respects?(arrangements, ann)
 
       # One a day, so one on each of the three days.
-      assert arrangements |> Enum.map(&Tempo.day(Interval.from(&1.interval))) |> Enum.sort() ==
+      assert arrangements
+             |> Enum.map(&Tempo.day(Interval.from(&1.interval)))
+             |> Enum.sort() ==
                [5, 6, 7]
     end
 
@@ -330,7 +337,9 @@ defmodule Agenda.FixpointTest do
       assert respects?(arrangements, ann)
 
       # One hour a day and one-hour shifts, so one on each day.
-      assert arrangements |> Enum.map(&Tempo.day(Interval.from(&1.interval))) |> Enum.sort() ==
+      assert arrangements
+             |> Enum.map(&Tempo.day(Interval.from(&1.interval)))
+             |> Enum.sort() ==
                [5, 6, 7]
     end
 
@@ -385,7 +394,9 @@ defmodule Agenda.FixpointTest do
                Fixpoint.solve(shifts(2), [ann], busy: busy, timeout: 5_000)
 
       days_used =
-        arrangements |> Enum.map(&Tempo.day(Interval.from(&1.interval))) |> Enum.sort()
+        arrangements
+        |> Enum.map(&Tempo.day(Interval.from(&1.interval)))
+        |> Enum.sort()
 
       refute 5 in days_used
     end

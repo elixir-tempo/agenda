@@ -71,8 +71,13 @@ defmodule Agenda.Interest do
     end
   end
 
-  defp name_of(%Resource{name: name}), do: name
-  defp name_of(name) when is_binary(name), do: name
+  defp name_of(%Resource{name: name}) do
+    name
+  end
+
+  defp name_of(name) when is_binary(name) do
+    name
+  end
 
   @doc """
   The pairs who named each other.
@@ -132,7 +137,8 @@ defmodule Agenda.Interest do
       iex> {:ok, asked} = Agenda.Interest.new("Kim", "Harbour Tours")
       iex> {:ok, agreed} = Agenda.Interest.new("Harbour Tours", "Kim")
       iex> {:ok, hopeful} = Agenda.Interest.new("Sam", "Harbour Tours")
-      iex> Agenda.Interest.one_sided([asked, agreed, hopeful]) |> Enum.map(& &1.from)
+      iex> Agenda.Interest.one_sided([asked, agreed, hopeful])
+      ...> |> Enum.map(& &1.from)
       ["Sam"]
 
   """
@@ -143,6 +149,11 @@ defmodule Agenda.Interest do
     Enum.reject(interests, &MapSet.member?(stated, {&1.to, &1.from}))
   end
 
-  defp canonical(%__MODULE__{from: from, to: to}) when from <= to, do: {from, to}
-  defp canonical(%__MODULE__{from: from, to: to}), do: {to, from}
+  defp canonical(%__MODULE__{from: from, to: to}) when from <= to do
+    {from, to}
+  end
+
+  defp canonical(%__MODULE__{from: from, to: to}) do
+    {to, from}
+  end
 end

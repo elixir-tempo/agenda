@@ -19,7 +19,9 @@ defmodule Agenda.BufferTest do
   defp free(room, busy) do
     {:ok, free} = Availability.free(room, within: @window, busy: busy)
 
-    free |> IntervalSet.members() |> Enum.map(&Tempo.to_iso8601!/1)
+    free
+    |> IntervalSet.members()
+    |> Enum.map(&Tempo.to_iso8601!/1)
   end
 
   describe "turnaround blocks more than the claim itself" do

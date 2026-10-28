@@ -135,7 +135,8 @@ defmodule Agenda.PartialTest do
 
     test "every session being impossible is a layout with nothing placed", context do
       lecture = fn name ->
-        Agenda.session(name, duration: "PT1H") |> Session.needs(:room, seats: 500)
+        Agenda.session(name, duration: "PT1H")
+        |> Session.needs(:room, seats: 500)
       end
 
       programme = conf([lecture.("One"), lecture.("Two")])

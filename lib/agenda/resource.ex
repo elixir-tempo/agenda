@@ -155,9 +155,15 @@ defmodule Agenda.Resource do
       name: name,
       attributes: Map.new(attributes),
       within: Keyword.get(reserved, :within),
-      requires: reserved |> Keyword.get(:requires, []) |> Map.new(),
+      requires:
+        reserved
+        |> Keyword.get(:requires, [])
+        |> Map.new(),
       concurrency: Keyword.get(reserved, :concurrency, 1),
-      limits: reserved |> Keyword.get(:limits, []) |> Limit.parse!(),
+      limits:
+        reserved
+        |> Keyword.get(:limits, [])
+        |> Limit.parse!(),
       avoids: Keyword.get(reserved, :avoids),
       prefers: Keyword.get(reserved, :prefers),
       open: Keyword.get(reserved, :open),
@@ -173,7 +179,9 @@ defmodule Agenda.Resource do
   # which is a crash a long way from the line that caused it, and only
   # on resources that turned out to be busy. Parsing it here means the
   # value is either usable or unchanged from the moment it is given.
-  defp duration(nil), do: nil
+  defp duration(nil) do
+    nil
+  end
 
   defp duration(value) when is_binary(value) do
     case Tempo.from_iso8601(value) do
@@ -182,7 +190,9 @@ defmodule Agenda.Resource do
     end
   end
 
-  defp duration(value), do: value
+  defp duration(value) do
+    value
+  end
 
   @doc """
   The value of `name` on `resource`, or `nil` when the resource does
@@ -207,7 +217,9 @@ defmodule Agenda.Resource do
 
   """
   @spec attribute(t(), atom()) :: term()
-  def attribute(%__MODULE__{attributes: attributes}, name), do: Map.get(attributes, name)
+  def attribute(%__MODULE__{attributes: attributes}, name) do
+    Map.get(attributes, name)
+  end
 
   @doc """
   The resource in `pool` with this `name`.
@@ -325,8 +337,13 @@ defmodule Agenda.Resource do
 
   """
   @spec within?(t(), Place.t()) :: boolean()
-  def within?(%__MODULE__{within: nil}, %Place{}), do: false
-  def within?(%__MODULE__{within: within}, %Place{} = place), do: Place.contains?(place, within)
+  def within?(%__MODULE__{within: nil}, %Place{}) do
+    false
+  end
+
+  def within?(%__MODULE__{within: within}, %Place{} = place) do
+    Place.contains?(place, within)
+  end
 
   @doc """
   How far apart two resources are in the place tree, in levels.
@@ -356,8 +373,15 @@ defmodule Agenda.Resource do
 
   """
   @spec separation(t(), t()) :: Place.separation()
-  def separation(%__MODULE__{within: nil}, %__MODULE__{}), do: :disjoint
-  def separation(%__MODULE__{}, %__MODULE__{within: nil}), do: :disjoint
+  def separation(%__MODULE__{within: nil}, %__MODULE__{}) do
+    :disjoint
+  end
 
-  def separation(%__MODULE__{within: a}, %__MODULE__{within: b}), do: Place.separation(a, b)
+  def separation(%__MODULE__{}, %__MODULE__{within: nil}) do
+    :disjoint
+  end
+
+  def separation(%__MODULE__{within: a}, %__MODULE__{within: b}) do
+    Place.separation(a, b)
+  end
 end

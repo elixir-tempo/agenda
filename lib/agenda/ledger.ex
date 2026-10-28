@@ -73,7 +73,9 @@ defmodule Agenda.Ledger do
 
   """
   @spec new() :: t()
-  def new, do: %__MODULE__{}
+  def new do
+    %__MODULE__{}
+  end
 
   @doc """
   Record an arrangement, replacing whatever that session held before.
@@ -122,7 +124,9 @@ defmodule Agenda.Ledger do
       ...> }
       iex> {:ok, ledger} =
       ...>   Agenda.Ledger.allocate(Agenda.Ledger.new(), arrangement, tag: {:leave, :annual})
-      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      iex> ledger
+      ...> |> Agenda.Ledger.to_list()
+      ...> |> Enum.map(& &1.tag)
       [leave: :annual]
 
   """
@@ -308,7 +312,10 @@ defmodule Agenda.Ledger do
   # Saturday nobody works would send the caller looking in the wrong
   # place.
   defp claimable(ledger, resource, interval) do
-    busy = ledger |> busy() |> Map.get(resource.name, [])
+    busy =
+      ledger
+      |> busy()
+      |> Map.get(resource.name, [])
 
     with {:ok, open} <- Availability.free(resource, within: interval, busy: []),
          {:ok, free} <- Availability.free(resource, within: interval, busy: busy),
@@ -383,7 +390,8 @@ defmodule Agenda.Ledger do
       ...> }
       iex> {:ok, ledger} = Agenda.Ledger.hold(Agenda.Ledger.new(), arrangement,
       ...>                   until: "2026-06-15T10:15:00")
-      iex> Agenda.Ledger.holds(ledger) |> Enum.map(& &1.session)
+      iex> Agenda.Ledger.holds(ledger)
+      ...> |> Enum.map(& &1.session)
       ["Review"]
 
   """
@@ -502,8 +510,13 @@ defmodule Agenda.Ledger do
   end
 
   # A session's allocations share one expiry, so the head decides.
-  defp lapsed?([%Allocation{held_until: nil} | _rest], _now), do: false
-  defp lapsed?([], _now), do: false
+  defp lapsed?([%Allocation{held_until: nil} | _rest], _now) do
+    false
+  end
+
+  defp lapsed?([], _now) do
+    false
+  end
 
   defp lapsed?([%Allocation{held_until: until} | _rest], now) do
     Tempo.compare(until, now, by: :start) in [:lt, :eq]
@@ -528,7 +541,9 @@ defmodule Agenda.Ledger do
   """
   @spec holds(t()) :: [Allocation.t()]
   def holds(%__MODULE__{} = ledger) do
-    ledger |> to_list() |> Enum.filter(&(&1.held_until != nil))
+    ledger
+    |> to_list()
+    |> Enum.filter(&(&1.held_until != nil))
   end
 
   @doc """
@@ -609,8 +624,13 @@ defmodule Agenda.Ledger do
     end
   end
 
-  defp cutoff(nil), do: {:ok, nil}
-  defp cutoff(from), do: Availability.normalise(from)
+  defp cutoff(nil) do
+    {:ok, nil}
+  end
+
+  defp cutoff(from) do
+    Availability.normalise(from)
+  end
 
   defp in_series?(allocations, series, cutoff) do
     Enum.any?(allocations, fn allocation ->
@@ -618,14 +638,21 @@ defmodule Agenda.Ledger do
     end)
   end
 
-  defp at_or_after?(_allocation, nil), do: true
+  defp at_or_after?(_allocation, nil) do
+    true
+  end
 
   defp at_or_after?(allocation, cutoff) do
     Tempo.compare(Interval.from(allocation.interval), start_of(cutoff), by: :start) != :lt
   end
 
-  defp start_of(%Tempo{form: {:span, _from, _to}} = interval), do: Interval.from(interval)
-  defp start_of(point), do: point
+  defp start_of(%Tempo{form: {:span, _from, _to}} = interval) do
+    Interval.from(interval)
+  end
+
+  defp start_of(point) do
+    point
+  end
 
   @doc """
   What `session` currently holds.
@@ -755,10 +782,15 @@ defmodule Agenda.Ledger do
     end)
   end
 
-  defp only(allocations, nil), do: allocations
+  defp only(allocations, nil) do
+    allocations
+  end
 
   defp only(allocations, sessions) do
-    wanted = sessions |> List.wrap() |> MapSet.new()
+    wanted =
+      sessions
+      |> List.wrap()
+      |> MapSet.new()
 
     Enum.filter(allocations, &MapSet.member?(wanted, &1.session))
   end
@@ -806,7 +838,11 @@ defmodule Agenda.Ledger do
 
   """
   @spec count(t()) :: non_neg_integer()
-  def count(%__MODULE__{} = ledger), do: ledger |> to_list() |> length()
+  def count(%__MODULE__{} = ledger) do
+    ledger
+    |> to_list()
+    |> length()
+  end
 
   @doc """
   What each resource is already claimed for, shaped for
@@ -841,7 +877,8 @@ defmodule Agenda.Ledger do
       ...>   allocations: %{room: [boardroom]}
       ...> }
       iex> {:ok, ledger} = Agenda.Ledger.allocate(Agenda.Ledger.new(), arrangement)
-      iex> Agenda.Ledger.busy(ledger) |> Map.keys()
+      iex> Agenda.Ledger.busy(ledger)
+      ...> |> Map.keys()
       ["Boardroom"]
 
       iex> import Tempo.Sigils
@@ -858,7 +895,11 @@ defmodule Agenda.Ledger do
   """
   @spec busy(t(), keyword()) :: %{optional(String.t()) => [Tempo.t()]}
   def busy(%__MODULE__{} = ledger, options \\ []) do
-    except = options |> Keyword.get(:except, []) |> List.wrap() |> MapSet.new()
+    except =
+      options
+      |> Keyword.get(:except, [])
+      |> List.wrap()
+      |> MapSet.new()
 
     ledger
     |> to_list()
@@ -901,7 +942,8 @@ defmodule Agenda.Ledger do
       ...>   allocations: %{room: [boardroom]}
       ...> }
       iex> {:ok, ledger} = Agenda.Ledger.allocate(Agenda.Ledger.new(), arrangement)
-      iex> Agenda.Ledger.diff(ledger, "Review", arrangement) |> Enum.map(&elem(&1, 0))
+      iex> Agenda.Ledger.diff(ledger, "Review", arrangement)
+      ...> |> Enum.map(&elem(&1, 0))
       [:keep]
 
   """
@@ -917,5 +959,7 @@ defmodule Agenda.Ledger do
     tag(keep, :keep) ++ tag(release, :release) ++ tag(fresh, :allocate)
   end
 
-  defp tag(allocations, label), do: Enum.map(allocations, &{label, &1})
+  defp tag(allocations, label) do
+    Enum.map(allocations, &{label, &1})
+  end
 end

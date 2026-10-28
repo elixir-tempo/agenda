@@ -65,7 +65,11 @@ defmodule Agenda.GuidesTest do
   defp run_block(code, index, scope, document) do
     Enum.reduce(claims(code), scope, fn {chunk, claimed}, scope ->
       {result, scope} = evaluate(chunk, code, index, scope, document)
-      if claimed, do: compare(result, claimed, chunk, index, document)
+
+      if claimed do
+        compare(result, claimed, chunk, index, document)
+      end
+
       scope
     end)
   end
@@ -118,7 +122,9 @@ defmodule Agenda.GuidesTest do
     end
   end
 
-  defp squashed(text), do: String.replace(text, ~r/\s+/, "")
+  defp squashed(text) do
+    String.replace(text, ~r/\s+/, "")
+  end
 
   # A block reads as a sequence of expressions, some of which are
   # followed by a claim about what they returned. Each claim closes a
@@ -147,12 +153,18 @@ defmodule Agenda.GuidesTest do
   end
 
   defp closed({chunks, held, nil}) do
-    if held |> Enum.join("") |> String.trim() == "",
-      do: chunks,
-      else: chunks ++ [{Enum.join(held, "\n"), nil}]
+    if held
+       |> Enum.join("")
+       |> String.trim() == "" do
+      chunks
+    else
+      chunks ++ [{Enum.join(held, "\n"), nil}]
+    end
   end
 
-  defp closed({chunks, held, claiming}), do: chunks ++ [{Enum.join(held, "\n"), claiming}]
+  defp closed({chunks, held, claiming}) do
+    chunks ++ [{Enum.join(held, "\n"), claiming}]
+  end
 
   # A livebook's setup cell installs the packages this suite already has.
   defp runnable_blocks(path) do

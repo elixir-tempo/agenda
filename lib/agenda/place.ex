@@ -76,12 +76,19 @@ defmodule Agenda.Place do
 
   """
   @spec path(t()) :: [t()]
-  def path(%__MODULE__{} = place), do: climb(place, [])
+  def path(%__MODULE__{} = place) do
+    climb(place, [])
+  end
 
   # Climbing towards the root while prepending yields the chain
   # outermost-first, which is the order `common_ancestor/2` zips on.
-  defp climb(nil, acc), do: acc
-  defp climb(%__MODULE__{within: within} = place, acc), do: climb(within, [place | acc])
+  defp climb(nil, acc) do
+    acc
+  end
+
+  defp climb(%__MODULE__{within: within} = place, acc) do
+    climb(within, [place | acc])
+  end
 
   @doc """
   The outermost place enclosing `place`, or `place` itself when it is
@@ -104,8 +111,13 @@ defmodule Agenda.Place do
 
   """
   @spec root(t()) :: t()
-  def root(%__MODULE__{within: nil} = place), do: place
-  def root(%__MODULE__{within: within}), do: root(within)
+  def root(%__MODULE__{within: nil} = place) do
+    place
+  end
+
+  def root(%__MODULE__{within: within}) do
+    root(within)
+  end
 
   @doc """
   `true` when `outer` encloses `inner`, at any depth. A place contains
@@ -227,11 +239,16 @@ defmodule Agenda.Place do
   # Places are compared by identity of name and enclosing chain rather
   # than by struct equality, so two independently-built values naming
   # the same place are the same place.
-  defp same?(%__MODULE__{name: name, within: nil}, %__MODULE__{name: name, within: nil}), do: true
+  defp same?(%__MODULE__{name: name, within: nil}, %__MODULE__{name: name, within: nil}) do
+    true
+  end
 
   defp same?(%__MODULE__{name: name, within: a}, %__MODULE__{name: name, within: b})
-       when not is_nil(a) and not is_nil(b),
-       do: same?(a, b)
+       when not is_nil(a) and not is_nil(b) do
+    same?(a, b)
+  end
 
-  defp same?(%__MODULE__{}, %__MODULE__{}), do: false
+  defp same?(%__MODULE__{}, %__MODULE__{}) do
+    false
+  end
 end

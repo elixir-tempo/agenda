@@ -19,7 +19,8 @@ rooms = [boardroom, meeting_room_2, attic]
 
 needs_a_room = Agenda.needs(:room, seats: at_least(8), video_conferencing: true)
 
-Agenda.eligible(needs_a_room, rooms) |> Enum.map(& &1.name)
+Agenda.eligible(needs_a_room, rooms)
+|> Enum.map(& &1.name)
 #=> ["Boardroom", "Attic"]
 ```
 

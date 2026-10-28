@@ -70,7 +70,8 @@ defmodule Agenda.ArrangerTest do
 
       assert length(arrangements) == 3
 
-      assert Enum.map(arrangements, & &1.session) |> Enum.sort() ==
+      assert Enum.map(arrangements, & &1.session)
+             |> Enum.sort() ==
                ["Deep dive", "Keynote", "Panel"]
     end
 
@@ -233,7 +234,9 @@ defmodule Agenda.ArrangerTest do
       {:ok, speaker} = Agenda.open(speaker, "2026-09-15T09:00:00/2026-09-15T12:00:00")
 
       with_speaker = fn name ->
-        name |> talk() |> Session.roster(:speaker, [speaker])
+        name
+        |> talk()
+        |> Session.roster(:speaker, [speaker])
       end
 
       {:ok, track} =

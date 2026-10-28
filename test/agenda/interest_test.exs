@@ -42,7 +42,9 @@ defmodule Agenda.InterestTest do
       {:ok, c} = Interest.new("Sam", "Harbour")
 
       assert Interest.mutual([a, c]) == []
-      assert Interest.one_sided([a, c]) |> length() == 2
+
+      assert Interest.one_sided([a, c])
+             |> length() == 2
     end
 
     test "mutual and one-sided partition the interests" do
@@ -54,7 +56,9 @@ defmodule Agenda.InterestTest do
 
       # Two of the four are the A/B pair; the other two were never returned.
       assert Interest.mutual(interests) == [{"A", "B"}]
-      assert Interest.one_sided(interests) |> Enum.map(& &1.from) == ["C", "A"]
+
+      assert Interest.one_sided(interests)
+             |> Enum.map(& &1.from) == ["C", "A"]
     end
   end
 end

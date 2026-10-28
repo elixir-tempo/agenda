@@ -52,7 +52,11 @@ defmodule Agenda.PlannerTest do
 
   defp rooms(arrangements) do
     arrangements
-    |> Enum.map(&(&1.allocations.room |> hd() |> Map.get(:name)))
+    |> Enum.map(
+      &(&1.allocations.room
+        |> hd()
+        |> Map.get(:name))
+    )
     |> Enum.uniq()
     |> Enum.sort()
   end
@@ -128,9 +132,12 @@ defmodule Agenda.PlannerTest do
     test "the arrangement records roster members alongside the chosen room", context do
       {:ok, [first | _]} = Planner.plan(review(context), [context.boardroom])
 
-      assert Map.keys(first.allocations) |> Enum.sort() == [:attendees, :room]
+      assert Map.keys(first.allocations)
+             |> Enum.sort() == [:attendees, :room]
 
-      assert first.allocations.attendees |> Enum.map(& &1.name) |> Enum.sort() ==
+      assert first.allocations.attendees
+             |> Enum.map(& &1.name)
+             |> Enum.sort() ==
                ["Alice", "Bob"]
     end
 
@@ -142,7 +149,8 @@ defmodule Agenda.PlannerTest do
 
       {:ok, [first | _]} = Planner.plan(session, [])
 
-      assert first.allocations.attendees |> Enum.map(& &1.name) == ["Bob"]
+      assert first.allocations.attendees
+             |> Enum.map(& &1.name) == ["Bob"]
     end
 
     test "roster members appear once, not twice, in the provenance", context do
@@ -245,7 +253,10 @@ defmodule Agenda.PlannerTest do
     test "a preferred room sorts above an equally free one", context do
       {:ok, [%Arrangement{} = best | _]} = Planner.plan(context.session, context.pool)
 
-      assert best.allocations.room |> hd() |> Map.get(:name) == "Boardroom"
+      assert best.allocations.room
+             |> hd()
+             |> Map.get(:name) == "Boardroom"
+
       assert best.score > 0
     end
 
@@ -448,7 +459,10 @@ defmodule Agenda.PlannerTest do
 
       {:ok, [best | _rest]} = Planner.plan(session, pool, limit: 10)
 
-      assert best.attending[:optional] |> Enum.map(& &1.name) |> Enum.sort() == ["Carol", "Dave"]
+      assert best.attending[:optional]
+             |> Enum.map(& &1.name)
+             |> Enum.sort() == ["Carol", "Dave"]
+
       assert best.score == 2
     end
 
@@ -460,7 +474,9 @@ defmodule Agenda.PlannerTest do
 
       {:ok, [best | _rest]} = Planner.plan(session, pool, limit: 10)
 
-      assert best.attending[:optional] |> Enum.map(& &1.name) == ["Bob"]
+      assert best.attending[:optional]
+             |> Enum.map(& &1.name) == ["Bob"]
+
       assert best.score == 1
     end
 

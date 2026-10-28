@@ -33,7 +33,11 @@ defmodule Agenda.LedgerTest do
     }
   end
 
-  defp labels(changes), do: changes |> Enum.map(&elem(&1, 0)) |> Enum.frequencies()
+  defp labels(changes) do
+    changes
+    |> Enum.map(&elem(&1, 0))
+    |> Enum.frequencies()
+  end
 
   defp named(changes, label) do
     changes
@@ -95,7 +99,8 @@ defmodule Agenda.LedgerTest do
 
       {:ok, ledger} = Ledger.release(ledger, "Review")
 
-      assert Ledger.busy(ledger) |> Map.keys() == ["Annexe"]
+      assert Ledger.busy(ledger)
+             |> Map.keys() == ["Annexe"]
     end
   end
 
@@ -103,7 +108,9 @@ defmodule Agenda.LedgerTest do
     test "reports each resource's claimed intervals", context do
       {:ok, ledger} = Ledger.allocate(Ledger.new(), review(context))
 
-      assert Ledger.busy(ledger) |> Map.keys() |> Enum.sort() ==
+      assert Ledger.busy(ledger)
+             |> Map.keys()
+             |> Enum.sort() ==
                ["Alice", "Boardroom", "Bob"]
     end
 
@@ -122,7 +129,8 @@ defmodule Agenda.LedgerTest do
           review(context, session: "Standup", allocations: %{room: [context.annexe]})
         )
 
-      assert Ledger.busy(ledger, except: "Review") |> Map.keys() == ["Annexe"]
+      assert Ledger.busy(ledger, except: "Review")
+             |> Map.keys() == ["Annexe"]
     end
   end
 
@@ -195,7 +203,10 @@ defmodule Agenda.LedgerTest do
 
       assert Ledger.count(ledger) == 3
 
-      assert ledger |> Ledger.for_session("Review") |> hd() |> Map.get(:interval) ==
+      assert ledger
+             |> Ledger.for_session("Review")
+             |> hd()
+             |> Map.get(:interval) ==
                context.tuesday
     end
   end

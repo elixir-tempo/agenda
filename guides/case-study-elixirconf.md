@@ -45,9 +45,17 @@ plenary_hours =
 ```elixir
 venue = Agenda.place("Renaissance Orlando at SeaWorld")
 
-peninsula = Agenda.resource("Peninsula 4-7", within: venue, seats: 700) |> Agenda.open!(plenary_hours)
-canaveral = Agenda.resource("Canaveral", within: venue, seats: 250) |> Agenda.open!(talk_hours)
-biscayne  = Agenda.resource("Biscayne", within: venue, seats: 250) |> Agenda.open!(talk_hours)
+peninsula =
+  Agenda.resource("Peninsula 4-7", within: venue, seats: 700)
+  |> Agenda.open!(plenary_hours)
+
+canaveral =
+  Agenda.resource("Canaveral", within: venue, seats: 250)
+  |> Agenda.open!(talk_hours)
+
+biscayne =
+  Agenda.resource("Biscayne", within: venue, seats: 250)
+  |> Agenda.open!(talk_hours)
 
 rooms = [peninsula, canaveral, biscayne]
 ```
@@ -58,7 +66,8 @@ rooms = [peninsula, canaveral, biscayne]
 
 ```elixir
 speaker = fn name ->
-  Agenda.resource(name, role: :speaker) |> Agenda.open!(plenary_hours)
+  Agenda.resource(name, role: :speaker)
+  |> Agenda.open!(plenary_hours)
 end
 
 allison = speaker.("Allison Randal")
@@ -76,7 +85,10 @@ A scheduler that treats a speaker as a label on a talk cannot see any of this. A
 A talk therefore names its room by description and its speakers by name:
 
 ```elixir
-Agenda.session("Building Careers, Balancing Life", duration: "PT40M", window: "2025-08-28/2025-08-28")
+Agenda.session("Building Careers, Balancing Life",
+  duration: "PT40M",
+  window: "2025-08-28/2025-08-28"
+)
 |> Agenda.Session.needs(:room, seats: at_least(250))
 |> Agenda.Session.roster(:speaker, [savannah, anna, allison, lorena])
 ```
@@ -93,7 +105,8 @@ Keynotes are published months ahead. They are not decisions left to the schedule
 session =
   Agenda.session("Keynote: Open Source Resilience",
     duration: "PT60M",
-    window: "2025-08-28T09:15:00/2025-08-28T10:15:00")
+    window: "2025-08-28T09:15:00/2025-08-28T10:15:00"
+  )
   |> Agenda.Session.roster(:room, [peninsula])
   |> Agenda.Session.roster(:speaker, [allison])
 

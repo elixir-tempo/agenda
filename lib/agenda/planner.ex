@@ -271,7 +271,9 @@ defmodule Agenda.Planner do
     Infeasible.new(session.name, reasons)
   end
 
-  defp nearest_misses(_role, []), do: "the pool is empty"
+  defp nearest_misses(_role, []) do
+    "the pool is empty"
+  end
 
   defp nearest_misses(role, pool) do
     pool
@@ -281,7 +283,9 @@ defmodule Agenda.Planner do
   end
 
   defp miss(role, resource) do
-    role |> Requirement.unmet(resource) |> Enum.join(", ")
+    role
+    |> Requirement.unmet(resource)
+    |> Enum.join(", ")
   end
 
   # --- stages 2 and 3: availability and co-availability -----------
@@ -298,7 +302,9 @@ defmodule Agenda.Planner do
     end
   end
 
-  defp accumulate(a, b), do: Map.merge(a, b, fn _key, x, y -> x ++ y end)
+  defp accumulate(a, b) do
+    Map.merge(a, b, fn _key, x, y -> x ++ y end)
+  end
 
   defp tagged_free(resources, window, options) do
     Enum.reduce_while(resources, {:ok, []}, fn resource, {:ok, acc} ->
@@ -348,7 +354,9 @@ defmodule Agenda.Planner do
 
   # One resource per open role: the cartesian product across roles.
   # With the usual single role this is just the candidate list.
-  defp combinations([]), do: [%{}]
+  defp combinations([]) do
+    [%{}]
+  end
 
   defp combinations([{role, eligible} | rest]) do
     for choice <- eligible, tail <- combinations(rest), do: Map.put(tail, role.name, [choice])
@@ -364,7 +372,10 @@ defmodule Agenda.Planner do
   # mutual free time — the same co-availability question, so the same
   # function answers it.
   defp placements(session, allocation, roster_free, window, duration, options) do
-    chosen = allocation |> Map.values() |> List.flatten()
+    chosen =
+      allocation
+      |> Map.values()
+      |> List.flatten()
 
     with {:ok, free} <- co_free(chosen, roster_free, window, options),
          do: slots(session, allocation, free, duration, options)
@@ -429,9 +440,13 @@ defmodule Agenda.Planner do
     end
   end
 
-  defp widen(duration, nil), do: duration
+  defp widen(duration, nil) do
+    duration
+  end
 
-  defp widen(duration, turnaround), do: Duration.add(duration, turnaround)
+  defp widen(duration, turnaround) do
+    Duration.add(duration, turnaround)
+  end
 
   # --- stage 4b: load limits --------------------------------------
 
@@ -486,9 +501,17 @@ defmodule Agenda.Planner do
   end
 
   # An allocation carries its interval; an interval is its own.
-  defp moment(%{interval: %Tempo{} = interval}), do: moment(interval)
-  defp moment(%Tempo{form: {:span, _from, _to}} = interval), do: Interval.from(interval)
-  defp moment(_unreadable), do: nil
+  defp moment(%{interval: %Tempo{} = interval}) do
+    moment(interval)
+  end
+
+  defp moment(%Tempo{form: {:span, _from, _to}} = interval) do
+    Interval.from(interval)
+  end
+
+  defp moment(_unreadable) do
+    nil
+  end
 
   # --- stage 5: ranking -------------------------------------------
 
@@ -519,7 +542,9 @@ defmodule Agenda.Planner do
   # Their free sets are computed once for the whole window rather than
   # per candidate, because a session with forty candidate placements
   # and six invitees would otherwise ask the same question 240 times.
-  defp attendance(%Session{invitees: []}, _options), do: %{}
+  defp attendance(%Session{invitees: []}, _options) do
+    %{}
+  end
 
   defp attendance(%Session{} = session, options) do
     case Availability.normalise(session.window) do
@@ -555,7 +580,11 @@ defmodule Agenda.Planner do
         {role, free_now}
       end)
 
-    count = available |> Map.values() |> Enum.map(&length/1) |> Enum.sum()
+    count =
+      available
+      |> Map.values()
+      |> Enum.map(&length/1)
+      |> Enum.sum()
 
     %{arrangement | attending: available, score: arrangement.score + count}
   end
@@ -582,9 +611,13 @@ defmodule Agenda.Planner do
   # window instead of depth at the front of it. The result is sorted
   # back into rank order, because the search should still try the better
   # placements first.
-  defp take(scored, limit, false), do: Enum.take(scored, limit)
+  defp take(scored, limit, false) do
+    Enum.take(scored, limit)
+  end
 
-  defp take(scored, limit, true) when length(scored) <= limit, do: scored
+  defp take(scored, limit, true) when length(scored) <= limit do
+    scored
+  end
 
   defp take(scored, limit, true) do
     scored
@@ -605,17 +638,28 @@ defmodule Agenda.Planner do
   end
 
   defp together(placement, [last | _] = group) do
-    if starts(placement, last) == :eq,
-      do: {:cont, [placement | group]},
-      else: {:cont, Enum.reverse(group), [placement]}
+    if starts(placement, last) == :eq do
+      {:cont, [placement | group]}
+    else
+      {:cont, Enum.reverse(group), [placement]}
+    end
   end
 
-  defp together(placement, []), do: {:cont, [placement]}
+  defp together(placement, []) do
+    {:cont, [placement]}
+  end
 
-  defp last_group([]), do: {:cont, []}
-  defp last_group(group), do: {:cont, Enum.reverse(group), []}
+  defp last_group([]) do
+    {:cont, []}
+  end
 
-  defp starts(a, b), do: Tempo.compare(a.interval, b.interval, by: :start)
+  defp last_group(group) do
+    {:cont, Enum.reverse(group), []}
+  end
+
+  defp starts(a, b) do
+    Tempo.compare(a.interval, b.interval, by: :start)
+  end
 
   # Which *moments* to offer when there are more of them than the cap
   # allows. Taking the first `limit` of them would cover the front of
@@ -628,7 +672,9 @@ defmodule Agenda.Planner do
   # limit, count)` walks 0..limit-1 in contiguous runs as `index` walks
   # the moments, so keeping the first of each run keeps exactly `limit`
   # moments, evenly spaced, in order.
-  defp across(buckets, limit) when length(buckets) <= limit, do: buckets
+  defp across(buckets, limit) when length(buckets) <= limit do
+    buckets
+  end
 
   defp across(buckets, limit) do
     count = length(buckets)
@@ -643,7 +689,9 @@ defmodule Agenda.Planner do
   # round is *appended* to what came before: rounds are complete passes
   # across the window, so putting a later round first would hand a
   # truncated caller the tail of the window instead of a spread of it.
-  defp round_robin([], taken), do: Enum.reverse(taken)
+  defp round_robin([], taken) do
+    Enum.reverse(taken)
+  end
 
   defp round_robin(buckets, taken) do
     {heads, rest} =
@@ -665,7 +713,9 @@ defmodule Agenda.Planner do
     ]
   end
 
-  defp better?(%Arrangement{} = a, %Arrangement{} = b), do: a.score > b.score
+  defp better?(%Arrangement{} = a, %Arrangement{} = b) do
+    a.score > b.score
+  end
 
   defp score(%Arrangement{} = arrangement, preferences) do
     resources = Arrangement.resources(arrangement)

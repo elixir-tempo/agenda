@@ -49,13 +49,17 @@ defmodule Agenda.PinningTest do
     |> Interval.from()
   end
 
-  defp same_moment?(a, b), do: Tempo.compare(a, b, by: :start) == :eq
+  defp same_moment?(a, b) do
+    Tempo.compare(a, b, by: :start) == :eq
+  end
 
   # A placement for `session` at the `nth` slot the search would offer.
   defp placement(programme, pool, session, nth) do
     {:ok, arrangements} = Agenda.plan(pick(programme, session), pool, limit: 10)
 
-    arrangements |> Enum.at(nth) |> Map.put(:session, session)
+    arrangements
+    |> Enum.at(nth)
+    |> Map.put(:session, session)
   end
 
   defp pick(programme, name) do

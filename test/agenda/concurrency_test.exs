@@ -30,7 +30,11 @@ defmodule Agenda.ConcurrencyTest do
   defp free_hours(resource, busy) do
     {:ok, free} = Availability.free(resource, within: @window, busy: busy)
 
-    {:ok, hours} = free |> Tempo.duration() |> Duration.to_unit(:hour)
+    {:ok, hours} =
+      free
+      |> Tempo.duration()
+      |> Duration.to_unit(:hour)
+
     trunc(hours)
   end
 

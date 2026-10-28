@@ -345,8 +345,17 @@ defmodule Agenda.Arranger do
   @spec conflict(Programme.t(), [Resource.t()], keyword()) :: {:ok, [String.t()]} | :none
   def conflict(%Programme{} = programme, pool, options \\ []) when is_list(pool) do
     options = Keyword.put(options, :unplaced, :error)
-    fixed = options |> Keyword.get(:pinned, []) |> Enum.map(& &1.session)
-    free = programme |> Programme.all_sessions() |> Enum.map(& &1.name) |> Kernel.--(fixed)
+
+    fixed =
+      options
+      |> Keyword.get(:pinned, [])
+      |> Enum.map(& &1.session)
+
+    free =
+      programme
+      |> Programme.all_sessions()
+      |> Enum.map(& &1.name)
+      |> Kernel.--(fixed)
 
     Conflict.minimal(free, fixed, fn names ->
       match?({:ok, _placed}, arrange(Programme.restrict_to(programme, names), pool, options))
@@ -388,7 +397,9 @@ defmodule Agenda.Arranger do
 
   """
   @spec readable(Programme.t()) :: {:ok, Programme.t()} | {:error, Infeasible.t()}
-  def readable(%Programme{} = programme), do: with_readable_tracks(programme)
+  def readable(%Programme{} = programme) do
+    with_readable_tracks(programme)
+  end
 
   defp with_readable_tracks(%Programme{} = programme) do
     with {:ok, programme} <- with_readable_precedences(programme) do
@@ -421,7 +432,9 @@ defmodule Agenda.Arranger do
     end
   end
 
-  defp readable_span(nil, _precedence, _label), do: {:ok, nil}
+  defp readable_span(nil, _precedence, _label) do
+    {:ok, nil}
+  end
 
   defp readable_span(pattern, %Precedence{} = precedence, label) do
     case Availability.normalise(pattern) do
@@ -449,7 +462,9 @@ defmodule Agenda.Arranger do
     end
   end
 
-  defp readable_reach(%Track{reachable_within: nil} = track), do: {:ok, track}
+  defp readable_reach(%Track{reachable_within: nil} = track) do
+    {:ok, track}
+  end
 
   defp readable_reach(%Track{reachable_within: within} = track) do
     case Availability.normalise(within) do
@@ -470,7 +485,11 @@ defmodule Agenda.Arranger do
   # of two pins for the same session, or it clashes with another pin.
   defp pins(programme, options) do
     pinned = Keyword.get(options, :pinned, [])
-    known = programme |> Programme.all_sessions() |> MapSet.new(& &1.name)
+
+    known =
+      programme
+      |> Programme.all_sessions()
+      |> MapSet.new(& &1.name)
 
     with :ok <- all_known(pinned, known, programme),
          :ok <- one_per_session(pinned, programme) do
@@ -526,8 +545,14 @@ defmodule Agenda.Arranger do
       end
     end)
     |> case do
-      {:ok, settled} -> {:ok, settled |> Enum.reverse() |> Enum.map(&elem(&1, 0))}
-      {:error, reason} -> {:error, reason}
+      {:ok, settled} ->
+        {:ok,
+         settled
+         |> Enum.reverse()
+         |> Enum.map(&elem(&1, 0))}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -661,7 +686,9 @@ defmodule Agenda.Arranger do
     end
   end
 
-  defp ordered?(_session, %Programme{precedences: []}), do: false
+  defp ordered?(_session, %Programme{precedences: []}) do
+    false
+  end
 
   defp ordered?(session, %Programme{precedences: precedences}) do
     Enum.any?(precedences, &(&1.first == session.name or &1.then == session.name))
@@ -670,7 +697,9 @@ defmodule Agenda.Arranger do
   # A pinned placement is interchangeable with nothing: its time is
   # fixed, so it cannot be relabelled and must sit outside every
   # symmetry rule.
-  defp exempt(%Arrangement{session: session}), do: {:pinned, session}
+  defp exempt(%Arrangement{session: session}) do
+    {:pinned, session}
+  end
 
   defp placements_for(session, programme, pool, options, limit) do
     session = bounded_by(session, programme)
@@ -686,10 +715,13 @@ defmodule Agenda.Arranger do
   end
 
   # A session inherits the programme's window unless it states its own.
-  defp bounded_by(%{window: nil} = session, %Programme{window: window}),
-    do: %{session | window: window}
+  defp bounded_by(%{window: nil} = session, %Programme{window: window}) do
+    %{session | window: window}
+  end
 
-  defp bounded_by(session, _programme), do: session
+  defp bounded_by(session, _programme) do
+    session
+  end
 
   # --- how many sessions may be left out --------------------------
 
@@ -733,16 +765,21 @@ defmodule Agenda.Arranger do
   #     splitting would answer it per part.
   #
   #   * **Fewer than two sessions** has nothing to split.
-  defp components(candidates, _programme, [_first | _rest] = _unplaceable), do: [candidates]
+  defp components(candidates, _programme, [_first | _rest] = _unplaceable) do
+    [candidates]
+  end
 
-  defp components(candidates, _programme, _unplaceable) when length(candidates) < 2,
-    do: [candidates]
+  defp components(candidates, _programme, _unplaceable) when length(candidates) < 2 do
+    [candidates]
+  end
 
-  defp components(candidates, %Programme{preferences: [_first | _rest]}, _unplaceable),
-    do: [candidates]
+  defp components(candidates, %Programme{preferences: [_first | _rest]}, _unplaceable) do
+    [candidates]
+  end
 
-  defp components(candidates, programme, _unplaceable),
-    do: connected_components(candidates, programme)
+  defp components(candidates, programme, _unplaceable) do
+    connected_components(candidates, programme)
+  end
 
   defp solve_components([_only], candidates, programme, pinned, unplaceable, options) do
     resolve(candidates, programme, pinned, unplaceable, options, starvation(candidates))
@@ -901,7 +938,9 @@ defmodule Agenda.Arranger do
     end)
   end
 
-  defp group_components([], _edges, _seen, components), do: Enum.reverse(components)
+  defp group_components([], _edges, _seen, components) do
+    Enum.reverse(components)
+  end
 
   defp group_components([node | rest], edges, seen, components) do
     if Map.has_key?(seen, node) do
@@ -913,12 +952,19 @@ defmodule Agenda.Arranger do
         rest,
         edges,
         Map.merge(seen, members),
-        [members |> Map.keys() |> Enum.sort() | components]
+        [
+          members
+          |> Map.keys()
+          |> Enum.sort()
+          | components
+        ]
       )
     end
   end
 
-  defp reachable([], _edges, seen), do: seen
+  defp reachable([], _edges, seen) do
+    seen
+  end
 
   defp reachable([node | rest], edges, seen) do
     if Map.has_key?(seen, node) do
@@ -963,12 +1009,17 @@ defmodule Agenda.Arranger do
       |> Enum.uniq()
       |> length()
 
-    if distinct < length(candidates), do: {distinct, length(candidates)}
+    if distinct < length(candidates) do
+      {distinct, length(candidates)}
+    end
   end
 
   defp placement_key(%Arrangement{} = arrangement) do
     {Interval.from(arrangement.interval), Interval.to(arrangement.interval),
-     arrangement |> Arrangement.resources() |> Enum.map(& &1.name) |> Enum.sort()}
+     arrangement
+     |> Arrangement.resources()
+     |> Enum.map(& &1.name)
+     |> Enum.sort()}
   end
 
   # Only two values are meaningful, and a third is a typo worth hearing
@@ -1001,7 +1052,13 @@ defmodule Agenda.Arranger do
   # and the search stops rather than proving the point exhaustively.
   defp optimise(candidates, programme, pinned, allow?, options, preferences, ceiling \\ nil) do
     context = %{programme: programme, options: options}
-    widest = if allow?, do: length(candidates), else: 0
+
+    widest =
+      if allow? do
+        length(candidates)
+      else
+        0
+      end
 
     explore(candidates, context, Enum.map(pinned, &{&1, exempt(&1)}), [], %{
       best: nil,
@@ -1009,7 +1066,12 @@ defmodule Agenda.Arranger do
       budget: budget(options, preferences),
       exhausted?: false,
       ceiling: ceiling || widest,
-      floor: if(allow?, do: fewest_possible_unplaced(candidates), else: 0),
+      floor:
+        if allow? do
+          fewest_possible_unplaced(candidates)
+        else
+          0
+        end,
       preferences: preferences,
       count_proven?: nil,
       scoring: %{programme: programme, pool: Keyword.get(options, :pool, [])}
@@ -1036,11 +1098,13 @@ defmodule Agenda.Arranger do
   # search its own budget, so it can never spend the guarantee.
   defp refine(state, candidates, programme, pinned, allow?, options)
 
-  defp refine(state, _candidates, %Programme{preferences: []}, _pinned, _allow?, _options),
-    do: state
+  defp refine(state, _candidates, %Programme{preferences: []}, _pinned, _allow?, _options) do
+    state
+  end
 
-  defp refine(%{best: nil} = state, _candidates, _programme, _pinned, _allow?, _options),
-    do: state
+  defp refine(%{best: nil} = state, _candidates, _programme, _pinned, _allow?, _options) do
+    state
+  end
 
   defp refine(
          %{best: {count, _score, _placed, _skipped}} = proven,
@@ -1064,7 +1128,9 @@ defmodule Agenda.Arranger do
 
   # The scoring pass gets its own budget so that looking for a prettier
   # layout can never eat the budget that proves how many fit.
-  defp budget(options, []), do: Keyword.get(options, :nodes, @default_nodes)
+  defp budget(options, []) do
+    Keyword.get(options, :nodes, @default_nodes)
+  end
 
   defp budget(options, [_first | _rest]) do
     Keyword.get(options, :score_nodes, @default_score_nodes)
@@ -1142,7 +1208,9 @@ defmodule Agenda.Arranger do
     |> leave_out(entry, rest, context, placed, skipped)
   end
 
-  defp place_each(state, [], _symmetry, _rest, _context, _placed, _skipped), do: state
+  defp place_each(state, [], _symmetry, _rest, _context, _placed, _skipped) do
+    state
+  end
 
   defp place_each(state, [candidate | others], symmetry, rest, context, placed, skipped) do
     cond do
@@ -1203,28 +1271,41 @@ defmodule Agenda.Arranger do
     explore(rest, context, placed, [{session, symmetry} | skipped], spend(state))
   end
 
-  defp spend(state), do: %{state | budget: state.budget - 1}
+  defp spend(state) do
+    %{state | budget: state.budget - 1}
+  end
 
   # No layout can leave out fewer than the resources force, so one that
   # matches the bound is optimal and there is nothing left to prove —
   # unless preferences are declared, in which case another layout
   # placing just as many may still score better, and stopping here
   # would return the first workable answer rather than a good one.
-  defp settled?(%{best: nil}), do: false
+  defp settled?(%{best: nil}) do
+    false
+  end
 
   # Penalties are never negative, so a score of zero is the best any
   # layout can do and the scoring pass has nothing left to look for.
-  defp settled?(%{preferences: [_first | _rest], best: {_count, 0, _placed, _skipped}}), do: true
+  defp settled?(%{preferences: [_first | _rest], best: {_count, 0, _placed, _skipped}}) do
+    true
+  end
 
-  defp settled?(%{preferences: [_first | _rest]}), do: false
-  defp settled?(%{best: {count, _score, _placed, _skipped}, floor: floor}), do: count <= floor
+  defp settled?(%{preferences: [_first | _rest]}) do
+    false
+  end
+
+  defp settled?(%{best: {count, _score, _placed, _skipped}, floor: floor}) do
+    count <= floor
+  end
 
   # Without preferences a branch that ties the best count cannot
   # improve on it, so `>=` cuts it. With preferences a tie is exactly
   # where a better score lives, so only a strictly worse count is cut.
   # That is what makes soft constraints cost something: the search can
   # no longer dismiss the layouts it would otherwise never look at.
-  defp hopeless?(_skipped, %{best: nil}), do: false
+  defp hopeless?(_skipped, %{best: nil}) do
+    false
+  end
 
   defp hopeless?(skipped, %{best: {count, _score, _placed, _skipped}} = state) do
     if state.preferences == [] do
@@ -1238,20 +1319,31 @@ defmodule Agenda.Arranger do
   # only separates layouts that leave out the same number.
   defp record(state, placed, skipped) do
     count = length(skipped)
-    arrangements = placed |> Enum.reverse() |> Enum.map(&elem(&1, 0))
+
+    arrangements =
+      placed
+      |> Enum.reverse()
+      |> Enum.map(&elem(&1, 0))
+
     score = Preference.score(state.preferences, arrangements, state.scoring)
 
     if better_than_best?(state.best, count, score) do
       %{
         state
-        | best: {count, score, arrangements, skipped |> Enum.reverse() |> Enum.map(&elem(&1, 0))}
+        | best:
+            {count, score, arrangements,
+             skipped
+             |> Enum.reverse()
+             |> Enum.map(&elem(&1, 0))}
       }
     else
       state
     end
   end
 
-  defp better_than_best?(nil, _count, _score), do: true
+  defp better_than_best?(nil, _count, _score) do
+    true
+  end
 
   defp better_than_best?({best_count, best_score, _placed, _skipped}, count, score) do
     count < best_count or (count == best_count and score < best_score)
@@ -1269,7 +1361,9 @@ defmodule Agenda.Arranger do
     }
   end
 
-  defp note_stuck(state, _session, _candidates, _placed, _context), do: state
+  defp note_stuck(state, _session, _candidates, _placed, _context) do
+    state
+  end
 
   # Symmetry breaking, and the reason the search is tractable at all.
   #
@@ -1385,7 +1479,9 @@ defmodule Agenda.Arranger do
   # the budget ran out. When a scoring pass has run, the answer is the
   # one the counting pass reached — the scoring pass never changes how
   # many were placed, so its budget cannot cost the guarantee.
-  defp minimal?(%{count_proven?: proven}) when is_boolean(proven), do: proven
+  defp minimal?(%{count_proven?: proven}) when is_boolean(proven) do
+    proven
+  end
 
   defp minimal?(%{best: {count, _score, _placed, _skipped}, floor: floor, exhausted?: exhausted?}) do
     not exhausted? or count <= floor
@@ -1409,7 +1505,9 @@ defmodule Agenda.Arranger do
     end
   end
 
-  defp refusals(%{candidates: [], placed: _placed}), do: []
+  defp refusals(%{candidates: [], placed: _placed}) do
+    []
+  end
 
   defp refusals(%{candidates: candidates, placed: placed, context: context}) do
     %{programme: programme, options: options} = context
@@ -1427,7 +1525,10 @@ defmodule Agenda.Arranger do
   # ordering, and deserves to be told so without a name it cannot
   # attach to a single session.
   defp blocker(refused) do
-    case refused |> Enum.map(&elem(&1, 1)) |> Enum.reject(&is_nil/1) |> Enum.uniq() do
+    case refused
+         |> Enum.map(&elem(&1, 1))
+         |> Enum.reject(&is_nil/1)
+         |> Enum.uniq() do
       [only] -> only
       _none_or_several -> nil
     end
@@ -1451,14 +1552,33 @@ defmodule Agenda.Arranger do
     {kinds, blocked_by && elem(blocked_by, 0).session}
   end
 
-  defp add(reasons, _reason, false), do: reasons
-  defp add(reasons, reason, true), do: [reason | reasons]
+  defp add(reasons, _reason, false) do
+    reasons
+  end
 
-  defp phrase(:capacity, _blocker), do: "without clashing with something already placed"
-  defp phrase(:limit, _blocker), do: "without exceeding a load limit"
-  defp phrase(:track, _blocker), do: "without colliding with another session in its track"
-  defp phrase(:order, nil), do: "anywhere its ordering allows"
-  defp phrase(:order, other), do: "anywhere its ordering with #{other} allows"
+  defp add(reasons, reason, true) do
+    [reason | reasons]
+  end
+
+  defp phrase(:capacity, _blocker) do
+    "without clashing with something already placed"
+  end
+
+  defp phrase(:limit, _blocker) do
+    "without exceeding a load limit"
+  end
+
+  defp phrase(:track, _blocker) do
+    "without colliding with another session in its track"
+  end
+
+  defp phrase(:order, nil) do
+    "anywhere its ordering allows"
+  end
+
+  defp phrase(:order, other) do
+    "anywhere its ordering with #{other} allows"
+  end
 
   defp in_programme_order(arrangements, programme) do
     order =
@@ -1531,7 +1651,9 @@ defmodule Agenda.Arranger do
   # Precedence relates exactly two sessions, so it belongs here beside
   # the track check rather than needing machinery of its own. A chain
   # of three is two precedences, each enforced independently.
-  defp order_ok?(_a, _b, %Programme{precedences: []}), do: true
+  defp order_ok?(_a, _b, %Programme{precedences: []}) do
+    true
+  end
 
   defp order_ok?(a, b, %Programme{} = programme) do
     case Precedence.between(programme.precedences, a.session, b.session) do
@@ -1556,14 +1678,21 @@ defmodule Agenda.Arranger do
       )
   end
 
-  defp shifted(moment, nil), do: moment
-  defp shifted(moment, duration), do: Tempo.shift!(moment, duration)
+  defp shifted(moment, nil) do
+    moment
+  end
+
+  defp shifted(moment, duration) do
+    Tempo.shift!(moment, duration)
+  end
 
   defp not_before?(moment, earliest) do
     Tempo.compare(moment, earliest, by: :start) in [:gt, :eq]
   end
 
-  defp within_limit?(_moment, _from, nil), do: true
+  defp within_limit?(_moment, _from, nil) do
+    true
+  end
 
   defp within_limit?(moment, from, within) do
     Tempo.compare(moment, Tempo.shift!(from, within), by: :start) in [:lt, :eq]
@@ -1595,7 +1724,9 @@ defmodule Agenda.Arranger do
   # resource's turnaround overlap exactly when the real gap between
   # them is smaller than that turnaround, so one overlap test measures
   # the separation in either direction.
-  defp turnaround(interval, %Resource{buffer_before: nil, buffer_after: nil}), do: interval
+  defp turnaround(interval, %Resource{buffer_before: nil, buffer_after: nil}) do
+    interval
+  end
 
   defp turnaround(%Tempo{} = interval, %Resource{} = resource) do
     Interval.new!(
@@ -1605,11 +1736,21 @@ defmodule Agenda.Arranger do
     )
   end
 
-  defp earlier_by(moment, nil), do: moment
-  defp earlier_by(moment, duration), do: Tempo.shift!(moment, Duration.negate(duration))
+  defp earlier_by(moment, nil) do
+    moment
+  end
 
-  defp later_by(moment, nil), do: moment
-  defp later_by(moment, duration), do: Tempo.shift!(moment, duration)
+  defp earlier_by(moment, duration) do
+    Tempo.shift!(moment, Duration.negate(duration))
+  end
+
+  defp later_by(moment, nil) do
+    moment
+  end
+
+  defp later_by(moment, duration) do
+    Tempo.shift!(moment, duration)
+  end
 
   defp holds_at?({arrangement, _symmetry}, %Resource{} = resource, interval) do
     Enum.any?(Arrangement.resources(arrangement), &(&1.name == resource.name)) and
@@ -1665,8 +1806,13 @@ defmodule Agenda.Arranger do
     Limit.sum([candidate.interval | already] ++ booked)
   end
 
-  defp interval_start(%Tempo{form: {:span, _from, _to}} = interval), do: Interval.from(interval)
-  defp interval_start(other), do: other
+  defp interval_start(%Tempo{form: {:span, _from, _to}} = interval) do
+    Interval.from(interval)
+  end
+
+  defp interval_start(other) do
+    other
+  end
 
   defp track_ok?(a, b, programme, options) do
     case {Programme.track_of(programme, a.session), Programme.track_of(programme, b.session)} do
@@ -1684,7 +1830,9 @@ defmodule Agenda.Arranger do
     Tempo.disjoint?(a.interval, b.interval) and reachable?(a, b, track, options)
   end
 
-  defp reachable?(_a, _b, %Track{reachable_within: nil}, _options), do: true
+  defp reachable?(_a, _b, %Track{reachable_within: nil}, _options) do
+    true
+  end
 
   defp reachable?(a, b, %Track{reachable_within: within}, options) do
     {earlier, later} = in_time_order(a, b)
@@ -1756,10 +1904,16 @@ defmodule Agenda.Arranger do
   end
 
   defp longer_of(longest, journey) do
-    if no_longer_than?(journey, longest), do: longest, else: journey
+    if no_longer_than?(journey, longest) do
+      longest
+    else
+      journey
+    end
   end
 
   defp located(%Arrangement{} = arrangement) do
-    arrangement |> Arrangement.resources() |> Enum.reject(&is_nil(&1.within))
+    arrangement
+    |> Arrangement.resources()
+    |> Enum.reject(&is_nil(&1.within))
   end
 end

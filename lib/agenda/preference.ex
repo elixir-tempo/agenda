@@ -102,10 +102,17 @@ defmodule Agenda.Preference do
     {:ok, %__MODULE__{name: name, weight: weight(options), count: counter}}
   end
 
-  def new(name, _options) when is_atom(name), do: {:error, {:unknown_preference, name}}
-  def new(other, _options), do: {:error, {:unknown_preference, other}}
+  def new(name, _options) when is_atom(name) do
+    {:error, {:unknown_preference, name}}
+  end
 
-  defp weight(options), do: Keyword.get(options, :weight, 1)
+  def new(other, _options) do
+    {:error, {:unknown_preference, other}}
+  end
+
+  defp weight(options) do
+    Keyword.get(options, :weight, 1)
+  end
 
   @doc """
   What a layout costs against `preferences`.
@@ -173,9 +180,17 @@ defmodule Agenda.Preference do
 
   ## --- the built-ins ---------------------------------------------
 
-  defp counter(:room_changes), do: &room_changes/2
-  defp counter(:room_spread), do: &room_spread/2
-  defp counter(:resource_wishes), do: &resource_wishes/2
+  defp counter(:room_changes) do
+    &room_changes/2
+  end
+
+  defp counter(:room_spread) do
+    &room_spread/2
+  end
+
+  defp counter(:resource_wishes) do
+    &resource_wishes/2
+  end
 
   # What each resource would rather. `avoids` and `prefers` on a
   # `Agenda.Resource` are wishes, not rules — unlike `open/2`, which
@@ -196,7 +211,9 @@ defmodule Agenda.Preference do
     end)
   end
 
-  defp unwilling?(%Resource{avoids: nil, prefers: nil}, _interval), do: false
+  defp unwilling?(%Resource{avoids: nil, prefers: nil}, _interval) do
+    false
+  end
 
   defp unwilling?(%Resource{} = resource, interval) do
     overlaps?(resource.avoids, interval) or
@@ -208,10 +225,14 @@ defmodule Agenda.Preference do
   # a bound of its own. An unreadable wish scores nothing rather than
   # crashing a scoring pass: a preference must never be able to fail an
   # arrangement that is otherwise valid.
-  defp overlaps?(nil, _interval), do: false
+  defp overlaps?(nil, _interval) do
+    false
+  end
 
   defp overlaps?(pattern, interval) do
-    pattern |> shared(interval) |> occupied?()
+    pattern
+    |> shared(interval)
+    |> occupied?()
   end
 
   defp shared(pattern, interval) do
@@ -221,8 +242,13 @@ defmodule Agenda.Preference do
     end
   end
 
-  defp occupied?({:ok, shared}), do: not Tempo.empty?(shared)
-  defp occupied?(_unreadable), do: false
+  defp occupied?({:ok, shared}) do
+    not Tempo.empty?(shared)
+  end
+
+  defp occupied?(_unreadable) do
+    false
+  end
 
   # A delegate following a track would rather stay put. Counts the
   # consecutive pairs within each track that sit in different rooms —

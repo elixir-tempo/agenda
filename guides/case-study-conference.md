@@ -27,9 +27,17 @@ conf_days =
     ~o"2027-05-14T09:00:00/2027-05-14T17:00:00"
   ])
 
-hall   = Agenda.resource("Main Hall", within: main_level, seats: 800) |> Agenda.open!(conf_days)
-room_a = Agenda.resource("Room A", within: break_level, seats: 200) |> Agenda.open!(conf_days)
-room_b = Agenda.resource("Room B", within: break_level, seats: 200) |> Agenda.open!(conf_days)
+hall =
+  Agenda.resource("Main Hall", within: main_level, seats: 800)
+  |> Agenda.open!(conf_days)
+
+room_a =
+  Agenda.resource("Room A", within: break_level, seats: 200)
+  |> Agenda.open!(conf_days)
+
+room_b =
+  Agenda.resource("Room B", within: break_level, seats: 200)
+  |> Agenda.open!(conf_days)
 ```
 
 Open hours are a Tempo value, so "nine to five on two specific days" is just a two-member interval set. It could equally be an ISO 8601 recurrence or an RFC 5545 `RRULE` — `open/2` takes all three, and ISO 8601 is the preferred spelling because it is what Tempo stores and renders back.
@@ -70,7 +78,9 @@ This is worth stating plainly because the alternative — a genuine "nothing els
   |> Agenda.Track.reachable(within: ~o"PT15M")
 
 {:ok, web} =
-  Agenda.track("Web", of: [talk.("LiveView patterns", day1_rest), talk.("Phoenix 2.0", day2_rest)])
+  Agenda.track("Web",
+    of: [talk.("LiveView patterns", day1_rest), talk.("Phoenix 2.0", day2_rest)]
+  )
   |> Agenda.Track.reachable(within: ~o"PT15M")
 ```
 
@@ -286,7 +296,9 @@ The search is depth-first with backtracking, ordered most-constrained-first, and
 **Both caps report when they are hit.** A partial programme presented as finished is worse than an admitted failure, so hitting the node limit is an error naming the limit, not a short list of arrangements:
 
 ```elixir
-Agenda.arrange(programme, [hall, room_a, room_b], nodes: 1) |> elem(1) |> Agenda.explain()
+Agenda.arrange(programme, [hall, room_a, room_b], nodes: 1)
+|> elem(1)
+|> Agenda.explain()
 #=> "ElixirConf 2027 cannot be held: the search reached its node limit before placing
 #=>  every session — raise :nodes, or narrow the programme"
 ```

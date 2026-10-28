@@ -137,7 +137,8 @@ plenary_hours =
   ])
 
 room = fn name, seats, hours ->
-  Agenda.resource(name, within: venue, seats: seats) |> Agenda.open!(hours)
+  Agenda.resource(name, within: venue, seats: seats)
+  |> Agenda.open!(hours)
 end
 
 peninsula = room.("Peninsula 4-7", 700, plenary_hours)
@@ -185,11 +186,12 @@ speaker_names =
      Igor|Spiridonov Gonzalo|Rodriguez Michael|St_Clair Micah|Woods Ivy|Markwell
      Kate|Rezentes Paulo|Valente Daniel|Kentfield Dan|Janowski Brett|Beatty
      German|Velasco Doug|VonMoser Geoffrey|Lessel)
-  |> Enum.map(&(&1 |> String.replace("|", " ") |> String.replace("_", " ")))
+  |> Enum.map(&String.replace(&1, ["|", "_"], " "))
 
 speakers =
   Enum.map(speaker_names, fn name ->
-    Agenda.resource(name, role: :speaker) |> Agenda.open!(plenary_hours)
+    Agenda.resource(name, role: :speaker)
+    |> Agenda.open!(plenary_hours)
   end)
 
 length(speakers)
@@ -458,9 +460,13 @@ end)
 
 ```elixir
 {:ok, afternoon} =
-  Agenda.resource("Canaveral", seats: 250) |> Agenda.open(~o"2025-08-28T13:45/T15:05")
+  Agenda.resource("Canaveral", seats: 250)
+  |> Agenda.open(~o"2025-08-28T13:45/T15:05")
 
-three = sessions |> Enum.filter(&(&1.duration == ~o"PT40M")) |> Enum.take(3)
+three =
+  sessions
+  |> Enum.filter(&(&1.duration == ~o"PT40M"))
+  |> Enum.take(3)
 
 one_block =
   Agenda.programme("After lunch")
@@ -487,7 +493,11 @@ in_tension
 turnaround =
   Agenda.programme("Turnaround")
   |> Agenda.Programme.across(~o"2025-08-28")
-  |> Agenda.Programme.add_sessions(sessions |> Enum.filter(&(&1.duration == ~o"PT20M")) |> Enum.take(4))
+  |> Agenda.Programme.add_sessions(
+    sessions
+    |> Enum.filter(&(&1.duration == ~o"PT20M"))
+    |> Enum.take(4)
+  )
 
 {:ok, spaced} = Agenda.arrange(turnaround, [hall] ++ speakers)
 

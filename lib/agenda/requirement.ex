@@ -109,7 +109,8 @@ defmodule Agenda.Requirement do
       iex> alice = Agenda.Resource.new("Alice", requires: [step_free_access: true])
       iex> room = Agenda.Requirement.new(:room, seats: 8)
       iex> tightened = Agenda.Requirement.induce(room, [alice])
-      iex> Map.keys(tightened.attributes) |> Enum.sort()
+      iex> Map.keys(tightened.attributes)
+      ...> |> Enum.sort()
       [:seats, :step_free_access]
 
   """
@@ -153,13 +154,16 @@ defmodule Agenda.Requirement do
       iex> bob = Agenda.Resource.new("Bob")
       iex> first = Agenda.Requirement.roster(:speaker, [alice])
       iex> second = Agenda.Requirement.roster(:speaker, [bob])
-      iex> Agenda.Requirement.merge(first, second).roster |> Enum.map(& &1.name)
+      iex> Agenda.Requirement.merge(first, second).roster
+      ...> |> Enum.map(& &1.name)
       ["Alice", "Bob"]
 
       iex> import Agenda.Predicate
       iex> seating = Agenda.Requirement.new(:room, seats: at_least(250))
       iex> wired = Agenda.Requirement.new(:room, projector: true)
-      iex> Agenda.Requirement.merge(seating, wired).attributes |> Map.keys() |> Enum.sort()
+      iex> Agenda.Requirement.merge(seating, wired).attributes
+      ...> |> Map.keys()
+      ...> |> Enum.sort()
       [:projector, :seats]
 
   """
@@ -262,7 +266,8 @@ defmodule Agenda.Requirement do
       iex> big = Agenda.Resource.new("Boardroom", seats: 8)
       iex> small = Agenda.Resource.new("Meeting room 2", seats: 4)
       iex> requirement = Agenda.Requirement.new(:room, seats: at_least(8))
-      iex> Agenda.Requirement.eligible(requirement, [big, small]) |> Enum.map(& &1.name)
+      iex> Agenda.Requirement.eligible(requirement, [big, small])
+      ...> |> Enum.map(& &1.name)
       ["Boardroom"]
 
   """

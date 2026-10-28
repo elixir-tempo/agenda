@@ -7,7 +7,9 @@ defmodule Agenda.ArrangementTest do
 
   doctest Agenda.Arrangement
 
-  defp at(interval), do: %Arrangement{interval: interval}
+  defp at(interval) do
+    %Arrangement{interval: interval}
+  end
 
   describe "compare/2" do
     test "orders by start" do

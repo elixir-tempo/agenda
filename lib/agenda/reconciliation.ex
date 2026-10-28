@@ -189,7 +189,9 @@ defmodule Agenda.Reconciliation do
   # Everything reaching the set algebra is clipped to the window first,
   # so a holiday set spanning a decade costs nothing to pass in and a
   # claim straddling the boundary contributes only its part inside.
-  defp set(nil, _window), do: {:ok, IntervalSet.new!([])}
+  defp set(nil, _window) do
+    {:ok, IntervalSet.new!([])}
+  end
 
   defp set(given, window) do
     with {:ok, as_set} <- spans(given), do: clip(as_set, window)
@@ -199,7 +201,9 @@ defmodule Agenda.Reconciliation do
   # holiday is naturally written as the day it falls on — `~o"2026-08-12"`
   # — and the day is already the span it denotes; requiring the caller to
   # spell it as an interval would ask for a second form of the same thing.
-  defp spans(%Tempo{} = given), do: {:ok, given}
+  defp spans(%Tempo{} = given) do
+    {:ok, given}
+  end
 
   defp spans(values) do
     values
@@ -218,8 +222,13 @@ defmodule Agenda.Reconciliation do
   end
 
   # One step of a fold that stops at the first error, handing it back.
-  defp continued({:ok, result}, accumulate), do: {:cont, {:ok, accumulate.(result)}}
-  defp continued(error, _accumulate), do: {:halt, error}
+  defp continued({:ok, result}, accumulate) do
+    {:cont, {:ok, accumulate.(result)}}
+  end
+
+  defp continued(error, _accumulate) do
+    {:halt, error}
+  end
 
   defp clip(set, window) do
     with {:ok, bounds} <- bounds(window), do: Tempo.intersection(set, bounds)
@@ -230,11 +239,15 @@ defmodule Agenda.Reconciliation do
   # designator resolved in a fiscal calendar: the set operations take
   # any of them, so a caller names a period the way their calendar
   # names it rather than having to spell out its endpoints.
-  defp bounds(%Tempo{} = window), do: {:ok, window}
+  defp bounds(%Tempo{} = window) do
+    {:ok, window}
+  end
 
   # Anything else — an imported VAVAILABILITY handle, a bare duration —
   # denotes no span, so it cannot bound a reconciliation.
-  defp bounds(other), do: {:error, {:unusable_window, other}}
+  defp bounds(other) do
+    {:error, {:unusable_window, other}}
+  end
 
   defp allocations(ledger, resource, window) do
     ledger
@@ -246,10 +259,15 @@ defmodule Agenda.Reconciliation do
     Tempo.overlaps?(interval, window) == true
   end
 
-  defp overlaps?(_other, _window), do: false
+  defp overlaps?(_other, _window) do
+    false
+  end
 
   defp claimed(allocations, window) do
-    with {:ok, set} <- allocations |> Enum.map(& &1.interval) |> IntervalSet.new() do
+    with {:ok, set} <-
+           allocations
+           |> Enum.map(& &1.interval)
+           |> IntervalSet.new() do
       clip(set, window)
     end
   end
@@ -364,7 +382,9 @@ defmodule Agenda.Reconciliation do
       Enum.map(reconciliation.breaches, &breach_sentence(reconciliation.resource, &1))
   end
 
-  defp gaps(_reconciliation, set, _what) when set == nil, do: []
+  defp gaps(_reconciliation, set, _what) when set == nil do
+    []
+  end
 
   defp gaps(reconciliation, set, what) do
     case IntervalSet.members(set) do
@@ -382,19 +402,45 @@ defmodule Agenda.Reconciliation do
     "#{resource}: #{describe(breach)} in the #{period} of #{label(bucket)}"
   end
 
-  defp describe({:over, {:count, most}}), do: "more than #{most} claims"
-  defp describe({:under, {:count, least}}), do: "fewer than #{least} claims"
-  defp describe({:over, {:duration, most}}), do: "more than #{hours(most)}"
-  defp describe({:under, {:duration, least}}), do: "less than #{hours(least)}"
+  defp describe({:over, {:count, most}}) do
+    "more than #{most} claims"
+  end
+
+  defp describe({:under, {:count, least}}) do
+    "fewer than #{least} claims"
+  end
+
+  defp describe({:over, {:duration, most}}) do
+    "more than #{hours(most)}"
+  end
+
+  defp describe({:under, {:duration, least}}) do
+    "less than #{hours(least)}"
+  end
 
   # A period is written as Tempo writes it, built from its parts, as the
   # spans in the same sentences are.
-  defp label({year, {:week, week}, nil}), do: written(year: year, week: week)
-  defp label({year, month, nil}), do: written(year: year, month: month)
-  defp label({year, month, day}), do: written(year: year, month: month, day: day)
-  defp label(other), do: inspect(other)
+  defp label({year, {:week, week}, nil}) do
+    written(year: year, week: week)
+  end
 
-  defp written(units), do: units |> Tempo.new!() |> Tempo.to_iso8601!()
+  defp label({year, month, nil}) do
+    written(year: year, month: month)
+  end
+
+  defp label({year, month, day}) do
+    written(year: year, month: month, day: day)
+  end
+
+  defp label(other) do
+    inspect(other)
+  end
+
+  defp written(units) do
+    units
+    |> Tempo.new!()
+    |> Tempo.to_iso8601!()
+  end
 
   defp hours(duration) do
     case Duration.to_unit(duration, :hour) do

@@ -42,7 +42,9 @@ defmodule Agenda.PreferenceTest do
 
   defp rooms(arrangements) do
     Enum.map(arrangements, fn arrangement ->
-      arrangement |> Arrangement.resources() |> Enum.map(& &1.name)
+      arrangement
+      |> Arrangement.resources()
+      |> Enum.map(& &1.name)
     end)
   end
 
@@ -114,7 +116,12 @@ defmodule Agenda.PreferenceTest do
 
       assert {:ok, arrangements} = Agenda.arrange(programme, [context.hall, context.studio])
 
-      used = arrangements |> rooms() |> List.flatten() |> Enum.uniq()
+      used =
+        arrangements
+        |> rooms()
+        |> List.flatten()
+        |> Enum.uniq()
+
       assert length(used) == 2
     end
 

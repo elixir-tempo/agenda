@@ -48,7 +48,10 @@ defmodule Agenda.PrecedenceTest do
   end
 
   defp ends(arrangements, name) do
-    arrangements |> Enum.find(&(&1.session == name)) |> Map.get(:interval) |> Interval.to()
+    arrangements
+    |> Enum.find(&(&1.session == name))
+    |> Map.get(:interval)
+    |> Interval.to()
   end
 
   defp at_or_after?(later, earlier) do
@@ -256,13 +259,19 @@ defmodule Agenda.PrecedenceTest do
 
       rooms =
         Enum.map(1..3, fn i ->
-          {:ok, room} = Agenda.resource("Room #{i}", seats: 100) |> Agenda.open(open)
+          {:ok, room} =
+            Agenda.resource("Room #{i}", seats: 100)
+            |> Agenda.open(open)
+
           room
         end)
 
       speakers =
         Enum.map(1..30, fn i ->
-          {:ok, speaker} = Agenda.resource("Speaker #{i}", role: :speaker) |> Agenda.open(open)
+          {:ok, speaker} =
+            Agenda.resource("Speaker #{i}", role: :speaker)
+            |> Agenda.open(open)
+
           speaker
         end)
 

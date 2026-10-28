@@ -171,7 +171,9 @@ defmodule Agenda.Limit do
     end
   end
 
-  defp bound(_period, _which, nil), do: {:ok, nil}
+  defp bound(_period, _which, nil) do
+    {:ok, nil}
+  end
 
   defp bound(_period, _which, value) when is_integer(value) and value > 0 do
     {:ok, {:count, value}}
@@ -191,7 +193,9 @@ defmodule Agenda.Limit do
     end
   end
 
-  defp bound(period, which, value), do: unreadable(period, which, value)
+  defp bound(period, which, value) do
+    unreadable(period, which, value)
+  end
 
   defp unreadable(period, which, value) do
     {:error,
@@ -254,13 +258,22 @@ defmodule Agenda.Limit do
   """
   @spec sum(Tempo.t() | [Tempo.t() | Allocation.t()]) ::
           {non_neg_integer(), Duration.t()}
-  def sum(%Tempo{} = claims), do: claims |> IntervalSet.members() |> sum()
-
-  def sum(claims) when is_list(claims) do
-    {length(claims), claims |> Enum.flat_map(&measurable/1) |> Duration.sum()}
+  def sum(%Tempo{} = claims) do
+    claims
+    |> IntervalSet.members()
+    |> sum()
   end
 
-  defp measurable(%Allocation{interval: interval}), do: measurable(interval)
+  def sum(claims) when is_list(claims) do
+    {length(claims),
+     claims
+     |> Enum.flat_map(&measurable/1)
+     |> Duration.sum()}
+  end
+
+  defp measurable(%Allocation{interval: interval}) do
+    measurable(interval)
+  end
 
   defp measurable(%Tempo{} = interval) do
     case Tempo.duration(interval) do
@@ -269,7 +282,9 @@ defmodule Agenda.Limit do
     end
   end
 
-  defp measurable(_other), do: []
+  defp measurable(_other) do
+    []
+  end
 
   @doc """
   Which day, week or month a moment falls in.
@@ -322,17 +337,30 @@ defmodule Agenda.Limit do
   """
   @spec bucket(Tempo.t() | term(), atom()) :: tuple() | :undated
   def bucket(%Tempo{} = moment, period) do
-    if dated?(moment), do: moment |> Tempo.trunc(period) |> period_of(), else: :undated
+    if dated?(moment) do
+      moment
+      |> Tempo.trunc(period)
+      |> period_of()
+    else
+      :undated
+    end
   end
 
-  def bucket(_other, _period), do: :undated
+  def bucket(_other, _period) do
+    :undated
+  end
 
   defp dated?(moment) do
     Enum.all?([Tempo.year(moment), Tempo.month(moment), Tempo.day(moment)], &is_integer/1)
   end
 
-  defp period_of({:ok, start}), do: components(start)
-  defp period_of(_cannot_be_placed), do: :undated
+  defp period_of({:ok, start}) do
+    components(start)
+  end
+
+  defp period_of(_cannot_be_placed) do
+    :undated
+  end
 
   # The start of the period, reduced to its plain components. The
   # reduction matters: a truncated value carries the zone and extended
@@ -383,9 +411,13 @@ defmodule Agenda.Limit do
 
   """
   @spec permits?(t(), non_neg_integer(), Tempo.Duration.t()) :: boolean()
-  def permits?(%__MODULE__{at_most: nil}, _count, _duration), do: true
+  def permits?(%__MODULE__{at_most: nil}, _count, _duration) do
+    true
+  end
 
-  def permits?(%__MODULE__{at_most: {:count, most}}, count, _duration), do: count <= most
+  def permits?(%__MODULE__{at_most: {:count, most}}, count, _duration) do
+    count <= most
+  end
 
   def permits?(%__MODULE__{at_most: {:duration, most}}, _count, duration) do
     Duration.compare(duration, most) in [:lt, :eq]
@@ -426,8 +458,13 @@ defmodule Agenda.Limit do
 
   """
   @spec ceiling(t()) :: non_neg_integer() | nil
-  def ceiling(%__MODULE__{at_most: nil}), do: nil
-  def ceiling(%__MODULE__{at_most: measure}), do: quantity(measure)
+  def ceiling(%__MODULE__{at_most: nil}) do
+    nil
+  end
+
+  def ceiling(%__MODULE__{at_most: measure}) do
+    quantity(measure)
+  end
 
   @doc """
   What a count and a duration amount to, in the unit `limit` measures.
@@ -470,8 +507,13 @@ defmodule Agenda.Limit do
     end
   end
 
-  defp quantity({:count, bound}), do: bound
-  defp quantity({:duration, bound}), do: seconds(bound)
+  defp quantity({:count, bound}) do
+    bound
+  end
+
+  defp quantity({:duration, bound}) do
+    seconds(bound)
+  end
 
   defp seconds(duration) do
     case Duration.to_unit(duration, :second) do
@@ -524,7 +566,15 @@ defmodule Agenda.Limit do
     end
   end
 
-  defp short?(nil, _count, _duration), do: false
-  defp short?({:count, least}, count, _duration), do: count < least
-  defp short?({:duration, least}, _count, duration), do: Duration.compare(duration, least) == :lt
+  defp short?(nil, _count, _duration) do
+    false
+  end
+
+  defp short?({:count, least}, count, _duration) do
+    count < least
+  end
+
+  defp short?({:duration, least}, _count, duration) do
+    Duration.compare(duration, least) == :lt
+  end
 end

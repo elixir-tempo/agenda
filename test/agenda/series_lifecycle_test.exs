@@ -72,13 +72,19 @@ defmodule Agenda.SeriesLifecycleTest do
     test "the allocations all carry the series name", context do
       ledger = book_all(context.occurrences, context.room)
 
-      assert ledger |> Ledger.to_list() |> Enum.map(& &1.series) |> Enum.uniq() == ["Stand-up"]
+      assert ledger
+             |> Ledger.to_list()
+             |> Enum.map(& &1.series)
+             |> Enum.uniq() == ["Stand-up"]
     end
 
     test "occurrences are booked at distinct times", context do
       ledger = book_all(context.occurrences, context.room)
 
-      starts = ledger |> Ledger.to_list() |> Enum.map(&Interval.from(&1.interval))
+      starts =
+        ledger
+        |> Ledger.to_list()
+        |> Enum.map(&Interval.from(&1.interval))
 
       assert length(Enum.uniq(starts)) == 4
     end
@@ -106,7 +112,11 @@ defmodule Agenda.SeriesLifecycleTest do
       {:ok, ledger} = Ledger.release_series(ledger, "Stand-up")
 
       assert Ledger.count(ledger) == 1
-      assert ledger |> Ledger.to_list() |> hd() |> Map.get(:session) == "Retro"
+
+      assert ledger
+             |> Ledger.to_list()
+             |> hd()
+             |> Map.get(:session) == "Retro"
     end
 
     test "an unknown series changes nothing", context do
@@ -121,7 +131,11 @@ defmodule Agenda.SeriesLifecycleTest do
       # Occurrences fall on 1, 8, 15 and 22 March; cancel from the 10th.
       {:ok, ledger} = Ledger.release_series(ledger, "Stand-up", from: "2027-03-10")
 
-      remaining = ledger |> Ledger.to_list() |> Enum.map(& &1.session) |> Enum.sort()
+      remaining =
+        ledger
+        |> Ledger.to_list()
+        |> Enum.map(& &1.session)
+        |> Enum.sort()
 
       assert remaining == ["Stand-up 1", "Stand-up 2"]
     end
@@ -146,7 +160,11 @@ defmodule Agenda.SeriesLifecycleTest do
       ledger = book_all(context.occurrences, context.room)
       [_, second | _] = context.occurrences
 
-      booked = ledger |> Ledger.for_session("Stand-up 2") |> hd() |> Map.get(:interval)
+      booked =
+        ledger
+        |> Ledger.for_session("Stand-up 2")
+        |> hd()
+        |> Map.get(:interval)
 
       # While held, that precise slot is not on offer.
       {:ok, held} =

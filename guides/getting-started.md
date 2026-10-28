@@ -21,10 +21,12 @@ Tempo treats **every date and time as a bounded interval, never an instant.** A 
 Tempo.duration(~o"2027-03-02")
 #=> ~o"P1D"
 
-Tempo.to_interval!(~o"2027-03-02") |> Tempo.to_iso8601!()
+Tempo.to_interval!(~o"2027-03-02")
+|> Tempo.to_iso8601!()
 #=> "2027Y3M2D/2027Y3M2D"
 
-Tempo.to_interval!(~o"2027-03") |> Tempo.to_iso8601!()
+Tempo.to_interval!(~o"2027-03")
+|> Tempo.to_iso8601!()
 #=> "2027Y3M/2027Y3M"
 ```
 

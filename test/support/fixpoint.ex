@@ -272,10 +272,13 @@ if Code.ensure_loaded?(CPSolver) do
       end)
     end
 
-    defp bounded_by(%{window: nil} = session, %Programme{window: window}),
-      do: %{session | window: window}
+    defp bounded_by(%{window: nil} = session, %Programme{window: window}) do
+      %{session | window: window}
+    end
 
-    defp bounded_by(session, _programme), do: session
+    defp bounded_by(session, _programme) do
+      session
+    end
 
     ## --- the model ------------------------------------------------
 
@@ -349,7 +352,9 @@ if Code.ensure_loaded?(CPSolver) do
       |> Enum.filter(fn resource -> Enum.any?(resource.limits, &(&1.at_most != nil)) end)
     end
 
-    defp periods(_resource, %Limit{at_most: nil}, _candidates, _variables, _busy), do: []
+    defp periods(_resource, %Limit{at_most: nil}, _candidates, _variables, _busy) do
+      []
+    end
 
     defp periods(resource, %Limit{} = limit, candidates, variables, busy) do
       contributions =
@@ -387,7 +392,14 @@ if Code.ensure_loaded?(CPSolver) do
       arrays =
         contributions
         |> Enum.map(fn {variable, rows} ->
-          {variable, Enum.map(rows, fn {at, amount} -> if at == bucket, do: amount, else: 0 end)}
+          {variable,
+           Enum.map(rows, fn {at, amount} ->
+             if at == bucket do
+               amount
+             else
+               0
+             end
+           end)}
         end)
         |> Enum.reject(fn {_variable, array} -> Enum.all?(array, &(&1 == 0)) end)
 
@@ -450,7 +462,9 @@ if Code.ensure_loaded?(CPSolver) do
       |> max(1)
     end
 
-    defp div_all(array, divisor), do: Enum.map(array, &div(&1, divisor))
+    defp div_all(array, divisor) do
+      Enum.map(array, &div(&1, divisor))
+    end
 
     # What the ledger already holds comes off the budget, because a
     # limit counts claims that exist as well as claims being made. A
@@ -469,10 +483,13 @@ if Code.ensure_loaded?(CPSolver) do
       max(0, Limit.ceiling(limit) - Limit.measure(limit, count, duration))
     end
 
-    defp interval_start(%Tempo{form: {:span, _from, _to}} = interval),
-      do: Interval.from(interval)
+    defp interval_start(%Tempo{form: {:span, _from, _to}} = interval) do
+      Interval.from(interval)
+    end
 
-    defp interval_start(other), do: other
+    defp interval_start(other) do
+      other
+    end
 
     # `1` where the two placements cannot both stand. The predicate is
     # `Agenda.Arranger.conflict?/4`, so the solver is answering the
@@ -485,7 +502,11 @@ if Code.ensure_loaded?(CPSolver) do
 
     defp conflict_row(a, b_places, programme, travel) do
       Enum.map(b_places, fn b ->
-        if Arranger.conflict?(a, b, programme, travel), do: 1, else: 0
+        if Arranger.conflict?(a, b, programme, travel) do
+          1
+        else
+          0
+        end
       end)
     end
 

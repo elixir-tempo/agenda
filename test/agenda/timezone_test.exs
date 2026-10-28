@@ -12,7 +12,11 @@ defmodule Agenda.TimezoneTest do
   # `:time_zone_database` configuration is ever lost.
 
   defp hours(set) do
-    {:ok, hours} = set |> Tempo.duration() |> Duration.to_unit(:hour)
+    {:ok, hours} =
+      set
+      |> Tempo.duration()
+      |> Duration.to_unit(:hour)
+
     trunc(hours)
   end
 

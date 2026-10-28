@@ -107,7 +107,8 @@ Tempo.metadata(hd(options).interval)
 Agenda.count(ledger)
 #=> 2
 
-Agenda.busy(ledger) |> Map.keys()
+Agenda.busy(ledger)
+|> Map.keys()
 #=> ["Acme HQ", "Dana"]
 ```
 

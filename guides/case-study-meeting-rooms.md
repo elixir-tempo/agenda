@@ -11,12 +11,21 @@ office = Agenda.place("Head office")
 level_1 = Agenda.place("Level 1", within: office)
 level_4 = Agenda.place("Level 4", within: office)
 
-priya = Agenda.resource("Priya", requires: [step_free_access: true]) |> Agenda.open!(day)
-tom = Agenda.resource("Tom") |> Agenda.open!(day)
+priya =
+  Agenda.resource("Priya", requires: [step_free_access: true])
+  |> Agenda.open!(day)
+
+tom =
+  Agenda.resource("Tom")
+  |> Agenda.open!(day)
 
 boardroom =
   Agenda.resource("Boardroom",
-    within: level_4, seats: 14, video_conferencing: true, step_free_access: true)
+    within: level_4,
+    seats: 14,
+    video_conferencing: true,
+    step_free_access: true
+  )
   |> Agenda.open!(day)
 
 huddle =
@@ -157,7 +166,8 @@ Seven — the same as if it had been booked outright. That is the point: a hold 
 It is still visible *as* a hold, not as a booking — and it holds everything the arrangement claimed, not only the room:
 
 ```elixir
-Agenda.holds(ledger) |> Enum.map(& &1.resource)
+Agenda.holds(ledger)
+|> Enum.map(& &1.resource)
 #=> ["Priya", "Tom", "Boardroom"]
 ```
 
@@ -188,7 +198,11 @@ The operation every hand-rolled system gets wrong. The naive implementation rele
 ```elixir
 annexe =
   Agenda.resource("Annexe",
-    within: level_4, seats: 12, video_conferencing: true, step_free_access: true)
+    within: level_4,
+    seats: 12,
+    video_conferencing: true,
+    step_free_access: true
+  )
   |> Agenda.open!(day)
 
 free_of_itself = Agenda.busy(ledger, except: ["Quarterly review"])

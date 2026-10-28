@@ -65,7 +65,8 @@ defmodule Agenda do
       iex> boardroom = Agenda.resource("Boardroom", seats: 8, video_conferencing: true)
       iex> small = Agenda.resource("Meeting room 2", seats: 4)
       iex> needs_a_room = Agenda.needs(:room, seats: at_least(8), video_conferencing: true)
-      iex> Agenda.eligible(needs_a_room, [boardroom, small]) |> Enum.map(& &1.name)
+      iex> Agenda.eligible(needs_a_room, [boardroom, small])
+      ...> |> Enum.map(& &1.name)
       ["Boardroom"]
 
   > *"Of the two rooms, only the boardroom seats eight and has video
@@ -191,7 +192,8 @@ defmodule Agenda do
 
       iex> bob = Agenda.resource("Bob")
       iex> session = Agenda.session("Review", duration: "PT1H")
-      iex> Agenda.invite(session, :optional, [bob]).invitees |> Keyword.keys()
+      iex> Agenda.invite(session, :optional, [bob]).invitees
+      ...> |> Keyword.keys()
       [:optional]
 
   """
@@ -464,9 +466,17 @@ defmodule Agenda do
 
   """
   @spec explain(Arrangement.t() | Layout.t() | Infeasible.t()) :: String.t()
-  def explain(%Arrangement{} = arrangement), do: Arrangement.explain(arrangement)
-  def explain(%Layout{} = layout), do: Layout.explain(layout)
-  def explain(%Infeasible{} = reason), do: Infeasible.message(reason)
+  def explain(%Arrangement{} = arrangement) do
+    Arrangement.explain(arrangement)
+  end
+
+  def explain(%Layout{} = layout) do
+    Layout.explain(layout)
+  end
+
+  def explain(%Infeasible{} = reason) do
+    Infeasible.message(reason)
+  end
 
   @doc """
   An empty ledger. Delegates to `Agenda.Ledger.new/0`.
@@ -508,7 +518,9 @@ defmodule Agenda do
       ...>   allocations: %{consultant: [Agenda.resource("Dana")]}
       ...> }
       iex> {:ok, ledger} = Agenda.allocate(Agenda.ledger(), arrangement, tag: {:project, "ACME"})
-      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      iex> ledger
+      ...> |> Agenda.Ledger.to_list()
+      ...> |> Enum.map(& &1.tag)
       [project: "ACME"]
 
   """
@@ -528,7 +540,9 @@ defmodule Agenda do
       iex> import Tempo.Sigils
       iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
       iex> {:ok, ledger} = Agenda.claim(Agenda.ledger(), dana, ~o"2026-08-10T09:00:00/2026-08-10T12:00:00", tag: {:project, "ACME"})
-      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      iex> ledger
+      ...> |> Agenda.Ledger.to_list()
+      ...> |> Enum.map(& &1.tag)
       [project: "ACME"]
 
       iex> import Tempo.Sigils
@@ -554,7 +568,9 @@ defmodule Agenda do
       iex> import Tempo.Sigils
       iex> {:ok, dana} = Agenda.open(Agenda.resource("Dana"), "2026-08-10T09:00:00/2026-08-10T17:00:00")
       iex> {:ok, ledger} = Agenda.record(Agenda.ledger(), dana, ~o"2026-08-15T09:00:00/2026-08-15T12:00:00", tag: {:project, "ACME"})
-      iex> ledger |> Agenda.Ledger.to_list() |> Enum.map(& &1.tag)
+      iex> ledger
+      ...> |> Agenda.Ledger.to_list()
+      ...> |> Enum.map(& &1.tag)
       [project: "ACME"]
 
   """
@@ -591,7 +607,8 @@ defmodule Agenda do
       ...> }
       iex> {:ok, ledger} = Agenda.hold(Agenda.ledger(), arrangement,
       ...>                   until: "2026-06-15T10:15:00")
-      iex> Agenda.holds(ledger) |> length()
+      iex> Agenda.holds(ledger)
+      ...> |> length()
       1
 
   """
@@ -755,7 +772,9 @@ defmodule Agenda do
   ### Examples
 
       iex> import Tempo.Sigils
-      iex> {:ok, track} = Agenda.track("Elixir") |> Agenda.reachable(within: ~o"PT10M")
+      iex> {:ok, track} =
+      ...>   Agenda.track("Elixir")
+      ...>   |> Agenda.reachable(within: ~o"PT10M")
       iex> track.reachable_within
       ~o"PT10M"
 
@@ -842,11 +861,13 @@ defmodule Agenda do
           {:ok, [term()]} | :none
   def conflict(subject, pool, options \\ [])
 
-  def conflict(%Programme{} = programme, pool, options),
-    do: Arranger.conflict(programme, pool, options)
+  def conflict(%Programme{} = programme, pool, options) do
+    Arranger.conflict(programme, pool, options)
+  end
 
-  def conflict(%Session{} = session, pool, options),
-    do: Planner.conflict(session, pool, options)
+  def conflict(%Session{} = session, pool, options) do
+    Planner.conflict(session, pool, options)
+  end
 
   @doc """
   What a layout costs against a programme's preferences.
@@ -883,8 +904,9 @@ defmodule Agenda do
   @spec score([Arrangement.t()] | Layout.t(), Programme.t(), keyword()) :: number()
   def score(arrangements, programme, options \\ [])
 
-  def score(%Layout{} = layout, programme, options),
-    do: score(layout.placed, programme, options)
+  def score(%Layout{} = layout, programme, options) do
+    score(layout.placed, programme, options)
+  end
 
   def score(arrangements, %Programme{} = programme, options) when is_list(arrangements) do
     Preference.score(programme.preferences, arrangements, scoring(programme, options))
@@ -923,8 +945,9 @@ defmodule Agenda do
   @spec explain_score([Arrangement.t()] | Layout.t(), Programme.t(), keyword()) :: [String.t()]
   def explain_score(arrangements, programme, options \\ [])
 
-  def explain_score(%Layout{} = layout, programme, options),
-    do: explain_score(layout.placed, programme, options)
+  def explain_score(%Layout{} = layout, programme, options) do
+    explain_score(layout.placed, programme, options)
+  end
 
   def explain_score(arrangements, %Programme{} = programme, options) when is_list(arrangements) do
     Preference.explain(programme.preferences, arrangements, scoring(programme, options))
@@ -1104,7 +1127,9 @@ defmodule Agenda do
     end)
   end
 
-  defp from_separation(:disjoint, _options), do: {:error, :unknown}
+  defp from_separation(:disjoint, _options) do
+    {:error, :unknown}
+  end
 
   defp from_separation(separation, options) do
     levels = Keyword.get(options, :levels, @default_levels)

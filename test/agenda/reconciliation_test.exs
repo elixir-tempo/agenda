@@ -98,7 +98,9 @@ defmodule Agenda.ReconciliationTest do
       refute Reconciliation.balanced?(report)
       assert total(report.unaccounted) == 5.0
 
-      assert report.unaccounted |> IntervalSet.members() |> Enum.map(&Tempo.to_iso8601!/1) ==
+      assert report.unaccounted
+             |> IntervalSet.members()
+             |> Enum.map(&Tempo.to_iso8601!/1) ==
                ["2026Y6M15DT12H0M0S/T17H0M0S"]
     end
 
@@ -297,7 +299,8 @@ defmodule Agenda.ReconciliationTest do
       assert [%{period: :week, breach: {:under, {:duration, _}}}] = report.breaches
       refute Reconciliation.balanced?(report)
 
-      assert Reconciliation.explain(report) |> Enum.any?(&(&1 =~ "less than 38 hours"))
+      assert Reconciliation.explain(report)
+             |> Enum.any?(&(&1 =~ "less than 38 hours"))
     end
 
     test "a floor that is met is not a breach" do
@@ -333,7 +336,9 @@ defmodule Agenda.ReconciliationTest do
       assert {:ok, report} = Agenda.reconcile(ledger, dana, within: @week)
 
       assert [%{period: :day, bucket: {2026, 6, 15}, breach: {:over, _}}] = report.breaches
-      assert Reconciliation.explain(report) |> Enum.any?(&(&1 =~ "the day of 2026Y6M15D"))
+
+      assert Reconciliation.explain(report)
+             |> Enum.any?(&(&1 =~ "the day of 2026Y6M15D"))
     end
   end
 

@@ -81,7 +81,9 @@ defmodule Agenda.RequirementTest do
       room = Requirement.new(:room, seats: at_least(8))
       tightened = Requirement.induce(room, [context.alice])
 
-      assert tightened.attributes |> Map.keys() |> Enum.sort() == [:seats, :step_free_access]
+      assert tightened.attributes
+             |> Map.keys()
+             |> Enum.sort() == [:seats, :step_free_access]
     end
 
     test "an accessible room still qualifies once Alice is added", context do

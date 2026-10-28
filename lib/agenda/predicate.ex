@@ -58,7 +58,9 @@ defmodule Agenda.Predicate do
 
   """
   @spec at_least(term()) :: t(:at_least)
-  def at_least(value), do: %__MODULE__{op: :at_least, operand: value}
+  def at_least(value) do
+    %__MODULE__{op: :at_least, operand: value}
+  end
 
   @doc """
   The attribute must be less than or equal to `value`.
@@ -78,7 +80,9 @@ defmodule Agenda.Predicate do
 
   """
   @spec at_most(term()) :: t(:at_most)
-  def at_most(value), do: %__MODULE__{op: :at_most, operand: value}
+  def at_most(value) do
+    %__MODULE__{op: :at_most, operand: value}
+  end
 
   @doc """
   The attribute must equal `value`. A bare value in a requirement is
@@ -99,7 +103,9 @@ defmodule Agenda.Predicate do
 
   """
   @spec exactly(term()) :: t(:exactly)
-  def exactly(value), do: %__MODULE__{op: :exactly, operand: value}
+  def exactly(value) do
+    %__MODULE__{op: :exactly, operand: value}
+  end
 
   @doc """
   The attribute must be one of `values`.
@@ -119,7 +125,9 @@ defmodule Agenda.Predicate do
 
   """
   @spec any_of([term()]) :: t()
-  def any_of(values) when is_list(values), do: %__MODULE__{op: :any_of, operand: values}
+  def any_of(values) when is_list(values) do
+    %__MODULE__{op: :any_of, operand: values}
+  end
 
   @doc """
   The attribute — itself a list — must contain every one of `values`.
@@ -139,7 +147,9 @@ defmodule Agenda.Predicate do
 
   """
   @spec all_of([term()]) :: t()
-  def all_of(values) when is_list(values), do: %__MODULE__{op: :all_of, operand: values}
+  def all_of(values) when is_list(values) do
+    %__MODULE__{op: :all_of, operand: values}
+  end
 
   @doc """
   The attribute must be none of `values`.
@@ -159,7 +169,9 @@ defmodule Agenda.Predicate do
 
   """
   @spec none_of([term()]) :: t()
-  def none_of(values) when is_list(values), do: %__MODULE__{op: :none_of, operand: values}
+  def none_of(values) when is_list(values) do
+    %__MODULE__{op: :none_of, operand: values}
+  end
 
   @doc """
   Coerce a bare value into a predicate, leaving predicates untouched.
@@ -186,8 +198,13 @@ defmodule Agenda.Predicate do
 
   """
   @spec coerce(t() | term()) :: t()
-  def coerce(%__MODULE__{} = predicate), do: predicate
-  def coerce(value), do: exactly(value)
+  def coerce(%__MODULE__{} = predicate) do
+    predicate
+  end
+
+  def coerce(value) do
+    exactly(value)
+  end
 
   @doc """
   `true` when `value` satisfies `predicate`.
@@ -218,8 +235,13 @@ defmodule Agenda.Predicate do
 
   """
   @spec satisfied?(t(), term()) :: boolean()
-  def satisfied?(%__MODULE__{op: :none_of}, nil), do: true
-  def satisfied?(%__MODULE__{}, nil), do: false
+  def satisfied?(%__MODULE__{op: :none_of}, nil) do
+    true
+  end
+
+  def satisfied?(%__MODULE__{}, nil) do
+    false
+  end
 
   def satisfied?(%__MODULE__{op: :at_least, operand: operand}, value) do
     compare(value, operand) in [:eq, :gt]
@@ -245,19 +267,30 @@ defmodule Agenda.Predicate do
     Enum.all?(operand, fn required -> Enum.any?(value, &(compare(&1, required) == :eq)) end)
   end
 
-  def satisfied?(%__MODULE__{op: :all_of}, _value), do: false
+  def satisfied?(%__MODULE__{op: :all_of}, _value) do
+    false
+  end
 
   # Tempo values are ordered on the time line, never by Erlang term
   # order — comparing two `%Tempo{}` structs with `>=` compares their
   # maps field by field, which has nothing to do with chronology.
   # Everything else falls back to the standard term ordering, which is
   # what integers, atoms, and strings want.
-  defp compare(%Tempo{} = value, %Tempo{} = operand),
-    do: Tempo.compare(value, operand, by: :start)
+  defp compare(%Tempo{} = value, %Tempo{} = operand) do
+    Tempo.compare(value, operand, by: :start)
+  end
 
-  defp compare(value, operand) when value < operand, do: :lt
-  defp compare(value, operand) when value > operand, do: :gt
-  defp compare(_value, _operand), do: :eq
+  defp compare(value, operand) when value < operand do
+    :lt
+  end
+
+  defp compare(value, operand) when value > operand do
+    :gt
+  end
+
+  defp compare(_value, _operand) do
+    :eq
+  end
 
   @doc """
   A phrase describing what `predicate` demands, for use in an
@@ -279,12 +312,31 @@ defmodule Agenda.Predicate do
 
   """
   @spec describe(t()) :: String.t()
-  def describe(%__MODULE__{op: :at_least, operand: operand}), do: "at least #{inspect(operand)}"
-  def describe(%__MODULE__{op: :at_most, operand: operand}), do: "at most #{inspect(operand)}"
-  def describe(%__MODULE__{op: :exactly, operand: operand}), do: inspect(operand)
-  def describe(%__MODULE__{op: :any_of, operand: operand}), do: "any of #{list(operand)}"
-  def describe(%__MODULE__{op: :all_of, operand: operand}), do: "all of #{list(operand)}"
-  def describe(%__MODULE__{op: :none_of, operand: operand}), do: "none of #{list(operand)}"
+  def describe(%__MODULE__{op: :at_least, operand: operand}) do
+    "at least #{inspect(operand)}"
+  end
 
-  defp list(values), do: Enum.map_join(values, ", ", &inspect/1)
+  def describe(%__MODULE__{op: :at_most, operand: operand}) do
+    "at most #{inspect(operand)}"
+  end
+
+  def describe(%__MODULE__{op: :exactly, operand: operand}) do
+    inspect(operand)
+  end
+
+  def describe(%__MODULE__{op: :any_of, operand: operand}) do
+    "any of #{list(operand)}"
+  end
+
+  def describe(%__MODULE__{op: :all_of, operand: operand}) do
+    "all of #{list(operand)}"
+  end
+
+  def describe(%__MODULE__{op: :none_of, operand: operand}) do
+    "none of #{list(operand)}"
+  end
+
+  defp list(values) do
+    Enum.map_join(values, ", ", &inspect/1)
+  end
 end

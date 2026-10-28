@@ -90,7 +90,9 @@ defmodule Agenda.Programme do
 
   """
   @spec across(t(), Availability.pattern()) :: t()
-  def across(%__MODULE__{} = programme, window), do: %{programme | window: window}
+  def across(%__MODULE__{} = programme, window) do
+    %{programme | window: window}
+  end
 
   @doc """
   Add a track.
@@ -109,7 +111,8 @@ defmodule Agenda.Programme do
 
       iex> programme = Agenda.Programme.new("Conf")
       iex> track = Agenda.track("Elixir", of: [Agenda.session("Keynote")])
-      iex> Agenda.Programme.add_track(programme, track).tracks |> Enum.map(& &1.name)
+      iex> Agenda.Programme.add_track(programme, track).tracks
+      ...> |> Enum.map(& &1.name)
       ["Elixir"]
 
   """
@@ -135,7 +138,8 @@ defmodule Agenda.Programme do
 
       iex> programme = Agenda.Programme.new("Conf")
       iex> Agenda.Programme.add_session(programme, Agenda.session("Registration"))
-      ...> |> Map.get(:sessions) |> Enum.map(& &1.name)
+      ...> |> Map.get(:sessions)
+      ...> |> Enum.map(& &1.name)
       ["Registration"]
 
   """
@@ -167,7 +171,8 @@ defmodule Agenda.Programme do
       iex> programme = Agenda.Programme.new("Conf")
       iex> sessions = [Agenda.session("Registration"), Agenda.session("Keynote")]
       iex> Agenda.Programme.add_sessions(programme, sessions)
-      ...> |> Map.get(:sessions) |> Enum.map(& &1.name)
+      ...> |> Map.get(:sessions)
+      ...> |> Enum.map(& &1.name)
       ["Registration", "Keynote"]
 
   """
@@ -219,7 +224,10 @@ defmodule Agenda.Programme do
   """
   @spec precede(t(), String.t(), String.t(), keyword()) :: {:ok, t()} | {:error, term()}
   def precede(%__MODULE__{} = programme, first, then, options \\ []) do
-    known = programme |> all_sessions() |> MapSet.new(& &1.name)
+    known =
+      programme
+      |> all_sessions()
+      |> MapSet.new(& &1.name)
 
     case Enum.reject([first, then], &MapSet.member?(known, &1)) do
       [] ->

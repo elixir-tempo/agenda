@@ -131,7 +131,9 @@ defmodule Agenda.Refine do
   """
   @spec during_any(refinable(), [Availability.pattern()]) ::
           {:ok, Tempo.t()} | {:error, term()}
-  def during_any(free, []), do: unwrap(free)
+  def during_any(free, []) do
+    unwrap(free)
+  end
 
   def during_any(free, [first | rest]) do
     with {:ok, set} <- unwrap(free),
@@ -188,9 +190,17 @@ defmodule Agenda.Refine do
 
   # Accepting both a bare set and a previous step's result is what lets
   # these read as one sentence; an error simply falls through.
-  defp unwrap(%Tempo{} = set), do: {:ok, set}
-  defp unwrap({:ok, %Tempo{} = set}), do: {:ok, set}
-  defp unwrap({:error, reason}), do: {:error, reason}
+  defp unwrap(%Tempo{} = set) do
+    {:ok, set}
+  end
+
+  defp unwrap({:ok, %Tempo{} = set}) do
+    {:ok, set}
+  end
+
+  defp unwrap({:error, reason}) do
+    {:error, reason}
+  end
 
   defp normalise_all(patterns) do
     Enum.reduce_while(patterns, {:ok, []}, fn pattern, {:ok, acc} ->

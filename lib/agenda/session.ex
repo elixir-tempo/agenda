@@ -170,7 +170,9 @@ defmodule Agenda.Session do
     (held == [] and added == []) or (held != [] and added != [])
   end
 
-  defp combinable?(_requirement, _addition), do: false
+  defp combinable?(_requirement, _addition) do
+    false
+  end
 
   @doc """
   Set the interval the session must fall inside.
@@ -194,7 +196,9 @@ defmodule Agenda.Session do
 
   """
   @spec window(t(), Availability.pattern()) :: t()
-  def window(%__MODULE__{} = session, window), do: %{session | window: window}
+  def window(%__MODULE__{} = session, window) do
+    %{session | window: window}
+  end
 
   @doc """
   Set how long the session runs.
@@ -218,7 +222,9 @@ defmodule Agenda.Session do
 
   """
   @spec duration(t(), Availability.pattern()) :: t()
-  def duration(%__MODULE__{} = session, duration), do: %{session | duration: duration}
+  def duration(%__MODULE__{} = session, duration) do
+    %{session | duration: duration}
+  end
 
   @doc """
   Add soft preferences — they rank arrangements but never exclude one.
@@ -239,7 +245,8 @@ defmodule Agenda.Session do
 
       iex> sydney = Agenda.Place.new("Sydney")
       iex> session = Agenda.Session.new("Review")
-      iex> Agenda.Session.prefers(session, within: sydney).preferences |> Keyword.keys()
+      iex> Agenda.Session.prefers(session, within: sydney).preferences
+      ...> |> Keyword.keys()
       [:within]
 
   """
@@ -262,7 +269,9 @@ defmodule Agenda.Session do
   ### Examples
 
       iex> alice = Agenda.Resource.new("Alice")
-      iex> session = Agenda.Session.new("Review") |> Agenda.Session.roster(:attendees, [alice])
+      iex> session =
+      ...>   Agenda.Session.new("Review")
+      ...>   |> Agenda.Session.roster(:attendees, [alice])
       iex> Enum.map(Agenda.Session.rosters(session), & &1.name)
       [:attendees]
 
@@ -287,7 +296,9 @@ defmodule Agenda.Session do
 
   ### Examples
 
-      iex> session = Agenda.Session.new("Review") |> Agenda.Session.needs(:room, seats: 8)
+      iex> session =
+      ...>   Agenda.Session.new("Review")
+      ...>   |> Agenda.Session.needs(:room, seats: 8)
       iex> Enum.map(Agenda.Session.open_roles(session), & &1.name)
       [:room]
 
@@ -314,14 +325,18 @@ defmodule Agenda.Session do
   ### Examples
 
       iex> alice = Agenda.Resource.new("Alice")
-      iex> session = Agenda.Session.new("Review") |> Agenda.Session.roster(:attendees, [alice])
+      iex> session =
+      ...>   Agenda.Session.new("Review")
+      ...>   |> Agenda.Session.roster(:attendees, [alice])
       iex> Enum.map(Agenda.Session.named_resources(session), & &1.name)
       ["Alice"]
 
   """
   @spec named_resources(t()) :: [Resource.t()]
   def named_resources(%__MODULE__{} = session) do
-    session |> rosters() |> Enum.flat_map(& &1.roster)
+    session
+    |> rosters()
+    |> Enum.flat_map(& &1.roster)
   end
 
   @doc """
@@ -363,7 +378,9 @@ defmodule Agenda.Session do
 
   """
   @spec invite(t(), atom(), [Resource.t()]) :: t()
-  def invite(%__MODULE__{} = session, _role, []), do: session
+  def invite(%__MODULE__{} = session, _role, []) do
+    session
+  end
 
   def invite(%__MODULE__{} = session, role, resources)
       when is_atom(role) and is_list(resources) do

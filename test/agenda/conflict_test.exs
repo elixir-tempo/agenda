@@ -41,7 +41,9 @@ defmodule Agenda.ConflictTest do
   describe "minimal/3 — the algorithm itself" do
     # A set holds together while its members sum to ten or less. That
     # is monotone, which is all QuickXplain asks of an oracle.
-    defp room_for(chosen), do: Enum.sum(chosen) <= 10
+    defp room_for(chosen) do
+      Enum.sum(chosen) <= 10
+    end
 
     test "nothing to explain when everything fits" do
       assert Conflict.minimal([1, 2, 3], &room_for/1) == :none
@@ -146,7 +148,11 @@ defmodule Agenda.ConflictTest do
       pool = [room("Hall", 1)]
 
       {:ok, arrangements} = Agenda.plan(pick(programme, "A"), pool)
-      pin = arrangements |> hd() |> Map.put(:session, "A")
+
+      pin =
+        arrangements
+        |> hd()
+        |> Map.put(:session, "A")
 
       assert {:ok, conflict} = Arranger.conflict(programme, pool, pinned: [pin])
       assert conflict == ["B"]
@@ -157,7 +163,12 @@ defmodule Agenda.ConflictTest do
       pool = [room("Hall", 1)]
 
       {:ok, arrangements} = Agenda.plan(pick(programme, "A"), pool)
-      slot = arrangements |> hd() |> Map.put(:session, "A")
+
+      slot =
+        arrangements
+        |> hd()
+        |> Map.put(:session, "A")
+
       clash = %{slot | session: "B"}
 
       assert Arranger.conflict(programme, pool, pinned: [slot, clash]) == {:ok, []}

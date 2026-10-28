@@ -160,5 +160,7 @@ defmodule Agenda.Track do
 
   """
   @spec session_names(t()) :: [String.t()]
-  def session_names(%__MODULE__{sessions: sessions}), do: Enum.map(sessions, & &1.name)
+  def session_names(%__MODULE__{sessions: sessions}) do
+    Enum.map(sessions, & &1.name)
+  end
 end

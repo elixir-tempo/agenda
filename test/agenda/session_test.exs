@@ -9,7 +9,9 @@ defmodule Agenda.SessionTest do
 
   describe "roster/3 with nobody named" do
     test "adds no requirement" do
-      session = Session.new("Review") |> Session.roster(:speaker, [])
+      session =
+        Session.new("Review")
+        |> Session.roster(:speaker, [])
 
       assert session.requirements == []
       assert Session.open_roles(session) == []

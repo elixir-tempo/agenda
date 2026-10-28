@@ -162,7 +162,9 @@ defmodule Agenda.Arrangement do
   """
   @spec resource(t(), atom()) :: Resource.t() | nil
   def resource(%__MODULE__{} = arrangement, role) when is_atom(role) do
-    arrangement |> resources(role) |> List.first()
+    arrangement
+    |> resources(role)
+    |> List.first()
   end
 
   @doc """
@@ -203,7 +205,9 @@ defmodule Agenda.Arrangement do
       iex> import Tempo.Sigils
       iex> morning = %Agenda.Arrangement{interval: ~o"2026-06-16T09:00:00/2026-06-16T10:00:00"}
       iex> midday = %Agenda.Arrangement{interval: ~o"2026-06-16T12:00:00/2026-06-16T13:00:00"}
-      iex> [midday, morning] |> Enum.sort(Agenda.Arrangement) |> Enum.map(& &1.interval)
+      iex> [midday, morning]
+      ...> |> Enum.sort(Agenda.Arrangement)
+      ...> |> Enum.map(& &1.interval)
       [~o"2026Y6M16DT9H0M0S/T10H0M0S",
        ~o"2026Y6M16DT12H0M0S/T13H0M0S"]
 
