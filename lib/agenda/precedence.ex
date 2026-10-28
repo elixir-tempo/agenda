@@ -35,6 +35,9 @@ defmodule Agenda.Precedence do
   the fixpoint bridge gets precedence for free: both solvers ask the
   same question about the same pair.
 
+  `new/3` builds one, and `between/3` finds the precedence relating two
+  sessions, whichever way round they are given.
+
   """
 
   alias Agenda.Availability

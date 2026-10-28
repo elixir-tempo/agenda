@@ -76,6 +76,22 @@ defmodule Agenda.PreferenceTest do
     end
   end
 
+  describe "a custom preference's context" do
+    test "carries the pool the programme is arranged from", context do
+      test_process = self()
+
+      consult = fn _arrangements, %{pool: pool} ->
+        send(test_process, {:pool, Enum.map(pool, & &1.name)})
+        0
+      end
+
+      {:ok, programme} = Agenda.prefer(conf([talk("Keynote")]), {:consult, consult})
+
+      assert {:ok, _arrangements} = Agenda.arrange(programme, [context.hall, context.studio])
+      assert_received {:pool, ["Hall", "Studio"]}
+    end
+  end
+
   describe "room_changes" do
     test "a track that stays put beats one that moves", context do
       # Two talks in one track, two rooms free at both times. Without a

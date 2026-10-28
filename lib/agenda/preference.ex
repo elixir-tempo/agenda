@@ -38,6 +38,9 @@ defmodule Agenda.Preference do
   `:programme` and `:pool`, so it can consult the tracks and the
   resources as well as the placements.
 
+  `new/2` builds one. `score/3` gives what a layout costs against a list
+  of preferences, and `explain/3` what each contributed, as sentences.
+
   """
 
   alias Agenda.Arrangement

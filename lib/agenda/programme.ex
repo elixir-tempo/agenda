@@ -14,6 +14,13 @@ defmodule Agenda.Programme do
   elsewhere a `Schedule` is the bookable resource itself, and
   colloquially it is this output).
 
+  `new/2` builds one and `across/2` sets the window every session falls
+  inside. `add_track/2`, `add_session/2` and `add_sessions/2` add what
+  is to be laid out; `precede/4` and `prefer/3` add hard and soft
+  constraints, and `interest/3` and `meetings/3` turn interest between
+  resources into sessions. `all_sessions/1`, `track_of/2` and
+  `restrict_to/2` read it back.
+
   """
 
   alias Agenda.Availability

@@ -33,6 +33,10 @@ defmodule Agenda.Resource do
     [at_least: ~o"PT38H"]]`. See `Agenda.Limit`, which also explains
     why only ceilings constrain the search.
 
+  `new/2` builds one. `attribute/2` reads an attribute, `within?/2` and
+  `separation/2` place it in the place tree, and `fetch/2` and
+  `fetch_all/2` find resources in a pool by name.
+
   """
 
   alias Agenda.Limit
@@ -375,6 +379,8 @@ defmodule Agenda.Resource do
 
   """
   @spec separation(t(), t()) :: Place.separation()
+  def separation(a, b)
+
   def separation(%__MODULE__{within: nil}, %__MODULE__{}) do
     :disjoint
   end

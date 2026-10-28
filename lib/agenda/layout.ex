@@ -59,6 +59,10 @@ defmodule Agenda.Layout do
   `Agenda.explain_score/3` breaks the number down per preference,
   since a bare total says a layout is worse without saying how.
 
+  `new/4` builds one. `explain/1` gives it as a sentence, how much was
+  placed and why the rest was not, and `unplaced_sessions/1` names the
+  sessions left out.
+
   """
 
   alias Agenda.Arrangement

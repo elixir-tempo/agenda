@@ -239,6 +239,11 @@ defmodule Agenda.Arranger do
     is larger — because the work per session grows with the programme
     and a fixed cap reports a satisfiable one as impossible.
 
+  * `:score_nodes` caps the search steps of the second pass, which
+    looks for a better-scoring layout once the first has proved how
+    many sessions can be placed. The default is `2_000`; a layout that
+    stops at it reports `score_proven?: false`.
+
   * `:concurrency` is how many processes may work at once, defaulting
     to `System.schedulers_online/0`. Candidate enumeration and
     independent subproblems are both spread across them. Pass `1` to
@@ -283,7 +288,13 @@ defmodule Agenda.Arranger do
   def arrange(%Programme{} = programme, pool, options \\ []) when is_list(pool) do
     with {:ok, programme} <- with_readable_tracks(programme),
          {:ok, pinned} <- pins(programme, options) do
-      options = Keyword.put(options, :busy, busy_including(pinned, options))
+      # The pool rides in the options to the scoring pass, so a preference
+      # consults the resources the programme is arranged from.
+      options =
+        options
+        |> Keyword.put(:busy, busy_including(pinned, options))
+        |> Keyword.put(:pool, pool)
+
       {candidates, unplaceable} = candidates_per_session(programme, pool, pinned, options)
 
       candidates
@@ -319,8 +330,11 @@ defmodule Agenda.Arranger do
 
   ### Options
 
-  Takes the same options as `arrange/3`. `:unplaced` is ignored — a
-  conflict is only meaningful against the all-or-nothing question.
+  * `:busy`, `:pinned`, `:candidates`, `:nodes`, `:score_nodes`,
+    `:concurrency` and `:travel` are as for `arrange/3`.
+
+  * `:unplaced` is ignored: a conflict is only meaningful against the
+    all-or-nothing question.
 
   ### Returns
 

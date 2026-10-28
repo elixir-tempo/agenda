@@ -34,6 +34,10 @@ defmodule Agenda.Allocation do
   because both would be claims on the same resource over the same
   span, and that is the overlap the ledger already refuses.
 
+  `from_arrangement/2` gives the allocations an arrangement implies, one
+  per resource, and `same?/2` says whether two allocations bind the same
+  resource in the same role over the same span.
+
   """
 
   alias Agenda.Arrangement

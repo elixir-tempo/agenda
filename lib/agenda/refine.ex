@@ -131,6 +131,8 @@ defmodule Agenda.Refine do
   """
   @spec during_any(refinable(), [Availability.pattern()]) ::
           {:ok, Tempo.t()} | {:error, term()}
+  def during_any(free, constraints)
+
   def during_any(free, []) do
     unwrap(free)
   end

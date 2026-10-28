@@ -15,6 +15,12 @@ defmodule Agenda.Requirement do
   Both shapes are the same struct, so a session can hold a list of
   requirements without the caller sorting them into kinds.
 
+  `new/2` builds a requirement from attribute predicates and `roster/2`
+  one naming specific resources; `merge/2` and `induce/2` combine them.
+  `eligible/2`, `eligible?/2` and `unmet/2` hold resources to a
+  requirement: which satisfy it, whether one does, and every way one
+  does not.
+
   """
 
   alias Agenda.Predicate

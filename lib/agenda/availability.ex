@@ -169,6 +169,8 @@ defmodule Agenda.Availability do
 
   """
   @spec normalise(term()) :: {:ok, span() | imported()} | {:error, :unreadable_pattern}
+  def normalise(pattern)
+
   def normalise({:vavailability, _calendar} = imported) do
     {:ok, imported}
   end

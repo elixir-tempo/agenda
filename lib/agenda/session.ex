@@ -13,6 +13,12 @@ defmodule Agenda.Session do
   names the request in some scheduling libraries, not the thing
   requested).
 
+  `new/2` builds one. `duration/2` and `window/2` say how long it runs
+  and where it must fall; `needs/3`, `roster/3` and `invite/3` add what
+  it requires and who may attend, and `prefers/2` adds soft preferences.
+  `rosters/1`, `open_roles/1` and `named_resources/1` read its
+  requirements back.
+
   """
 
   alias Agenda.Availability

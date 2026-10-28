@@ -199,6 +199,8 @@ defmodule Agenda.Predicate do
 
   """
   @spec coerce(t() | term()) :: t()
+  def coerce(value)
+
   def coerce(%__MODULE__{} = predicate) do
     predicate
   end

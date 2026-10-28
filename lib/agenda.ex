@@ -129,6 +129,21 @@ defmodule Agenda do
   @doc """
   Build a place. Delegates to `Agenda.Place.new/2`.
 
+  ### Arguments
+
+  * `name` is the place's name.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:within` is the enclosing `t:Agenda.Place.t/0`. The default is `nil`, making
+    this place a root.
+
+  ### Returns
+
+  * a `t:Agenda.Place.t/0`.
+
   ### Examples
 
       iex> Agenda.place("Level 2").name
@@ -140,6 +155,60 @@ defmodule Agenda do
 
   @doc """
   Build a resource. Delegates to `Agenda.Resource.new/2`.
+
+  ### Arguments
+
+  * `name` is the resource's name.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:within` is the enclosing `t:Agenda.Place.t/0`. The
+    default is `nil`.
+
+  * `:requires` is a keyword list of attributes this resource demands
+    of resources allocated alongside it. The default is `[]`.
+
+  * `:concurrency` is how many sessions may hold this resource
+    simultaneously. The default is `1`.
+
+  * `:limits` budgets the resource *over a period*, as
+    `[day: 1, week: 5]` — at most one shift a day and five a week.
+    Recognised periods are `:day`, `:week` and `:month`. A value may be
+    a count, a duration (`~o"PT7H36M"`), or a keyword list carrying
+    `:at_most` and `:at_least`. This is not concurrency: concurrency is
+    how many claims may overlap at one instant, a limit is how much
+    falls inside a stretch of calendar however far apart. Parsed on
+    construction, so a malformed limit raises here rather than being
+    silently unenforced. The default is none. See `Agenda.Limit`.
+
+  * `:avoids` is when the resource would *rather not* be used — a
+    Tempo value, an ISO 8601 string, or a recurrence. Unlike `:open`
+    this is a wish, not a rule: it makes a placement worse rather than
+    invalid, and only counts when the programme declares the
+    `:resource_wishes` preference. The default is none.
+
+  * `:prefers` is the mirror — when the resource would *rather* be
+    used. A placement outside it is a violation. The default is none.
+
+  * `:open` is when the resource is available at all — see
+    `Agenda.open/2`, which validates it. The default is `nil`,
+    meaning the resource is never open.
+
+  * `:buffer_before` is turnaround needed before each claim — set-up,
+    travel in, a room being unlocked. A `t:Tempo.Duration.t/0`; the
+    default is none.
+
+  * `:buffer_after` is turnaround needed after each claim — cleaning,
+    resetting the room, a machine cooling down. A
+    `t:Tempo.Duration.t/0`; the default is none.
+
+  * every other option is taken as an attribute.
+
+  ### Returns
+
+  * a `t:Agenda.Resource.t/0`.
 
   ### Examples
 
@@ -154,6 +223,16 @@ defmodule Agenda do
   Build an attribute requirement. Delegates to
   `Agenda.Requirement.new/2`.
 
+  ### Arguments
+
+  * `name` is the role name, such as `:room`.
+
+  * `predicates` is a keyword list of attribute predicates.
+
+  ### Returns
+
+  * a `t:Agenda.Requirement.t/0`.
+
   ### Examples
 
       iex> Agenda.needs(:room, seats: 8).name
@@ -166,6 +245,16 @@ defmodule Agenda do
   @doc """
   Build a requirement naming specific resources. Delegates to
   `Agenda.Requirement.roster/2`.
+
+  ### Arguments
+
+  * `name` is the role name, such as `:attendees`.
+
+  * `resources` is the list of required `t:Agenda.Resource.t/0`.
+
+  ### Returns
+
+  * a `t:Agenda.Requirement.t/0`.
 
   ### Examples
 
@@ -188,6 +277,19 @@ defmodule Agenda do
   attendee that could cost some other session its placement would not
   be optional.
 
+  ### Arguments
+
+  * `session` is a `t:Agenda.Session.t/0`.
+
+  * `role` names what the invitees would be there as, the same way
+    `Agenda.Session.roster/3` does.
+
+  * `resources` is a list of `t:Agenda.Resource.t/0`.
+
+  ### Returns
+
+  * The session, with the invitees added.
+
   ### Examples
 
       iex> bob = Agenda.resource("Bob")
@@ -203,6 +305,16 @@ defmodule Agenda do
   @doc """
   The resources satisfying `requirement`. Delegates to
   `Agenda.Requirement.eligible/2`.
+
+  ### Arguments
+
+  * `requirement` is a `t:Agenda.Requirement.t/0`.
+
+  * `candidates` is a list of `t:Agenda.Resource.t/0`.
+
+  ### Returns
+
+  * the eligible resources, in the order given.
 
   ### Examples
 
@@ -248,6 +360,23 @@ defmodule Agenda do
   @doc """
   Build a session. Delegates to `Agenda.Session.new/2`.
 
+  ### Arguments
+
+  * `name` is the session's name.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:duration` is how long the session runs, a `t:Tempo.Duration.t/0`.
+
+  * `:window` is the interval it must fall inside, a
+    `t:Tempo.t/0` interval.
+
+  ### Returns
+
+  * a `t:Agenda.Session.t/0`.
+
   ### Examples
 
       iex> Agenda.session("Review", duration: "PT1H").name
@@ -260,6 +389,19 @@ defmodule Agenda do
   @doc """
   Set when a resource is open. Delegates to
   `Agenda.Availability.open/2`.
+
+  ### Arguments
+
+  * `resource` is a `t:Agenda.Resource.t/0`.
+
+  * `pattern` is a Tempo value, an ISO 8601 string (preferred), or an
+    RFC 5545 `RRULE` string.
+
+  ### Returns
+
+  * `{:ok, resource}` with its open hours set, or
+
+  * `{:error, reason}` when `pattern` cannot be read as a span.
 
   ### Examples
 
@@ -279,6 +421,16 @@ defmodule Agenda do
   The `!` companion to `open/2`, for a pattern that is a literal in the
   source — a guide, a notebook, a fixture — where the tuple is ceremony
   around what cannot fail except by typo.
+
+  ### Arguments
+
+  * `resource` is a `t:Agenda.Resource.t/0`.
+
+  * `pattern` is as for `Agenda.Availability.open/2`.
+
+  ### Returns
+
+  * the resource with its open hours set; or raises `ArgumentError`.
 
   ### Examples
 
@@ -302,6 +454,17 @@ defmodule Agenda do
   on it too: a floating one beside them is a `Tempo.FrameError`, as Tempo
   has it. A `within:` window alone may be floating, and is read on the
   hours' clock.
+
+  ### Arguments
+
+  * `ics` is iCalendar data as a string.
+
+  ### Returns
+
+  * `{:ok, pattern}` to hand to `Agenda.Availability.open/2`, or
+
+  * `{:error, reason}` when the data cannot be read, or when `ical`
+    is not available.
 
   ### Examples
 
@@ -336,6 +499,28 @@ defmodule Agenda do
   When a resource is open and not already taken. Delegates to
   `Agenda.Availability.free/2`.
 
+  ### Arguments
+
+  * `resource` is a `t:Agenda.Resource.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:within` is the query window — a Tempo value or ISO 8601 string.
+    Required: an unbounded recurrence has no materialisation without
+    one.
+
+  * `:busy` is what already claims the resource — a Tempo value, a
+    string, a `t:Tempo.t/0` interval set, or a list of them. The
+    default is `[]`.
+
+  ### Returns
+
+  * `{:ok, interval_set}` of the free spans, or
+
+  * `{:error, reason}` when the window or a pattern cannot be read.
+
   ### Examples
 
       iex> boardroom = Agenda.resource("Boardroom")
@@ -351,6 +536,19 @@ defmodule Agenda do
   @doc """
   Keep only free time inside `constraint`. Delegates to
   `Agenda.Refine.only_during/2`.
+
+  ### Arguments
+
+  * `free` is an interval set, or the `{:ok, set}` from a previous
+    step.
+
+  * `constraint` is a Tempo value or ISO 8601 string bounding it.
+
+  ### Returns
+
+  * `{:ok, interval_set}`, or
+
+  * `{:error, reason}`, including any error passed in.
 
   ### Examples
 
@@ -371,6 +569,19 @@ defmodule Agenda do
   Keep only free time inside any of `constraints`. Delegates to
   `Agenda.Refine.during_any/2`.
 
+  ### Arguments
+
+  * `free` is an interval set, or the `{:ok, set}` from a previous
+    step.
+
+  * `constraints` is a list of Tempo values or ISO 8601 strings.
+
+  ### Returns
+
+  * `{:ok, interval_set}`, or
+
+  * `{:error, reason}`.
+
   ### Examples
 
       iex> {:ok, room} = Agenda.open(Agenda.resource("R"), "2027-03-02T09:00:00/2027-03-02T17:00:00")
@@ -389,6 +600,20 @@ defmodule Agenda do
   @doc """
   Keep only windows of at least `duration`. Delegates to
   `Agenda.Refine.lasting_at_least/2`.
+
+  ### Arguments
+
+  * `free` is an interval set, or the `{:ok, set}` from a previous
+    step.
+
+  * `duration` is the shortest useful window, a `t:Tempo.Duration.t/0`
+    or ISO 8601 string.
+
+  ### Returns
+
+  * `{:ok, interval_set}`, or
+
+  * `{:error, reason}`.
 
   ### Examples
 
@@ -409,6 +634,29 @@ defmodule Agenda do
   Expand a repeating session into its occurrences. Delegates to
   `Agenda.Series.expand/3`.
 
+  ### Arguments
+
+  * `session` is the `t:Agenda.Session.t/0` to repeat. Its own
+    window, if any, is replaced by each occurrence's.
+
+  * `pattern` is a recurrence — an ISO 8601 repeating interval
+    (preferred) or an RFC 5545 `RRULE`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:bound` bounds an otherwise unbounded recurrence: the occurrences
+    that overlap it are expanded. Required when `pattern` does not state
+    its own count or end.
+
+  ### Returns
+
+  * `{:ok, sessions}`, one per occurrence, in time order, or
+
+  * `{:error, reason}` when the pattern cannot be read or is unbounded
+    and unbounded by `:bound`.
+
   ### Examples
 
       iex> standup = Agenda.session("Stand-up", duration: "PT15M")
@@ -424,6 +672,43 @@ defmodule Agenda do
   @doc """
   Rank the ways a session could be held. Delegates to
   `Agenda.Planner.plan/3`.
+
+  ### Arguments
+
+  * `session` is a `t:Agenda.Session.t/0` with a duration and a
+    window.
+
+  * `pool` is the list of `t:Agenda.Resource.t/0` available to
+    choose from.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:busy` is a map of resource name to what already claims it — any
+    value `Agenda.Availability.free/2` accepts. The default is
+    `%{}`.
+
+  * `:limit` is the most arrangements to return. The default is `20`.
+    Truncation is reported rather than silent — see `:truncated?` on
+    the result.
+
+  * `:spread` chooses *how* the list is truncated. `false`, the
+    default, keeps the best `:limit` placements, which is what a caller
+    picking one time wants. `true` samples start moments evenly across
+    the window instead and round-robins between them, trading depth at
+    the front of the window for coverage of all of it — which is what
+    `Agenda.Arranger.arrange/3` needs, since sessions handed identical
+    placements collide. The coverage is what makes a cap safe to set:
+    with `:spread`, `limit: 4` over two days offers both days rather
+    than four times on the first.
+
+  ### Returns
+
+  * `{:ok, arrangements}` ranked best-first, or
+
+  * `{:error, t:Agenda.Infeasible.t/0}` carrying the reasons — which
+    includes a session that never said when it may be held.
 
   ### Examples
 
@@ -466,6 +751,8 @@ defmodule Agenda do
 
   """
   @spec explain(Arrangement.t() | Layout.t() | Infeasible.t()) :: String.t()
+  def explain(result)
+
   def explain(%Arrangement{} = arrangement) do
     Arrangement.explain(arrangement)
   end
@@ -496,6 +783,25 @@ defmodule Agenda do
 
   @doc """
   Record an arrangement. Delegates to `Agenda.Ledger.allocate/3`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `arrangement` is a `t:Agenda.Arrangement.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:tag` is what the claim was for, as a `t:Agenda.Allocation.tag/0`
+    — `{:project, "ACME-2026-01"}`, `{:leave, :annual}`. Recorded on
+    every allocation the arrangement implies, and grouped on by
+    `Agenda.reconcile/3`. The default is `nil`.
+
+  ### Returns
+
+  * `{:ok, ledger}`.
 
   ### Examples
 
@@ -535,6 +841,35 @@ defmodule Agenda do
   happen, and checks. See `Agenda.Ledger.claim/4` for why a timesheet
   wants the first and a schedule wants the second.
 
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `resource` is the `t:Agenda.Resource.t/0` being claimed.
+
+  * `interval` is when — a Tempo value or an ISO 8601 string.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:tag` is what the claim is for, as a `t:Agenda.Allocation.tag/0`.
+
+  * `:role` is the role the resource is filling. The default is
+    `:resource`.
+
+  * `:session` names the claim, and is what `Agenda.Ledger.release/2` takes. The
+    default is the interval's ISO 8601 form, which is unique per
+    resource per span.
+
+  ### Returns
+
+  * `{:ok, ledger}`, or
+
+  * `{:error, reason}` — a sentence naming the time that could not be
+    claimed and why, when the resource is not open then or is already
+    claimed for part of it.
+
   ### Examples
 
       iex> import Tempo.Sigils
@@ -563,6 +898,27 @@ defmodule Agenda do
   request and must be validated, a timesheet is a record and the world
   is not obliged to match the contract. See `Agenda.Ledger.record/4`.
 
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `resource` is the `t:Agenda.Resource.t/0` whose time is recorded.
+
+  * `interval` is when — a Tempo value or an ISO 8601 string.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  As `Agenda.Ledger.claim/4`: `:tag`, `:role` and `:session`.
+
+  ### Returns
+
+  * `{:ok, ledger}`, or
+
+  * `{:error, reason}` when `interval` cannot be read as a span. Never
+    for a reason of availability — that is `Agenda.Ledger.claim/4`'s business.
+
   ### Examples
 
       iex> import Tempo.Sigils
@@ -582,6 +938,17 @@ defmodule Agenda do
   Free everything a session holds. Delegates to
   `Agenda.Ledger.release/2`.
 
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `session` is the session's name.
+
+  ### Returns
+
+  * `{:ok, ledger}`. Releasing a session that holds nothing is a no-op,
+    so this is safe to call twice.
+
   ### Examples
 
       iex> {:ok, ledger} = Agenda.release(Agenda.ledger(), "Review")
@@ -595,6 +962,29 @@ defmodule Agenda do
   @doc """
   Claim resources tentatively, until a moment. Delegates to
   `Agenda.Ledger.hold/3`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `arrangement` is a `t:Agenda.Arrangement.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:until` is when the hold lapses — a Tempo value or an ISO 8601
+    string. Required.
+
+  * `:tag` is what the claim was for, as a `t:Agenda.Allocation.tag/0`.
+    A hold occupies a resource exactly as a booking does, so it carries
+    the same tag. The default is `nil`.
+
+  ### Returns
+
+  * `{:ok, ledger}`, or
+
+  * `{:error, reason}` when `:until` cannot be read as a moment.
 
   ### Examples
 
@@ -619,6 +1009,17 @@ defmodule Agenda do
   Turn a session's hold into a firm allocation. Delegates to
   `Agenda.Ledger.confirm/2`.
 
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `session` is the session's name.
+
+  ### Returns
+
+  * `{:ok, ledger}`. Confirming a session that holds nothing, or one
+    already firm, is a no-op.
+
   ### Examples
 
       iex> {:ok, ledger} = Agenda.confirm(Agenda.ledger(), "Review")
@@ -636,6 +1037,18 @@ defmodule Agenda do
   Nothing expires on its own — this is what advances time, and it
   takes the moment as an argument so that no function in this library
   reads a clock.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `now` is the current moment — a Tempo value or an ISO 8601 string.
+
+  ### Returns
+
+  * `{:ok, ledger}` with lapsed holds removed, or
+
+  * `{:error, reason}` when `now` cannot be read as a moment.
 
   ### Examples
 
@@ -658,6 +1071,36 @@ defmodule Agenda do
   Holidays are not this library's business — pass them in through
   `:excluding` as an ordinary interval set, from wherever they are
   resolved.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `resource` is a `t:Agenda.Resource.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:within` is the window to reconcile — a Tempo value or an ISO 8601
+    string. Required, because open hours may be an unbounded recurrence
+    and have no materialisation without one.
+
+  * `:excluding` is time the resource did not owe — public holidays, a
+    shutdown — as a `t:Tempo.t/0` interval set, any Tempo value that
+    denotes a span (a bare day, `~o"2026-08-12"`, is the natural way to
+    write a holiday), a string, or a list of any of those. Subtracted from the expectation before any claim is
+    compared against it. The default is none.
+
+  * `:expected` states the owed time outright, as an
+    `t:Tempo.t/0` interval set, instead of deriving it from the
+    resource's open hours. `:excluding` still applies to it.
+
+  ### Returns
+
+  * `{:ok, reconciliation}`, or
+
+  * `{:error, reason}` when the window or a set cannot be read.
 
   ### Examples
 
@@ -683,6 +1126,14 @@ defmodule Agenda do
   Every allocation that is still only a hold. Delegates to
   `Agenda.Ledger.holds/1`.
 
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  ### Returns
+
+  * the held allocations, ordered as `Agenda.Ledger.to_list/1` orders them.
+
   ### Examples
 
       iex> Agenda.holds(Agenda.ledger())
@@ -695,6 +1146,27 @@ defmodule Agenda do
   @doc """
   Free everything held by a whole series. Delegates to
   `Agenda.Ledger.release_series/3`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `series` is the series name — the original session's name, before
+    it was expanded.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:from` releases only the occurrences starting at or after this
+    point, a Tempo value or ISO 8601 string. Cancelling the rest of a
+    term should not unpick the sessions already held.
+
+  ### Returns
+
+  * `{:ok, ledger}`, or
+
+  * `{:error, reason}` when `:from` cannot be read.
 
   ### Examples
 
@@ -709,6 +1181,20 @@ defmodule Agenda do
   @doc """
   What would change if a session moved. Delegates to
   `Agenda.Ledger.diff/3`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `session` is the session's name.
+
+  * `arrangement` is the `t:Agenda.Arrangement.t/0` it should move
+    to.
+
+  ### Returns
+
+  * a list of `t:Agenda.Ledger.change/0`, ordered `:keep`, then `:release`, then
+    `:allocate`.
 
   ### Examples
 
@@ -730,6 +1216,24 @@ defmodule Agenda do
   What each resource is already claimed for. Delegates to
   `Agenda.Ledger.busy/2`.
 
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:except` is a session name, or a list of them, whose allocations
+    are ignored — use it when re-planning a session so it does not
+    collide with the copy of itself it is about to replace, or when
+    pinning sessions in `Agenda.arrange/3`, which claims what its
+    pins hold and so must not be told about them twice.
+
+  ### Returns
+
+  * a map of resource name to the intervals claiming it.
+
   ### Examples
 
       iex> Agenda.busy(Agenda.ledger())
@@ -742,6 +1246,14 @@ defmodule Agenda do
   @doc """
   How many allocations a ledger holds. Delegates to
   `Agenda.Ledger.count/1`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  ### Returns
+
+  * the count.
 
   ### Examples
 
@@ -756,6 +1268,21 @@ defmodule Agenda do
   Build a track — sessions that cannot clash with each other.
   Delegates to `Agenda.Track.new/2`.
 
+  ### Arguments
+
+  * `name` is the track's name.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:of` is the list of `t:Agenda.Session.t/0` in the track. The
+    default is `[]`.
+
+  ### Returns
+
+  * a `t:Agenda.Track.t/0`.
+
   ### Examples
 
       iex> Agenda.track("Elixir", of: [Agenda.session("Keynote")]).name
@@ -768,6 +1295,23 @@ defmodule Agenda do
   @doc """
   Require that a delegate can get between consecutive track sessions.
   Delegates to `Agenda.Track.reachable/2`.
+
+  ### Arguments
+
+  * `track` is a `t:Agenda.Track.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:within` is the longest journey a delegate is expected to make, a
+    duration.
+
+  ### Returns
+
+  * `{:ok, track}` with the reachability requirement set, or
+
+  * `{:error, {:missing_option, :within}}`.
 
   ### Examples
 
@@ -785,6 +1329,20 @@ defmodule Agenda do
   @doc """
   Build a programme. Delegates to `Agenda.Programme.new/2`.
 
+  ### Arguments
+
+  * `name` is the programme's name.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:across` is the window every session must fall inside.
+
+  ### Returns
+
+  * a `t:Agenda.Programme.t/0`.
+
   ### Examples
 
       iex> Agenda.programme("ElixirConf AU").name
@@ -797,6 +1355,73 @@ defmodule Agenda do
   @doc """
   Find a placement for every session in a programme. Delegates to
   `Agenda.Arranger.arrange/3`.
+
+  ### Arguments
+
+  * `programme` is a `t:Agenda.Programme.t/0`.
+
+  * `pool` is the list of `t:Agenda.Resource.t/0` to choose from.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:busy` is a map of resource name to what already claims it, as
+    `Agenda.Ledger.busy/2` returns. The default is `%{}`. It must
+    not include the claims of `:pinned` sessions — those are added for
+    you, so pass `Agenda.Ledger.busy/2` the pinned session names as
+    `:except`.
+
+  * `:pinned` is a list of `t:Agenda.Arrangement.t/0` whose
+    placements are fixed. Those sessions are not searched for, every
+    constraint still applies to them, and they are returned alongside
+    the sessions that were placed. The default is `[]`.
+
+  * `:unplaced` decides what happens when a session cannot be held —
+    `:error` (the default) fails the whole programme, `:allow` leaves
+    out as few sessions as the search can manage and returns
+    `{:partial, layout}`.
+
+  * `:candidates` caps how many placements are considered per session.
+    The default scales with the programme — `40`, or ten more than the
+    number of sessions, whichever is larger. Interchangeable sessions
+    are offered the same ranked placements, so a cap below the session
+    count makes a satisfiable programme unsatisfiable.
+
+  * `:nodes` caps how many search steps are taken across the whole
+    call, including every round of the `unplaced: :allow` search and
+    every independent subproblem the programme splits into. The default
+    scales with the programme — `10_000`, or 250 per session, whichever
+    is larger — because the work per session grows with the programme
+    and a fixed cap reports a satisfiable one as impossible.
+
+  * `:score_nodes` caps the search steps of the second pass, which
+    looks for a better-scoring layout once the first has proved how
+    many sessions can be placed. The default is `2_000`; a layout that
+    stops at it reports `score_proven?: false`.
+
+  * `:concurrency` is how many processes may work at once, defaulting
+    to `System.schedulers_online/0`. Candidate enumeration and
+    independent subproblems are both spread across them. Pass `1` to
+    stay on the calling process — what you want when the caller already
+    runs this inside a pool of its own. The answer does not depend on
+    it: results are collected in order, so the same programme arranges
+    the same way at any setting.
+
+  * `:travel` is passed to `Agenda.travel_time/3` for the
+    reachability check — use it to supply per-pair overrides.
+
+  ### Returns
+
+  * `{:ok, arrangements}` — one per session, mutually consistent, in
+    programme order, or
+
+  * `{:partial, t:Agenda.Layout.t/0}` under `unplaced: :allow`, when
+    some sessions could not be held, or
+
+  * `{:error, t:Agenda.Infeasible.t/0}` naming the session that
+    could not be placed, reporting a bad pin, or reporting that the cap
+    was hit.
 
   ### Examples
 
@@ -835,7 +1460,12 @@ defmodule Agenda do
 
   ### Options
 
-  * the same options as `arrange/3` or `plan/3` respectively.
+  * For a programme, `:busy`, `:pinned`, `:candidates`, `:nodes`,
+    `:score_nodes`, `:concurrency` and `:travel` are as for
+    `arrange/3`.
+
+  * For a session, `:busy`, `:limit` and `:spread` are as for
+    `plan/3`.
 
   ### Returns
 
@@ -967,6 +1597,25 @@ defmodule Agenda do
   Add a soft constraint to a programme. Delegates to
   `Agenda.Programme.prefer/3`.
 
+  ### Arguments
+
+  * `programme` is a `t:Agenda.Programme.t/0`.
+
+  * `preference` is a built-in name — `:room_changes` or
+    `:room_spread` — or a `{name, function}` pair of your own.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:weight` is how much each violation costs. The default is `1`.
+
+  ### Returns
+
+  * `{:ok, programme}`, or
+
+  * `{:error, reason}` when the preference is not recognised.
+
   ### Examples
 
       iex> {:ok, programme} = Agenda.prefer(Agenda.programme("Conf"), :room_spread)
@@ -981,6 +1630,28 @@ defmodule Agenda do
   @doc """
   Require that one session finishes before another starts. Delegates
   to `Agenda.Programme.precede/4`.
+
+  ### Arguments
+
+  * `programme` is a `t:Agenda.Programme.t/0`.
+
+  * `first` is the name of the session that must finish first.
+
+  * `then` is the name of the session that follows it.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:gap` is the least time that must pass between them.
+
+  * `:within` is the most, measured from the end of `first`.
+
+  ### Returns
+
+  * `{:ok, programme}`, or
+
+  * `{:error, reason}` naming a session the programme does not have.
 
   ### Examples
 
@@ -1004,6 +1675,21 @@ defmodule Agenda do
   Interest is one-directional. A meeting is held where it is returned,
   so both parties must say so — see `meetings/3`.
 
+  ### Arguments
+
+  * `programme` is a `t:Agenda.Programme.t/0`.
+
+  * `from` is the resource registering the interest, as a
+    `t:Agenda.Resource.t/0` or its name.
+
+  * `to` is the resource it would like to meet, in the same two forms.
+
+  ### Returns
+
+  * `{:ok, programme}`, or
+
+  * `{:error, :self_interest}` when a resource names itself.
+
   ### Examples
 
       iex> {:ok, programme} = Agenda.interest(Agenda.programme("Show"), "Kim", "Harbour")
@@ -1024,6 +1710,39 @@ defmodule Agenda do
   parties, so nobody being in two places at once is the constraint the
   library already enforces rather than one anybody writes.
 
+  ### Arguments
+
+  * `programme` is a `t:Agenda.Programme.t/0` carrying the interests.
+
+  * `pool` is the resources the interests name.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:duration` is how long each meeting runs. Required.
+
+  * `:window` is when meetings may be held. Defaults to the
+    programme's own window.
+
+  * `:needs` is what every meeting requires beyond its two parties, as
+    `[role: predicates]` — a table, most often.
+
+  * `:as` is the role both parties are rostered under. The default is
+    `:party`, which says neither of them is substitutable.
+
+  * `:name` is a two-argument function naming a meeting from the pair.
+    The default reads `"Kim with Harbour Tours"`.
+
+  ### Returns
+
+  * `{:ok, programme}` with one session added per mutual pair, or
+
+  * `{:error, {:missing_option, :duration}}`, or
+
+  * `{:error, {:unknown_resources, names}}` when an interest names a
+    resource the pool does not hold.
+
   ### Examples
 
       iex> kim = Agenda.resource("Kim")
@@ -1043,6 +1762,28 @@ defmodule Agenda do
   @doc """
   Rebuild what a ledger holds as arrangements, ready to pin. Delegates
   to `Agenda.Ledger.arrangements/3`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `pool` is the list of `t:Agenda.Resource.t/0` the allocations
+    were made from.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:only` is a session name, or a list of them, to rebuild. The
+    default is every session in the ledger.
+
+  ### Returns
+
+  * `{:ok, arrangements}` — one per session, ordered by session name,
+    or
+
+  * `{:error, t:Agenda.Infeasible.t/0}` naming the resources the
+    pool does not have.
 
   ### Examples
 

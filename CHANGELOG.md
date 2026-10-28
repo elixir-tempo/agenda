@@ -18,6 +18,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * A month in a reconciliation's breach sentence is named in full, where it was written `"2026-06-"`.
 
+* A preference's context during `Agenda.arrange/3` holds the pool the programme is arranged from, where it was always empty.
+
 ## [v0.1.0] — 2026-09-03
 
 First release. Resource-constrained scheduling on top of [Tempo](https://hexdocs.pm/ex_tempo): Tempo answers *when is this free?*, Agenda answers *what should I book, and where?*

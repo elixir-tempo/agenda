@@ -8,6 +8,8 @@ defmodule Agenda.Infeasible do
   act on; "the Boardroom qualifies but is allocated to the Board
   meeting all week" tells them who to ask.
 
+  `new/2` builds one, and `message/1` gives the failure as a sentence.
+
   """
 
   @typedoc "A session that cannot be placed, and why."
@@ -45,7 +47,7 @@ defmodule Agenda.Infeasible do
 
   ### Arguments
 
-  * `reason` is a `t:t/0`.
+  * `infeasible` is a `t:t/0`.
 
   ### Returns
 

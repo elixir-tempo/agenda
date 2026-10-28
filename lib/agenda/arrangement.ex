@@ -8,6 +8,12 @@ defmodule Agenda.Arrangement do
   overrule. An arrangement is inert: nothing is committed until it is
   allocated.
 
+  `resources/1` and `resources/2` give the resources it allocates,
+  across every role or in one, and `resource/2` the single resource
+  filling a role. `explain/1` describes it in a line, and `compare/2`
+  orders arrangements by time, so
+  `Enum.sort(arrangements, Agenda.Arrangement)` puts them in time order.
+
   """
 
   alias Agenda.Resource

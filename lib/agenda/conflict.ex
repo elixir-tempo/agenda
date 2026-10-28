@@ -35,6 +35,9 @@ defmodule Agenda.Conflict do
   two-session conflict costs on the order of ten arrangements, not a
   million subsets.
 
+  `minimal/3` gives the smallest subset of the constraints that still
+  cannot be satisfied.
+
   """
 
   @typedoc "Decides whether a set of constraints can hold together."

@@ -30,6 +30,9 @@ defmodule Agenda.Series do
   > *"The stand-up repeats weekly three times; the first occurrence may
   > fall anywhere in the week beginning the 2nd of March."*
 
+  `expand/3` expands a session over a pattern, one occurrence per
+  repetition.
+
   """
 
   alias Agenda.Availability

@@ -253,7 +253,14 @@ defmodule Agenda.Ledger do
 
   ### Options
 
-  As `claim/4`: `:tag`, `:role` and `:session`.
+  * `:tag` is what the time was for, as a `t:Agenda.Allocation.tag/0`.
+
+  * `:role` is the role the resource filled. The default is
+    `:resource`.
+
+  * `:session` names the record, and is what `release/2` takes. The
+    default is the interval's ISO 8601 form, which is unique per
+    resource per span.
 
   ### Returns
 
@@ -292,9 +299,6 @@ defmodule Agenda.Ledger do
     end
   end
 
-  # One resource in one role over one span. Shared so that a booking
-  # and a recorded hour are the same shape in the ledger — which is
-  # what lets the one block the other.
   # A required option. Absent, it is an error tuple like any other bad
   # input rather than a `KeyError` raised several frames from the call.
   defp required(options, name) do
@@ -304,6 +308,9 @@ defmodule Agenda.Ledger do
     end
   end
 
+  # One resource in one role over one span. Shared so that a booking
+  # and a recorded hour are the same shape in the ledger — which is
+  # what lets the one block the other.
   defp holding(resource, interval, options) do
     %Arrangement{
       session: Keyword.get(options, :session, Written.span(interval)),

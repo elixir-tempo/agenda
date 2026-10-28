@@ -42,6 +42,12 @@ defmodule Agenda.Limit do
   floors; `Agenda.reconcile/3` checks both, because it is the function
   that looks at a finished period and asks whether it adds up.
 
+  `parse/1` and `parse!/1` read a resource's `:limits` into limits.
+  `sum/1` totals a set of claims as a count and a duration, `bucket/2`
+  says which day, week or month a moment falls in, and `permits?/3`,
+  `breach/3`, `measure/3` and `ceiling/1` hold a period's total against
+  a limit.
+
   """
 
   alias Agenda.Allocation

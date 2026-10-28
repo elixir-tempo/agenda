@@ -28,6 +28,10 @@ defmodule Agenda.Planner do
   it, and `Tempo.IntervalSet.slots/3` carries that through to every
   placement. Nothing has to be reconstructed afterwards.
 
+  `plan/3` ranks the ways a session could be held against a pool of
+  resources, and `conflict/3` gives the smallest set of demands that
+  rules out every one of them.
+
   """
 
   alias Agenda.Arrangement
@@ -165,7 +169,7 @@ defmodule Agenda.Planner do
 
   ### Options
 
-  Takes the same options as `plan/3`.
+  * `:busy`, `:limit` and `:spread` are as for `plan/3`.
 
   ### Returns
 
