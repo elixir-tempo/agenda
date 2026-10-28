@@ -104,7 +104,7 @@ defmodule Agenda.MixProject do
 
   defp deps do
     [
-      {:ex_tempo, github: "elixir-tempo/tempo", branch: "main"},
+      {:ex_tempo, "~> 2.1"},
       {:ical, "~> 3.2", optional: true},
       {:fixpoint, "~> 0.22", only: [:test]},
       {:ex_doc, "~> 0.38", only: [:dev, :test, :release], optional: true, runtime: false},

@@ -99,7 +99,7 @@ defmodule Agenda.ClaimTest do
       assert {:error, reason} =
                Agenda.claim(ledger, resource, ~o"2026-08-10T11:00:00/2026-08-10T11:30:00")
 
-      assert reason == "Dana is already claimed for 2026Y8M10DT11H0M0S/T30M0S"
+      assert reason == "Dana is already claimed for 2026Y8M10DT11H0M0S/T11H30M0S"
     end
 
     test "not-open is reported ahead of already-claimed" do

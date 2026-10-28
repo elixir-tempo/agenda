@@ -6,7 +6,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ### Changed
 
-* Agenda runs on Tempo 2.0. A date written as an interval's end is read through, as it is said: `"2026-06-15/2026-06-19"` is Monday to Friday.
+* Agenda runs on Tempo 2.1. A date written as an interval's end is read through, as it is said: `"2026-06-15/2026-06-19"` is Monday to Friday.
 
 * A claim, a refinement or a session's window combined with hours in UTC or a zone is written on that time line; a floating one beside them is a `Tempo.FrameError`. A `within:` window may still be floating.
 
