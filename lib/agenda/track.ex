@@ -52,6 +52,8 @@ defmodule Agenda.Track do
 
   * `name` is the track's name.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:of` is the list of `t:Agenda.Session.t/0` in the track. The
@@ -84,6 +86,8 @@ defmodule Agenda.Track do
 
   * `track` is a `t:t/0`.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:within` is the longest journey a delegate is expected to make, a
@@ -91,7 +95,7 @@ defmodule Agenda.Track do
 
   ### Returns
 
-  * `{:ok, track}` with the reachability requirement set; or
+  * `{:ok, track}` with the reachability requirement set, or
 
   * `{:error, {:missing_option, :within}}`.
 

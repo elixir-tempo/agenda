@@ -58,6 +58,8 @@ defmodule Agenda.Precedence do
 
   * `then` is the name of the session that follows it.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:gap` is the least time that must pass between them, a duration.

@@ -50,6 +50,8 @@ defmodule Agenda.Series do
   * `pattern` is a recurrence — an ISO 8601 repeating interval
     (preferred) or an RFC 5545 `RRULE`.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:bound` bounds an otherwise unbounded recurrence: the occurrences
@@ -58,7 +60,7 @@ defmodule Agenda.Series do
 
   ### Returns
 
-  * `{:ok, sessions}`, one per occurrence, in time order; or
+  * `{:ok, sessions}`, one per occurrence, in time order, or
 
   * `{:error, reason}` when the pattern cannot be read or is unbounded
     and unbounded by `:bound`.

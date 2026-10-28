@@ -44,6 +44,7 @@ defmodule Agenda.Availability do
   Availability imported from an RFC 7953 `VAVAILABILITY`, held
   unmaterialised until a query window is known — exactly as a
   recurrence is.
+
   """
   @type imported :: {:vavailability, term()}
 
@@ -51,6 +52,7 @@ defmodule Agenda.Availability do
   Anything that can be read as a span: a Tempo value, a string in
   ISO 8601 (preferred) or RFC 5545 `RRULE` form, or the result of
   `from_ical/1`.
+
   """
   @type pattern :: span() | String.t() | imported()
 
@@ -66,7 +68,7 @@ defmodule Agenda.Availability do
 
   ### Returns
 
-  * `{:ok, resource}` with its open hours set; or
+  * `{:ok, resource}` with its open hours set, or
 
   * `{:error, reason}` when `pattern` cannot be read as a span.
 
@@ -149,7 +151,7 @@ defmodule Agenda.Availability do
 
   ### Returns
 
-  * `{:ok, value}`; or
+  * `{:ok, value}`, or
 
   * `{:error, :unreadable_pattern}` when it is neither.
 
@@ -211,7 +213,7 @@ defmodule Agenda.Availability do
 
   ### Returns
 
-  * `{:ok, pattern}` to hand to `open/2`; or
+  * `{:ok, pattern}` to hand to `open/2`, or
 
   * `{:error, reason}` when the data cannot be read, or when `ical`
     is not available.
@@ -267,6 +269,8 @@ defmodule Agenda.Availability do
 
   * `resource` is a `t:Agenda.Resource.t/0`.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:within` is the query window — a Tempo value or ISO 8601 string.
@@ -279,7 +283,7 @@ defmodule Agenda.Availability do
 
   ### Returns
 
-  * `{:ok, interval_set}` of the free spans; or
+  * `{:ok, interval_set}` of the free spans, or
 
   * `{:error, reason}` when the window or a pattern cannot be read.
 

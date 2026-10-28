@@ -49,6 +49,7 @@ defmodule Agenda.Allocation do
 
   `tag` records what the claim was for. `nil` means untagged, which is
   every allocation made before a caller asks for one.
+
   """
   @type t :: %__MODULE__{
           session: String.t(),
@@ -67,6 +68,7 @@ defmodule Agenda.Allocation do
   `{:leave, :annual}` and `{:holiday, "Show day"}` are the three this
   library's documentation uses, because they are the three a timesheet
   needs, but nothing rejects another.
+
   """
   @type tag :: {atom(), term()}
 
@@ -79,6 +81,8 @@ defmodule Agenda.Allocation do
   ### Arguments
 
   * `arrangement` is a `t:Agenda.Arrangement.t/0`.
+
+  * `options` is a keyword list of options.
 
   ### Options
 

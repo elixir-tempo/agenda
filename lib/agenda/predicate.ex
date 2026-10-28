@@ -32,6 +32,7 @@ defmodule Agenda.Predicate do
   `at_least/1` returns. The constructors are specified this precisely so
   that a misplaced predicate is a type error rather than a runtime
   surprise.
+
   """
   @type t(op) :: %__MODULE__{op: op, operand: term()}
 

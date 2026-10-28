@@ -206,6 +206,8 @@ defmodule Agenda.Arranger do
 
   * `pool` is the list of `t:Agenda.Resource.t/0` to choose from.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:busy` is a map of resource name to what already claims it, as
@@ -251,10 +253,10 @@ defmodule Agenda.Arranger do
   ### Returns
 
   * `{:ok, arrangements}` — one per session, mutually consistent, in
-    programme order; or
+    programme order, or
 
   * `{:partial, t:Agenda.Layout.t/0}` under `unplaced: :allow`, when
-    some sessions could not be held; or
+    some sessions could not be held, or
 
   * `{:error, t:Agenda.Infeasible.t/0}` naming the session that
     could not be placed, reporting a bad pin, or reporting that the cap
@@ -313,6 +315,8 @@ defmodule Agenda.Arranger do
 
   * `pool` is the list of `t:Agenda.Resource.t/0` to choose from.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   Takes the same options as `arrange/3`. `:unplaced` is ignored — a
@@ -321,7 +325,7 @@ defmodule Agenda.Arranger do
   ### Returns
 
   * `:none` when the whole programme can be arranged and there is
-    nothing to explain; or
+    nothing to explain, or
 
   * `{:ok, session_names}` — a minimal set of sessions that cannot all
     be held. Removing any one of them leaves a set that can.
@@ -385,7 +389,7 @@ defmodule Agenda.Arranger do
 
   ### Returns
 
-  * `{:ok, programme}` with every track's reach resolved; or
+  * `{:ok, programme}` with every track's reach resolved, or
 
   * `{:error, t:Agenda.Infeasible.t/0}` when one is not a duration.
 
@@ -1623,6 +1627,8 @@ defmodule Agenda.Arranger do
 
   * `programme` is the `t:Agenda.Programme.t/0` they belong to,
     consulted for their tracks.
+
+  * `options` is a keyword list of options.
 
   ### Options
 

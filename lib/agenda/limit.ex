@@ -52,6 +52,7 @@ defmodule Agenda.Limit do
 
   @typedoc """
   What a limit counts — claims, or time.
+
   """
   @type measure :: {:count, pos_integer()} | {:duration, Tempo.Duration.t()}
 
@@ -61,6 +62,7 @@ defmodule Agenda.Limit do
   `at_most` is a ceiling and constrains the search. `at_least` is a
   floor and is checked only by `Agenda.reconcile/3`. Either may be
   `nil`, but not both.
+
   """
   @type t :: %__MODULE__{
           period: :day | :week | :month,
@@ -81,7 +83,7 @@ defmodule Agenda.Limit do
 
   ### Returns
 
-  * `{:ok, limits}` in the order given; or
+  * `{:ok, limits}` in the order given, or
 
   * `{:error, reason}` naming the period that could not be read.
 
@@ -314,7 +316,7 @@ defmodule Agenda.Limit do
 
   ### Returns
 
-  * an opaque bucket key, equal for two moments in the same period; or
+  * an opaque bucket key, equal for two moments in the same period, or
 
   * `:undated` when the moment does not carry a full date, or the
     period is not one this module knows. Everything undated shares one
@@ -539,9 +541,9 @@ defmodule Agenda.Limit do
 
   ### Returns
 
-  * `nil` when the claims satisfy the limit; or
+  * `nil` when the claims satisfy the limit, or
 
-  * `{:over, measure}` naming the ceiling that was exceeded; or
+  * `{:over, measure}` naming the ceiling that was exceeded, or
 
   * `{:under, measure}` naming the floor that was not reached.
 

@@ -70,13 +70,15 @@ defmodule Agenda.Preference do
     or `:resource_wishes` — or a `{name, function}` pair for one of
     your own.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:weight` is how much each violation costs. The default is `1`.
 
   ### Returns
 
-  * `{:ok, t:t/0}`; or
+  * `{:ok, t:t/0}`, or
 
   * `{:error, reason}` when the name is neither a built-in nor paired
     with a function.

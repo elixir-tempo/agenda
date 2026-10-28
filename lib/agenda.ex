@@ -831,13 +831,15 @@ defmodule Agenda do
 
   * `pool` is the list of `t:Agenda.Resource.t/0` to choose from.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * the same options as `arrange/3` or `plan/3` respectively.
 
   ### Returns
 
-  * `:none` when there is nothing to explain; or
+  * `:none` when there is nothing to explain, or
 
   * `{:ok, conflict}` — a minimal set of session names, or of demands.
 
@@ -885,6 +887,8 @@ defmodule Agenda do
   * `programme` is the `t:Agenda.Programme.t/0` whose preferences
     to score against.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:pool` is the resources the layout drew on, for preferences that
@@ -925,6 +929,8 @@ defmodule Agenda do
 
   * `programme` is the `t:Agenda.Programme.t/0` whose preferences
     to score against.
+
+  * `options` is a keyword list of options.
 
   ### Options
 
@@ -1070,6 +1076,8 @@ defmodule Agenda do
 
   * `from` and `to` are each a `t:Agenda.Resource.t/0`.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:between` is a keyword-style list of `{{from_name, to_name},
@@ -1085,7 +1093,7 @@ defmodule Agenda do
 
   ### Returns
 
-  * `{:ok, duration}` where `duration` is a `t:Tempo.Duration.t/0`; or
+  * `{:ok, duration}` where `duration` is a `t:Tempo.Duration.t/0`, or
 
   * `{:error, :unknown}` when the two resources share no place.
 

@@ -47,7 +47,7 @@ defmodule Agenda.Interest do
 
   ### Returns
 
-  * `{:ok, interest}`; or
+  * `{:ok, interest}`, or
 
   * `{:error, :self_interest}` when a resource names itself, which no
     meeting can satisfy.

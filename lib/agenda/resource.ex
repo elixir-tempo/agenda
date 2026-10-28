@@ -88,6 +88,8 @@ defmodule Agenda.Resource do
 
   * `name` is the resource's name.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:within` is the enclosing `t:Agenda.Place.t/0`. The
@@ -239,7 +241,7 @@ defmodule Agenda.Resource do
 
   ### Returns
 
-  * `{:ok, resource}`; or
+  * `{:ok, resource}`, or
 
   * `{:error, {:unknown_resource, name}}`.
 
@@ -279,7 +281,7 @@ defmodule Agenda.Resource do
 
   ### Returns
 
-  * `{:ok, resources}` in the order the names were given; or
+  * `{:ok, resources}` in the order the names were given, or
 
   * `{:error, {:unknown_resources, names}}` listing every name that is
     not in the pool, in the order given.

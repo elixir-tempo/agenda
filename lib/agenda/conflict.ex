@@ -59,7 +59,7 @@ defmodule Agenda.Conflict do
   ### Returns
 
   * `:none` when everything holds together and there is nothing to
-    explain; or
+    explain, or
 
   * `{:ok, conflict}` where `conflict` is a minimal subset of
     `constraints`, in their original order. An empty list means

@@ -62,7 +62,7 @@ defmodule Agenda.Refine do
 
   ### Returns
 
-  * `{:ok, interval_set}`; or
+  * `{:ok, interval_set}`, or
 
   * `{:error, reason}`, including any error passed in.
 
@@ -107,7 +107,7 @@ defmodule Agenda.Refine do
 
   ### Returns
 
-  * `{:ok, interval_set}`; or
+  * `{:ok, interval_set}`, or
 
   * `{:error, reason}`.
 
@@ -159,7 +159,7 @@ defmodule Agenda.Refine do
 
   ### Returns
 
-  * `{:ok, interval_set}`; or
+  * `{:ok, interval_set}`, or
 
   * `{:error, reason}`.
 

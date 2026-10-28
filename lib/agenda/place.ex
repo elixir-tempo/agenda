@@ -22,6 +22,7 @@ defmodule Agenda.Place do
   How far apart two places are: `0` when they are the same place, `n`
   when the deeper of the two is `n` levels below their nearest common
   ancestor, and `:disjoint` when they share no ancestor at all.
+
   """
   @type separation :: non_neg_integer() | :disjoint
 
@@ -33,6 +34,8 @@ defmodule Agenda.Place do
   ### Arguments
 
   * `name` is the place's name.
+
+  * `options` is a keyword list of options.
 
   ### Options
 
@@ -161,7 +164,7 @@ defmodule Agenda.Place do
 
   ### Returns
 
-  * the innermost common `t:t/0`; or
+  * the innermost common `t:t/0`, or
 
   * `nil` when the two are in unrelated trees.
 
@@ -203,10 +206,10 @@ defmodule Agenda.Place do
 
   ### Returns
 
-  * `0` when `a` and `b` are the same place;
+  * `0` when `a` and `b` are the same place,
 
   * a positive integer — the number of levels from the deeper place up
-    to the nearest common ancestor; or
+    to the nearest common ancestor, or
 
   * `:disjoint` when the two share no ancestor.
 

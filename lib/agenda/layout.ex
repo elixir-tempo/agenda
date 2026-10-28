@@ -46,11 +46,11 @@ defmodule Agenda.Layout do
   `Agenda.Preference`s, where `0` is ideal. `score_proven?` is its
   counterpart to `minimal?` and answers a *different* question:
 
-  * `minimal?` — is this the fewest sessions left out? Proven by the
-    first pass, and never affected by the second.
+  * `minimal?` — whether this is the fewest sessions left out, proven
+    by the first pass and never affected by the second.
 
-  * `score_proven?` — did the scoring pass finish, or stop at its
-    `:score_nodes` budget with the best it had found?
+  * `score_proven?` — whether the scoring pass finished, rather than
+    stopping at its `:score_nodes` budget with the best it had found.
 
   The two are independent. A layout can be provably minimal and merely
   well-scored, which is the common case, because the count is cheap to

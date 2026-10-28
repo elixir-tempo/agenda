@@ -45,6 +45,8 @@ defmodule Agenda.Session do
 
   * `name` is the session's name.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:duration` is how long the session runs, a `t:Tempo.Duration.t/0`.

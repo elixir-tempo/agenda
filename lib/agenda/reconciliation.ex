@@ -63,6 +63,7 @@ defmodule Agenda.Reconciliation do
 
   `bucket` is the specific day, week or month at fault, as returned by
   `Agenda.Limit.bucket/2`.
+
   """
   @type breach :: %{
           period: atom(),
@@ -72,6 +73,7 @@ defmodule Agenda.Reconciliation do
 
   @typedoc """
   What a resource owed over a window, and what it claimed.
+
   """
   @type t :: %__MODULE__{
           resource: String.t(),
@@ -104,6 +106,8 @@ defmodule Agenda.Reconciliation do
 
   * `resource` is a `t:Agenda.Resource.t/0`.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:within` is the window to reconcile — a Tempo value or an ISO 8601
@@ -122,7 +126,7 @@ defmodule Agenda.Reconciliation do
 
   ### Returns
 
-  * `{:ok, reconciliation}`; or
+  * `{:ok, reconciliation}`, or
 
   * `{:error, reason}` when the window or a set cannot be read.
 

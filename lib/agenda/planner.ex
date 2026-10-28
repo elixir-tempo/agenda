@@ -56,6 +56,8 @@ defmodule Agenda.Planner do
   * `pool` is the list of `t:Agenda.Resource.t/0` available to
     choose from.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:busy` is a map of resource name to what already claims it — any
@@ -78,7 +80,7 @@ defmodule Agenda.Planner do
 
   ### Returns
 
-  * `{:ok, arrangements}` ranked best-first; or
+  * `{:ok, arrangements}` ranked best-first, or
 
   * `{:error, t:Agenda.Infeasible.t/0}` carrying the reasons — which
     includes a session that never said when it may be held.
@@ -159,6 +161,8 @@ defmodule Agenda.Planner do
 
   * `pool` is the list of `t:Agenda.Resource.t/0` to choose from.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   Takes the same options as `plan/3`.
@@ -166,7 +170,7 @@ defmodule Agenda.Planner do
   ### Returns
 
   * `:none` when the session can be held and there is nothing to
-    explain; or
+    explain, or
 
   * `{:ok, demands}` — a minimal set of demands that cannot all be met.
     An empty list means no demand is to blame: the session fails on

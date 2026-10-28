@@ -50,6 +50,8 @@ defmodule Agenda.Programme do
 
   * `name` is the programme's name.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:across` is the window every session must fall inside.
@@ -196,6 +198,8 @@ defmodule Agenda.Programme do
 
   * `then` is the name of the session that follows it.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:gap` is the least time that must pass between them.
@@ -204,7 +208,7 @@ defmodule Agenda.Programme do
 
   ### Returns
 
-  * `{:ok, programme}`; or
+  * `{:ok, programme}`, or
 
   * `{:error, reason}` naming a session the programme does not have.
 
@@ -260,13 +264,15 @@ defmodule Agenda.Programme do
   * `preference` is a built-in name — `:room_changes` or
     `:room_spread` — or a `{name, function}` pair of your own.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:weight` is how much each violation costs. The default is `1`.
 
   ### Returns
 
-  * `{:ok, programme}`; or
+  * `{:ok, programme}`, or
 
   * `{:error, reason}` when the preference is not recognised.
 
@@ -428,7 +434,7 @@ defmodule Agenda.Programme do
 
   ### Returns
 
-  * `{:ok, programme}`; or
+  * `{:ok, programme}`, or
 
   * `{:error, :self_interest}` when a resource names itself.
 
@@ -467,6 +473,8 @@ defmodule Agenda.Programme do
 
   * `pool` is the resources the interests name.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:duration` is how long each meeting runs. Required.
@@ -485,9 +493,9 @@ defmodule Agenda.Programme do
 
   ### Returns
 
-  * `{:ok, programme}` with one session added per mutual pair; or
+  * `{:ok, programme}` with one session added per mutual pair, or
 
-  * `{:error, {:missing_option, :duration}}`; or
+  * `{:error, {:missing_option, :duration}}`, or
 
   * `{:error, {:unknown_resources, names}}` when an interest names a
     resource the pool does not hold.

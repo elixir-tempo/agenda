@@ -54,6 +54,7 @@ defmodule Agenda.Ledger do
   @typedoc """
   One line of a changeset: keep a binding untouched, give one back, or
   take a new one.
+
   """
   @type change :: {:keep | :release | :allocate, Allocation.t()}
 
@@ -89,6 +90,8 @@ defmodule Agenda.Ledger do
   * `ledger` is a `t:t/0`.
 
   * `arrangement` is a `t:Agenda.Arrangement.t/0`.
+
+  * `options` is a keyword list of options.
 
   ### Options
 
@@ -164,6 +167,8 @@ defmodule Agenda.Ledger do
 
   * `interval` is when — a Tempo value or an ISO 8601 string.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:tag` is what the claim is for, as a `t:Agenda.Allocation.tag/0`.
@@ -177,7 +182,7 @@ defmodule Agenda.Ledger do
 
   ### Returns
 
-  * `{:ok, ledger}`; or
+  * `{:ok, ledger}`, or
 
   * `{:error, reason}` — a sentence naming the time that could not be
     claimed and why, when the resource is not open then or is already
@@ -244,13 +249,15 @@ defmodule Agenda.Ledger do
 
   * `interval` is when — a Tempo value or an ISO 8601 string.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   As `claim/4`: `:tag`, `:role` and `:session`.
 
   ### Returns
 
-  * `{:ok, ledger}`; or
+  * `{:ok, ledger}`, or
 
   * `{:error, reason}` when `interval` cannot be read as a span. Never
     for a reason of availability — that is `claim/4`'s business.
@@ -364,6 +371,8 @@ defmodule Agenda.Ledger do
 
   * `arrangement` is a `t:Agenda.Arrangement.t/0`.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:until` is when the hold lapses — a Tempo value or an ISO 8601
@@ -375,7 +384,7 @@ defmodule Agenda.Ledger do
 
   ### Returns
 
-  * `{:ok, ledger}`; or
+  * `{:ok, ledger}`, or
 
   * `{:error, reason}` when `:until` cannot be read as a moment.
 
@@ -474,7 +483,7 @@ defmodule Agenda.Ledger do
 
   ### Returns
 
-  * `{:ok, ledger}` with lapsed holds removed; or
+  * `{:ok, ledger}` with lapsed holds removed, or
 
   * `{:error, reason}` when `now` cannot be read as a moment.
 
@@ -594,6 +603,8 @@ defmodule Agenda.Ledger do
   * `series` is the series name — the original session's name, before
     it was expanded.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:from` releases only the occurrences starting at or after this
@@ -602,7 +613,7 @@ defmodule Agenda.Ledger do
 
   ### Returns
 
-  * `{:ok, ledger}`; or
+  * `{:ok, ledger}`, or
 
   * `{:error, reason}` when `:from` cannot be read.
 
@@ -724,6 +735,8 @@ defmodule Agenda.Ledger do
   * `pool` is the list of `t:Agenda.Resource.t/0` the allocations
     were made from.
 
+  * `options` is a keyword list of options.
+
   ### Options
 
   * `:only` is a session name, or a list of them, to rebuild. The
@@ -731,7 +744,7 @@ defmodule Agenda.Ledger do
 
   ### Returns
 
-  * `{:ok, arrangements}` — one per session, ordered by session name;
+  * `{:ok, arrangements}` — one per session, ordered by session name,
     or
 
   * `{:error, t:Agenda.Infeasible.t/0}` naming the resources the
@@ -854,6 +867,8 @@ defmodule Agenda.Ledger do
   ### Arguments
 
   * `ledger` is a `t:t/0`.
+
+  * `options` is a keyword list of options.
 
   ### Options
 
