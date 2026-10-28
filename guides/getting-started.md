@@ -8,7 +8,7 @@ Agenda answers *what should I book, and where?* It is built on [Tempo](https://h
 ```elixir
 def deps do
   [
-    {:agenda, "~> 0.1"}
+    {:agenda, "~> 0.2"}
   ]
 end
 ```

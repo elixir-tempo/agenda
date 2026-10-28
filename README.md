@@ -1,8 +1,54 @@
 # Agenda
 
-Resource-constrained scheduling for [Tempo](https://hexdocs.pm/ex_tempo).
+Resource-constrained scheduling for [Tempo](https://hexdocs.pm/ex_tempo). Tempo answers *when is this free?* Agenda answers *what should I book, and where?* It adds the named resources, the attributes describing them, the places containing them, and the requirements a session places on them — so that a scheduling question can be asked the way a person would ask it.
 
-Tempo answers *when is this free?* Agenda answers *what should I book, and where?* It adds the named resources, the attributes describing them, the places containing them, and the requirements a session places on them — so that a scheduling question can be asked the way a person would ask it.
+## Features
+
+* **Resources, attributes and places** — named resources with attributes, in a tree of places from which the travel time between them is derived.
+
+* **Requirements that explain themselves** — what a session needs, as predicates, with a sentence for every failed match, and a person's needs folded into the room they are booked in.
+
+* **Planning and arranging** — one session ranked against a pool, or a whole programme of tracks laid out: partially where not everything fits, around pinned placements, and with a minimal conflict set when it cannot be.
+
+* **Order, contracts and wishes** — precedence between sessions, load limits in claims or in time with floors and ceilings, and soft preferences, including each resource's own.
+
+* **One ledger of claims** — allocations, holds, and work and leave told apart by a tag, in one immutable value from which availability is derived and against which a period is reconciled.
+
+* **Open hours from a calendar** — RFC 7953 `VAVAILABILITY` read with the optional `ical` dependency.
+
+Meeting and conference scheduling is the focus. Task and shift scheduling are expressible — precedence makes a task graph, limits make a contract, wishes make a roster people will accept — and exact at small scale, or handed to a solver at large.
+
+## Supported Elixir and OTP versions
+
+Agenda supports **Elixir 1.17** and later on **Erlang/OTP 27** and later, the floor it takes from Tempo.
+
+## Installation
+
+Add `agenda` to the dependencies in `mix.exs`:
+
+<!-- guide-test: skip (mix.exs fragment) -->
+```elixir
+def deps do
+  [
+    {:agenda, "~> 0.2"}
+  ]
+end
+```
+
+Add [`ical`](https://hex.pm/packages/ical) `~> 3.2` as well to read RFC 7953 `VAVAILABILITY`; 3.2 is the first release carrying it.
+
+### Configure a time zone database
+
+Elixir ships a UTC-only time zone database, and with it every zone resolves to UTC and daylight-saving arithmetic is **silently wrong** rather than failing — a London window across the spring-forward boundary measures an hour longer than it is. Any application doing zoned scheduling configures a real IANA database; Tz comes with Tempo:
+
+<!-- guide-test: skip (config fragment) -->
+```elixir
+config :elixir, :time_zone_database, Tz.TimeZoneDatabase
+```
+
+Agenda does not choose one for you.
+
+## Quick start
 
 ```elixir
 import Agenda.Predicate
@@ -76,28 +122,6 @@ Agenda.travel_time(boardroom, main_stage, between: [{{"Boardroom", "Main Stage"}
 ```
 
 This is what a flat `location: :sydney` attribute cannot do. It can answer *"is this room in Sydney?"*, but not *"can a delegate get from here to there in the ten-minute break?"* — and only the second question decides whether a programme is workable.
-
-## Livebooks
-
-Interactive and runnable — every cell executes live in [Livebook](https://livebook.dev):
-
-* [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Felixir_melbourne_september_2026.livemd) **Scheduling ElixirConf** — the real ElixirConf US 2025 programme laid out from scratch: 42 talks, three rooms, two days, and the constraint invented data misses.
-
-* [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Ftimesheets_and_leave.livemd) **Timesheets and leave** — recording work and absence against one ledger, and reconciling a period against the hours that were owed.
-
-## Guides
-
-New to Tempo or to this library? Start with **[Getting started](https://hexdocs.pm/agenda/getting-started.html)** — the one Tempo idea you need, the five nouns, and the whole describe-plan-allocate-release loop in five minutes.
-
-Then three worked problems, each end to end with executed output:
-
-* [Consultants on customer sites](https://hexdocs.pm/agenda/case-study-consultants.html) — an IT services business. Skills matching, customer sites as resources, travel between jobs, and why a consultant's day is a track.
-
-* [Meeting rooms and AV equipment](https://hexdocs.pm/agenda/case-study-meeting-rooms.html) — a larger business. Room attributes, booking a room *and* a projector together, accessibility that cannot be forgotten, and moving a meeting without losing the room.
-
-* [ElixirConf US 2025](https://hexdocs.pm/agenda/case-study-elixirconf.html) — the real programme: 42 talks, three rooms, two days, and the constraint invented data misses. Why a speaker is a resource, not a label.
-
-* [ElixirConf 2027](https://hexdocs.pm/agenda/case-study-conference.html) — two days, keynotes, and parallel tracks. Where planning becomes searching, and where the search stops.
 
 ## When not everything fits
 
@@ -275,40 +299,28 @@ Availability usually already exists somewhere. `from_ical/1` reads [RFC 7953](ht
 
 Requires the optional `ical` dependency.
 
-## Status
+## Documentation
 
-**First release.** Implemented: resources, attributes, the place tree and derived travel, requirements and the predicate vocabulary, induced requirements, explanations, availability, single-session planning, required and optional participants, the allocation ledger, tagged claims, holds, recurring series, tracks, whole-programme arrangement, partial arrangement, pinning, precedence, load limits measured in claims or in time with floors and ceilings, reconciliation over a period, soft constraints including per-resource wishes, minimal conflict sets, meetings generated from mutual interest, and RFC 7953 import.
+* [Getting started](https://hexdocs.pm/agenda/getting-started.html) — the one Tempo idea you need, the five nouns, and the whole describe-plan-allocate-release loop in five minutes.
 
-Meeting and conference scheduling is the focus. Task and shift scheduling are expressible — precedence makes a task graph, limits make a contract, wishes make a roster people will accept — and exact at small scale, or handed to a solver at large.
+* [Sequencing, tracks and affinity](https://hexdocs.pm/agenda/sequencing-and-affinity.html) — *this after that*, *these may not collide*, and *keep them together if you can*: three kinds of constraint, and why the differences matter more than the syntax.
 
-Still open: the rest of the claim lifecycle — completed, cancelled, no-show — which belongs with the persistence adapter, since none of those states changes what is available. The full design is in [the plan](https://github.com/elixir-tempo/agenda/blob/v0.1.0/plans/agenda.md).
+* [Consultants on customer sites](https://hexdocs.pm/agenda/case-study-consultants.html) — an IT services business. Skills matching, customer sites as resources, travel between jobs, and why a consultant's day is a track.
 
-### Optional dependencies
+* [Meeting rooms and AV equipment](https://hexdocs.pm/agenda/case-study-meeting-rooms.html) — a larger business. Room attributes, booking a room *and* a projector together, accessibility that cannot be forgotten, and moving a meeting without losing the room.
 
-* [`ical`](https://hex.pm/packages/ical) `~> 3.2` for RFC 7953 `VAVAILABILITY` import — 3.2 is the first release carrying it.
+* [ElixirConf US 2025](https://hexdocs.pm/agenda/case-study-elixirconf.html) — the real programme: 42 talks, three rooms, two days, and the constraint invented data misses. Why a speaker is a resource, not a label.
 
-## Installation
+* [ElixirConf 2027](https://hexdocs.pm/agenda/case-study-conference.html) — two days, keynotes, and parallel tracks. Where planning becomes searching, and where the search stops.
 
-<!-- guide-test: skip (mix.exs fragment) -->
-```elixir
-def deps do
-  [
-    {:agenda, "~> 0.1"}
-  ]
-end
-```
+* [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Felixir_melbourne_september_2026.livemd) **Scheduling ElixirConf** — the real ElixirConf US 2025 programme laid out from scratch: 42 talks, three rooms, two days, and the constraint invented data misses.
 
-### Configure a timezone database
+* [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fraw.githubusercontent.com%2Felixir-tempo%2Fagenda%2Fmain%2Flivebook%2Ftimesheets_and_leave.livemd) **Timesheets and leave** — recording work and absence against one ledger, and reconciling a period against the hours that were owed.
 
-Elixir ships a UTC-only timezone database, and with it every zone resolves to UTC and daylight-saving arithmetic is **silently wrong** rather than failing — a London window across the spring-forward boundary measures an hour longer than it is. Any application doing zoned scheduling should configure a real IANA database:
+* [Changelog](https://hexdocs.pm/agenda/changelog.html) — release history.
 
-<!-- guide-test: skip (config fragment) -->
-```elixir
-config :elixir, :time_zone_database, Tz.TimeZoneDatabase
-```
-
-with `{:tz, "~> 0.28"}` in your dependencies. Agenda does not choose one for you.
+Full API documentation is available on [HexDocs](https://hexdocs.pm/agenda).
 
 ## License
 
-Apache-2.0. See [LICENSE.md](LICENSE.md).
+The code is licensed under the Apache License 2.0; [LICENSE.md](https://github.com/elixir-tempo/agenda/blob/v0.2.0/LICENSE.md) gives it.

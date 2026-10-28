@@ -1,7 +1,7 @@
 defmodule Agenda.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.2.0"
 
   def project do
     [
@@ -111,8 +111,9 @@ defmodule Agenda.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:stream_data, "~> 1.0", only: [:dev, :test], runtime: false},
-      # A real IANA database, so tests exercise zone and DST arithmetic
-      # rather than Elixir's UTC-only default. Consumers pick their own.
+      # Tz, which Tempo brings and asks where nothing else is configured.
+      # Named here because config/config.exs names Tz.TimeZoneDatabase for
+      # development and tests; an application configures its own.
       {:tz, "~> 0.28"}
     ]
   end
