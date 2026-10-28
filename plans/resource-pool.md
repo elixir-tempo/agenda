@@ -1,6 +1,8 @@
 # Plan — a resource pool abstraction
 
-**Status: deferred, deliberately.** `Agenda.Resource.fetch/2` and `fetch_all/2` landed 2026-08-27 to close the identity-lookup gap. The structure itself is not built, because measurement says it is not yet paying for itself. This records what was measured, so the next person does not re-derive it — or reach for ETS on instinct, which the numbers below say is the wrong instinct.
+**Status:** deferred, 2026-08-27
+
+Deferred deliberately. `Agenda.Resource.fetch/2` and `fetch_all/2` landed 2026-08-27 to close the identity-lookup gap. The structure itself is not built, because measurement says it is not yet paying for itself. This records what was measured, so the next person does not re-derive it — or reach for ETS on instinct, which the numbers below say is the wrong instinct.
 
 ## The problem
 

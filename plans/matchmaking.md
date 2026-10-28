@@ -1,6 +1,8 @@
 # Hosted-buyer matchmaking — a discussion document
 
-**Status: prototyped, then partly built.** Every measurement below was taken against this codebase on 2026-08-28. The prototype answered the question the plan was written to ask and changed the plan twice — see *Density* and *The answer* — and the first stage has since landed: `Agenda.Interest`, `Agenda.interest/3`, `Agenda.meetings/3`, and two fixes to `Agenda.Planner` — `plan/3` now honours a resource's `:limits`, and `:spread` now covers the window instead of its tail.
+**Status:** in progress, 2026-08-29
+
+Prototyped, then partly built. Every measurement below was taken against this codebase on 2026-08-28. The prototype answered the question the plan was written to ask and changed the plan twice — see *Density* and *The answer* — and the first stage has since landed: `Agenda.Interest`, `Agenda.interest/3`, `Agenda.meetings/3`, and two fixes to `Agenda.Planner` — `plan/3` now honours a resource's `:limits`, and `:spread` now covers the window instead of its tail.
 
 **On the name.** This document originally called the primitive a *wish*. That word was already taken: `Agenda.Resource`'s `avoids` and `prefers` are documented as "a wish, not a rule" and scored by the `:resource_wishes` preference. The built primitive is an **interest** — the domain's own phrase, and free.
 

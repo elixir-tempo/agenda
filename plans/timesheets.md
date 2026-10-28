@@ -1,5 +1,7 @@
 # Timesheets, leave, and working-time reconciliation — a discussion document
 
+**Status:** draft, 2026-09-03
+
 **Audience:** the team whose timesheet problem prompted it. This is a proposal to talk about, not a design to sign off. Everything that is theirs to call is marked as a question rather than answered.
 
 **Note on circulation:** this document paraphrases a prospective user's internal discussion. Names, clients and commercial specifics have been removed; what remains is the design argument, which stands on its own. The Hex package is unaffected either way: `mix.exs` does not include `plans/` in its `files:` list.

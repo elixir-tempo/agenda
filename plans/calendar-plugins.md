@@ -1,6 +1,8 @@
 # Calendar plugins — a discussion document
 
-**Status: an assessment, not a design.** No prototype was built and none is proposed yet. Everything here about Microsoft's and Apple's programmes is from general knowledge and **must be checked against current vendor documentation before any of it is costed** — certification tiers, manifest formats and consent rules all move, and some of what follows will have moved since it was written.
+**Status:** reference, 2026-08-29
+
+An assessment, not a design. No prototype was built and none is proposed yet. Everything here about Microsoft's and Apple's programmes is from general knowledge and **must be checked against current vendor documentation before any of it is costed** — certification tiers, manifest formats and consent rules all move, and some of what follows will have moved since it was written.
 
 The idea is to reach organisers where they already are rather than asking them to come to an API. That is a good instinct. The difficulty is that the surface a calendar plugin offers is a poor match for the half of Agenda that is worth anything, and it is better to know that before building a manifest.
 

@@ -1,6 +1,8 @@
 # Booking — a sibling library, and where it stops being one
 
-**Status: a proposal to argue with, not a design to sign off.** The measurements are from this codebase on 2026-08-28. No prototype was built; the contention claims in *The concert* are reasoned from the shape of the problem and are the part most worth attacking.
+**Status:** draft, 2026-08-29
+
+A proposal to argue with, not a design to sign off. The measurements are from this codebase on 2026-08-28. No prototype was built; the contention claims in *The concert* are reasoned from the shape of the problem and are the part most worth attacking.
 
 Agenda answers *what should I book, and where?* It does not book. That is not an omission to fill in later — the reason it does not is load-bearing, and understanding it decides what the sibling is.
 

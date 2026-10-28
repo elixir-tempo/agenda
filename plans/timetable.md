@@ -1,5 +1,7 @@
 # Plan — `timetable`: period grids, cohorts, and curriculum demand
 
+**Status:** planning, 2026-08-21
+
 ## Problem
 
 A school or university timetable is not a large scheduling problem. It is a different problem that happens to share vocabulary.

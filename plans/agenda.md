@@ -1,5 +1,7 @@
 # Plan — `agenda`: resources, requirements, and programmes
 
+**Status:** in progress, 2026-09-03
+
 Tempo answers *when is this free?* It cannot answer *what should I book, and where?* This plan adds named resources, the attributes that describe them, the places that contain them, the requirements a session places on them, and the allocation ledger that keeps the answer true as sessions move. The temporal core stays where it is; the resource vocabulary goes into a companion library, `agenda`; an adapter makes it drop into an Ash-based scheduling library's declared extension points.
 
 ## Problem
