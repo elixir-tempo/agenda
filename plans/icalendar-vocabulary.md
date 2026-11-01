@@ -104,6 +104,10 @@ is the cheapest this will ever be.
    booked, and cannot be checked for conflicts — the similarity of the names
    is the whole reason to say so.
 
+   Done 2026-11-01: two attributes, `cutype:` and `resource_type:`, kept
+   ordinary so a session can ask for them, and read by `Resource.cutype/1`
+   (`:unknown` when unset, never inferred) and `Resource.resource_type/1`.
+
 5. **Map `Agenda.Place` onto RFC 9073's `VLOCATION` and record what is
    lost.** `LOCATION-TYPE` is the natural conventional attribute for a place.
    `within` has no equivalent — `VLOCATION` does not nest — so any export

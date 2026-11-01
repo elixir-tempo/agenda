@@ -1,8 +1,10 @@
 defmodule Agenda.ResourceTest do
   use ExUnit.Case, async: true
 
+  alias Agenda.Arrangement
   alias Agenda.Place
   alias Agenda.Resource
+  alias Agenda.Session
 
   doctest Agenda.Resource
 
@@ -95,6 +97,50 @@ defmodule Agenda.ResourceTest do
 
     test "fetch_all of nothing is nothing", context do
       assert Resource.fetch_all(context.pool, []) == {:ok, []}
+    end
+  end
+
+  describe "calendar user type" do
+    test "cutype/1 reads the cutype: attribute, :unknown when there is none" do
+      assert Resource.cutype(Resource.new("Alice", cutype: :individual)) == :individual
+      assert Resource.cutype(Resource.new("Design team", cutype: :group)) == :group
+      assert Resource.cutype(Resource.new("Boardroom", seats: 8)) == :unknown
+    end
+
+    test "resource_type/1 reads the resource_type: attribute, nil when there is none" do
+      projector = Resource.new("Projector 2", cutype: :resource, resource_type: :projector)
+
+      assert Resource.resource_type(projector) == :projector
+      assert Resource.resource_type(Resource.new("Alice")) == nil
+    end
+
+    test "a value outside the lists is kept as given" do
+      assert Resource.cutype(Resource.new("Kiosk", cutype: :x_kiosk)) == :x_kiosk
+      assert Resource.resource_type(Resource.new("Desk", resource_type: :x_desk)) == :x_desk
+    end
+
+    test "both are ordinary attributes, so a session can ask for them" do
+      projector = Resource.new("Projector 2", cutype: :resource, resource_type: :projector)
+      speaker = Resource.new("Speakerphone", resource_type: :remote_conference_audio)
+
+      assert projector.attributes == %{cutype: :resource, resource_type: :projector}
+
+      {:ok, room} =
+        Agenda.resource("Boardroom", cutype: :room, resource_type: :room)
+        |> Agenda.open("2026-06-15T09:00:00/2026-06-15T17:00:00")
+
+      {:ok, projector} = Agenda.open(projector, "2026-06-15T09:00:00/2026-06-15T17:00:00")
+      {:ok, speaker} = Agenda.open(speaker, "2026-06-15T09:00:00/2026-06-15T17:00:00")
+
+      session =
+        Agenda.session("Review", duration: "PT1H", window: "2026-06-15/2026-06-15")
+        |> Session.needs(:room, cutype: :room)
+        |> Session.needs(:kit, resource_type: :projector)
+
+      {:ok, [best | _]} = Agenda.plan(session, [room, projector, speaker])
+
+      assert Arrangement.resource(best, :kit).name == "Projector 2"
+      assert Arrangement.resource(best, :room).name == "Boardroom"
     end
   end
 end

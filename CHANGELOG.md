@@ -14,6 +14,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.cancel/2` cancels a session, freeing what it held or booked: the session's name for `release/2`, completing hold, confirm and cancel.
 
+* `Agenda.Resource.cutype/1` and `resource_type/1` read the conventional `cutype:` and `resource_type:` attributes, iCalendar's `CUTYPE` and RFC 9073's `RESOURCE-TYPE`; a resource with no `cutype:` is `:unknown`.
+
 ## [v0.2.0] — 2026-10-28
 
 ### Breaking changes

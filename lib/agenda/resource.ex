@@ -33,9 +33,33 @@ defmodule Agenda.Resource do
     [at_least: ~o"PT38H"]]`. See `Agenda.Limit`, which also explains
     why only ceilings constrain the search.
 
-  `new/2` builds one. `attribute/2` reads an attribute, `within?/2` and
+  `new/2` builds one. `attribute/2` reads an attribute, `cutype/1` and
+  `resource_type/1` its calendar user type, `within?/2` and
   `separation/2` place it in the place tree, and `fetch/2` and
   `fetch_all/2` find resources in a pool by name.
+
+  ### Calendar user type
+
+  Two conventional attributes say what a resource is to a calendar, so
+  that an iCalendar adapter maps it mechanically instead of guessing
+  from its name or its other attributes:
+
+  * **`cutype:`** — RFC 5545's `CUTYPE`, for anything that can accept
+    an invitation as an `ATTENDEE`: `:individual`, `:group`,
+    `:resource` or `:room`.
+
+  * **`resource_type:`** — RFC 9073's `RESOURCE-TYPE`, for a
+    `VRESOURCE`: `:room`, `:projector`, `:remote_conference_audio` or
+    `:remote_conference_video`.
+
+  Both are ordinary attributes, so a session can ask for them like any
+  other (`needs(:kit, resource_type: :projector)`), and a value outside
+  these lists is kept as given, as iCalendar allows its own extension
+  names. `cutype/1` and `resource_type/1` read them.
+
+  An Agenda resource is **never** RFC 5545's `RESOURCES` property. That
+  is free text on an event: it cannot be booked and cannot be checked
+  for conflicts, and the likeness of the names is the reason to say so.
 
   """
 
@@ -56,6 +80,21 @@ defmodule Agenda.Resource do
           buffer_before: Tempo.Duration.t() | nil,
           buffer_after: Tempo.Duration.t() | nil
         }
+
+  @typedoc """
+  What a resource is as a calendar user: RFC 5545's `CUTYPE`, in
+  lower case. `:unknown` is RFC 5545's `UNKNOWN`, for a resource that
+  does not say.
+
+  """
+  @type cutype :: :individual | :group | :resource | :room | :unknown
+
+  @typedoc """
+  What kind of equipment or space a resource is: RFC 9073's
+  `RESOURCE-TYPE`, in lower case with underscores.
+
+  """
+  @type resource_type :: :room | :projector | :remote_conference_audio | :remote_conference_video
 
   defstruct name: nil,
             attributes: %{},
@@ -225,6 +264,71 @@ defmodule Agenda.Resource do
   @spec attribute(t(), atom()) :: term()
   def attribute(%__MODULE__{attributes: attributes}, name) do
     Map.get(attributes, name)
+  end
+
+  @doc """
+  What `resource` is as a calendar user, iCalendar's `CUTYPE`.
+
+  Read from the `cutype:` attribute. A resource that does not carry
+  one is `:unknown`, RFC 5545's own word for it: Agenda does not guess
+  that a resource with `seats` is a room.
+
+  ### Arguments
+
+  * `resource` is a `t:t/0`.
+
+  ### Returns
+
+  * the `cutype:` attribute, a `t:cutype/0` or another value as it was
+    given, or
+
+  * `:unknown` when the resource has none.
+
+  ### Examples
+
+      iex> boardroom = Agenda.Resource.new("Boardroom", cutype: :room, seats: 8)
+      iex> Agenda.Resource.cutype(boardroom)
+      :room
+
+      iex> Agenda.Resource.cutype(Agenda.Resource.new("Annexe", seats: 4))
+      :unknown
+
+  """
+  @spec cutype(t()) :: cutype() | term()
+  def cutype(%__MODULE__{attributes: attributes}) do
+    Map.get(attributes, :cutype, :unknown)
+  end
+
+  @doc """
+  What kind of equipment or space `resource` is, RFC 9073's
+  `RESOURCE-TYPE`.
+
+  Read from the `resource_type:` attribute.
+
+  ### Arguments
+
+  * `resource` is a `t:t/0`.
+
+  ### Returns
+
+  * the `resource_type:` attribute, a `t:resource_type/0` or another
+    value as it was given, or
+
+  * `nil` when the resource has none.
+
+  ### Examples
+
+      iex> projector = Agenda.Resource.new("Projector 2", cutype: :resource, resource_type: :projector)
+      iex> Agenda.Resource.resource_type(projector)
+      :projector
+
+      iex> Agenda.Resource.resource_type(Agenda.Resource.new("Alice", cutype: :individual))
+      nil
+
+  """
+  @spec resource_type(t()) :: resource_type() | term()
+  def resource_type(%__MODULE__{attributes: attributes}) do
+    Map.get(attributes, :resource_type)
   end
 
   @doc """

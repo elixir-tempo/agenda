@@ -7,8 +7,6 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 
 ## Open
 
-* [ ] **Give `Agenda.Resource` a `cutype:` attribute** — `INDIVIDUAL|GROUP|RESOURCE|ROOM` for invitable resources and RFC 9073 `RESOURCE-TYPE` for equipment; document that an Agenda resource is never RFC 5545's free-text `RESOURCES`.
-
 * [ ] **Map `Agenda.Place` onto `VLOCATION` and record what is lost** — `LOCATION-TYPE` as the conventional attribute; `within` and `travel_time/3` do not survive a round trip because `VLOCATION` does not nest.
 
 * [ ] **Carry recurrence identity through `Agenda.Series`** — a master identity on the series and an instance identity on each expansion, so a round trip does not turn one weekly stand-up into fifty-two unrelated events. Touches `lib/agenda/series.ex`.
@@ -18,6 +16,8 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 * [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/cancel are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
 
 ## Done
+
+* [x] **Give `Agenda.Resource` a calendar user type** — conventional `cutype:` and `resource_type:` attributes, read by `cutype/1` and `resource_type/1`; the moduledoc says a resource is never RFC 5545's `RESOURCES`. 2026-11-01, v0.3.0 (unreleased).
 
 * [x] **Add `Agenda.cancel/2`** — the session-facing name for `release/2`, in `Agenda` and `Agenda.Ledger`; the guides cancel sessions with it. 2026-11-01, v0.3.0 (unreleased).
 
