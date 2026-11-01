@@ -8,6 +8,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.Allocation`'s `:role` field is `:requirement`, and `Agenda.claim/4` and `Agenda.record/4` take `:requirement` where they took `:role`: it names the requirement a resource fills, which iCalendar's `ROLE` does not.
 
+* `Agenda.Session.open_roles/1` is `open_requirements/1`.
+
 ### Added
 
 * `Agenda.free_busy/2` gives each resource's claims as `{:busy | :tentative, interval}` pairs, iCalendar's `BUSY` and `BUSY-TENTATIVE`, where `busy/2` gives the intervals alone.

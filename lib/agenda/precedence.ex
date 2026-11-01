@@ -38,6 +38,18 @@ defmodule Agenda.Precedence do
   `new/3` builds one, and `between/3` finds the precedence relating two
   sessions, whichever way round they are given.
 
+  ### In iCalendar
+
+  A precedence is RFC 9253's `RELATED-TO;RELTYPE=FINISHTOSTART`, under
+  which a task "cannot start until" its predecessor finishes, and
+  `:gap` is that relation's `GAP` parameter under the same name: the
+  lag between the two. The names match because the idea does, so keep
+  them.
+
+  Two things differ. RFC 9253 allows a negative `GAP`, a lead, where
+  `:gap` is the least time that must pass; and it has nothing that
+  caps the lag, so an export drops `:within`.
+
   """
 
   alias Agenda.Availability

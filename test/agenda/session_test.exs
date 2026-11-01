@@ -14,7 +14,7 @@ defmodule Agenda.SessionTest do
         |> Session.roster(:speaker, [])
 
       assert session.requirements == []
-      assert Session.open_roles(session) == []
+      assert Session.open_requirements(session) == []
       assert Session.rosters(session) == []
     end
 

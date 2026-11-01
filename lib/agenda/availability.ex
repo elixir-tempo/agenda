@@ -29,6 +29,20 @@ defmodule Agenda.Availability do
   > *"The boardroom is open for five days from the 15th; across the
   > 15th and 16th that leaves two free days."*
 
+  ### In iCalendar
+
+  Open hours are RFC 7953's `AVAILABLE` components inside a
+  `VAVAILABILITY`: periods of free time, each with a `DTSTART`, a
+  `DTEND` or `DURATION`, and an `RRULE` when it repeats.
+  `from_ical/1` reads them. An export writes them the same way, one
+  `AVAILABLE` for each span or recurrence of a resource's open hours,
+  and leaves the time outside them to the `VAVAILABILITY`'s default
+  `BUSYTYPE`, `BUSY-UNAVAILABLE`.
+
+  What is taken is not written here: the ledger's claims are
+  `FREEBUSY` time, `BUSY` or `BUSY-TENTATIVE`, as
+  `Agenda.Ledger.free_busy/2` gives them.
+
   """
 
   alias Agenda.Resource

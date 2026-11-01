@@ -16,8 +16,30 @@ defmodule Agenda.Session do
   `new/2` builds one. `duration/2` and `window/2` say how long it runs
   and where it must fall; `needs/3`, `roster/3` and `invite/3` add what
   it requires and who may attend, and `prefers/2` adds soft preferences.
-  `rosters/1`, `open_roles/1` and `named_resources/1` read its
+  `rosters/1`, `open_requirements/1` and `named_resources/1` read its
   requirements back.
+
+  ### In iCalendar
+
+  A session is a `VEVENT`, and what it states lines up with iCalendar
+  and CalDAV as it is, with nothing renamed:
+
+  * **`duration`** is `DURATION`.
+
+  * **`window`** is the span planning searches, as CalDAV's
+    `time-range` is the span a query searches.
+
+  * **A roster and an invitation** are the two kinds of attendee.
+    `roster/3` is `ATTENDEE;ROLE=REQ-PARTICIPANT`: the session cannot
+    be held without them, and they are allocated. `invite/3` is
+    `ATTENDEE;ROLE=OPT-PARTICIPANT`: they make a time better and are
+    never allocated, because an optional attendee who can cost a
+    placement is not optional.
+
+  * **`Agenda.Arrangement`'s `attending`** has no counterpart. It says
+    which invitees a candidate time suits, a planning result rather
+    than a calendar fact; the nearest thing once the session is held is
+    `PARTSTAT=ACCEPTED`.
 
   """
 
@@ -309,12 +331,12 @@ defmodule Agenda.Session do
       iex> session =
       ...>   Agenda.Session.new("Review")
       ...>   |> Agenda.Session.needs(:room, seats: 8)
-      iex> Enum.map(Agenda.Session.open_roles(session), & &1.name)
+      iex> Enum.map(Agenda.Session.open_requirements(session), & &1.name)
       [:room]
 
   """
-  @spec open_roles(t()) :: [Requirement.t()]
-  def open_roles(%__MODULE__{requirements: requirements}) do
+  @spec open_requirements(t()) :: [Requirement.t()]
+  def open_requirements(%__MODULE__{requirements: requirements}) do
     Enum.filter(requirements, &Enum.empty?(&1.roster))
   end
 

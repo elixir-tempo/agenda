@@ -18,6 +18,11 @@ is the cheapest this will ever be.
 
 ## Already aligned — record the mapping, change nothing
 
+Done 2026-11-01: each is recorded in an "In iCalendar" section of the
+moduledoc it concerns (`Agenda.Precedence`, `Agenda.Availability`,
+`Agenda.Session`, `Agenda.Ledger`). RFC 9253's `GAP` may be negative and
+has no cap, so `:gap` is its non-negative case and `:within` does not export.
+
 * `Agenda.precede/4`'s `:gap` option is RFC 9253's `GAP` parameter under the
   same name, and the relation itself is `RELATED-TO;RELTYPE=FINISHTOSTART`.
   This is an exact match arrived at independently; say so in

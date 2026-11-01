@@ -37,6 +37,16 @@ defmodule Agenda.Ledger do
   > *"Plan against what is already allocated, then allocate the best
   > option."*
 
+  ### In iCalendar
+
+  A session's life in the ledger is its `STATUS`: `hold/3` makes it
+  `TENTATIVE`, `confirm/2` `CONFIRMED`, and `cancel/2` `CANCELLED`
+  (`release/2` is the same freeing, named from the resources' side).
+  The concepts match one for one. A hold's `held_until` has no
+  counterpart: iCalendar can say a session is tentative, not until
+  when, so an export drops the expiry and `expire/2` has nothing to
+  act on afterwards.
+
   """
 
   alias Agenda.Allocation

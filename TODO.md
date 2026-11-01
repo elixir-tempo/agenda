@@ -5,11 +5,9 @@ each change and for each deliberate divergence, is in
 [plans/icalendar-vocabulary.md](plans/icalendar-vocabulary.md). A rename is a
 breaking change, recorded in the CHANGELOG for the next minor release.
 
-## Open
-
-* [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/cancel are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
-
 ## Done
+
+* [x] **Record the mappings that already line up** — "In iCalendar" sections in the `Precedence`, `Availability`, `Session` and `Ledger` moduledocs; `Session.open_roles/1`, which the rename missed, is `open_requirements/1`. 2026-11-01, v0.3.0 (unreleased).
 
 * [x] **Record `Agenda.Track`'s iCalendar export** — the moduledoc names RFC 9253's `REFID` for the grouping and a minted `CONCEPT` for the classification, and says the no-overlap rule is lost. 2026-11-01.
 

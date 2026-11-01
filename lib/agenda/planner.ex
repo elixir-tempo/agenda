@@ -256,14 +256,14 @@ defmodule Agenda.Planner do
   # Alice, who needs step-free access, rules out inaccessible rooms.
   defp induced_requirements(%Session{} = session, named) do
     session
-    |> Session.open_roles()
+    |> Session.open_requirements()
     |> Enum.map(&Requirement.induce(&1, named))
   end
 
   defp eligible_by_requirement(session, requirements, pool) do
     candidates = Enum.map(requirements, &{&1, Requirement.eligible(&1, pool)})
 
-    case Enum.split_with(candidates, fn {_role, eligible} -> match?([_ | _], eligible) end) do
+    case Enum.split_with(candidates, fn {_requirement, eligible} -> match?([_ | _], eligible) end) do
       {filled, []} -> {:ok, filled}
       {_filled, empty} -> {:error, no_candidates(session, empty, pool)}
     end
@@ -278,7 +278,7 @@ defmodule Agenda.Planner do
     Infeasible.new(session.name, reasons)
   end
 
-  defp nearest_misses(_role, []) do
+  defp nearest_misses(_requirement, []) do
     "the pool is empty"
   end
 
