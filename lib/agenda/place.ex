@@ -13,10 +13,28 @@ defmodule Agenda.Place do
   the second question decides whether a programme is workable.
   `separation/2` is the primitive that answers it.
 
+  ### As an iCalendar `VLOCATION`
+
+  RFC 9073's `VLOCATION` is the nearest iCalendar has to a place, and
+  the mapping loses the very thing the tree is for:
+
+  * **`name`** is `VLOCATION`'s `NAME`.
+
+  * **`location_type`** is its `LOCATION-TYPE`, the RFC 4589 location
+    types (`:office`, `:hotel`, `:classroom`, …) written as atoms. It
+    is no part of a place's identity, which is its chain of names.
+
+  * **`within` has no equivalent.** A `VLOCATION` does not nest, so an
+    export writes a place alone, or the places on its `path/1` as
+    separate `VLOCATION`s with nothing to say which holds which.
+    `contains?/2`, `common_ancestor/2`, `separation/2` and
+    `Agenda.travel_time/3`, all derived from the nesting, do not
+    survive a round trip: a place read back from iCalendar is a root.
+
   """
 
   @typedoc "A place in the containment tree."
-  @type t :: %__MODULE__{name: String.t(), within: t() | nil}
+  @type t :: %__MODULE__{name: String.t(), within: t() | nil, location_type: [atom()]}
 
   @typedoc """
   How far apart two places are: `0` when they are the same place, `n`
@@ -26,7 +44,7 @@ defmodule Agenda.Place do
   """
   @type separation :: non_neg_integer() | :disjoint
 
-  defstruct [:name, :within]
+  defstruct name: nil, within: nil, location_type: []
 
   @doc """
   Build a place, optionally inside another.
@@ -42,6 +60,11 @@ defmodule Agenda.Place do
   * `:within` is the enclosing `t:t/0`. The default is `nil`, making
     this place a root.
 
+  * `:location_type` is what kind of place it is, RFC 9073's
+    `LOCATION-TYPE`: a list of RFC 4589 location types written as
+    atoms, such as `[:office]` or `[:hotel, :restaurant]`. One atom is
+    a list of one. The default is `[]`.
+
   ### Returns
 
   * a `t:t/0`.
@@ -53,10 +76,20 @@ defmodule Agenda.Place do
       iex> level_2.within.name
       "Sydney Convention Centre"
 
+      iex> Agenda.Place.new("Head office", location_type: :office).location_type
+      [:office]
+
   """
   @spec new(String.t(), keyword()) :: t()
   def new(name, options \\ []) when is_binary(name) do
-    %__MODULE__{name: name, within: Keyword.get(options, :within)}
+    %__MODULE__{
+      name: name,
+      within: Keyword.get(options, :within),
+      location_type:
+        options
+        |> Keyword.get(:location_type, [])
+        |> List.wrap()
+    }
   end
 
   @doc """

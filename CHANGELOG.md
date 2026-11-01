@@ -16,6 +16,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.Resource.cutype/1` and `resource_type/1` read the conventional `cutype:` and `resource_type:` attributes, iCalendar's `CUTYPE` and RFC 9073's `RESOURCE-TYPE`; a resource with no `cutype:` is `:unknown`.
 
+* `Agenda.Place.new/2` takes `:location_type`, RFC 9073's `LOCATION-TYPE`; the `Agenda.Place` moduledoc maps a place onto `VLOCATION` and says what an export loses.
+
 ## [v0.2.0] — 2026-10-28
 
 ### Breaking changes

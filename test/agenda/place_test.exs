@@ -107,4 +107,36 @@ defmodule Agenda.PlaceTest do
       assert Place.root(east_wing) == sydney
     end
   end
+
+  describe "location_type" do
+    test "is a list of location types, one atom being a list of one" do
+      assert Place.new("Head office", location_type: [:office]).location_type == [:office]
+      assert Place.new("Head office", location_type: :office).location_type == [:office]
+
+      assert Place.new("Grand", location_type: [:hotel, :restaurant]).location_type ==
+               [:hotel, :restaurant]
+    end
+
+    test "is empty when not given, and is the place's own, not its container's" do
+      campus = Place.new("Campus", location_type: :campus)
+      room = Place.new("Room 101", within: campus)
+
+      assert room.location_type == []
+      assert Agenda.place("Level 2").location_type == []
+    end
+
+    test "does not change how places nest", context do
+      typed = Place.new("Level 2", within: context.sydney, location_type: :office)
+
+      assert Place.contains?(context.sydney, typed)
+      assert Place.separation(typed, context.level_3) == 1
+    end
+
+    test "is no part of a place's identity", context do
+      typed = Place.new("Level 2", within: context.sydney, location_type: :office)
+
+      assert Place.separation(typed, context.level_2) == 0
+      assert Place.contains?(typed, context.east_wing)
+    end
+  end
 end

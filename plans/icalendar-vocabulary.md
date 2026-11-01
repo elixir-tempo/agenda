@@ -115,6 +115,10 @@ is the cheapest this will ever be.
    which is derived from the nesting, does not survive the round trip at
    all. Better to write that down than to have it discovered.
 
+   Done 2026-11-01: `Place` had no attributes, so `LOCATION-TYPE` is a
+   `:location_type` field (a list of RFC 4589 types as atoms), and the
+   mapping and its losses are in the `Agenda.Place` moduledoc.
+
 6. **Carry recurrence identity through `Agenda.Series`.** `Series.expand/3`
    materialises a recurrence into N independent sessions. iCalendar keeps one
    component with an `RRULE` plus overrides keyed by `RECURRENCE-ID`, and

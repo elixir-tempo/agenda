@@ -140,6 +140,10 @@ defmodule Agenda do
   * `:within` is the enclosing `t:Agenda.Place.t/0`. The default is `nil`, making
     this place a root.
 
+  * `:location_type` is what kind of place it is, iCalendar's
+    `LOCATION-TYPE`, as a list of atoms such as `[:office]`. The default
+    is `[]`.
+
   ### Returns
 
   * a `t:Agenda.Place.t/0`.
