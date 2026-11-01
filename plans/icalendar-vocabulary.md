@@ -78,6 +78,11 @@ is the cheapest this will ever be.
    exported: a caller planning around somebody else's tentative hold should
    be able to see that it is tentative. Touches `lib/agenda/ledger.ex:859`.
 
+   Decided 2026-11-01: a new `Agenda.free_busy/2` returns the type with each
+   interval, so `busy/2`, which planning reads, keeps its shape.
+   `BUSY-UNAVAILABLE` is not the ledger's to give: open hours are the
+   resource's, and `Agenda.Availability.free/2` subtracts them.
+
 3. **Add `Agenda.cancel/2` as the session-facing name for `release/2`.**
    `release` describes what happens to the *resources*; the calendar word for
    what happens to the *session* is cancelled, and hold/confirm/cancel is the

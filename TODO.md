@@ -7,8 +7,6 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 
 ## Open
 
-* [ ] **Teach `Agenda.busy/2` the busy-type distinction** — return `BUSY` / `BUSY-TENTATIVE` / `BUSY-UNAVAILABLE` alongside each interval, or select by a `:type` option, instead of discarding `held_until` in `Ledger.busy/2`.
-
 * [ ] **Add `Agenda.cancel/2`** — the session-facing name for `release/2`, completing the hold/confirm/cancel trio; keep `release/2` and delegate.
 
 * [ ] **Give `Agenda.Resource` a `cutype:` attribute** — `INDIVIDUAL|GROUP|RESOURCE|ROOM` for invitable resources and RFC 9073 `RESOURCE-TYPE` for equipment; document that an Agenda resource is never RFC 5545's free-text `RESOURCES`.
@@ -22,5 +20,7 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 * [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/release are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
 
 ## Done
+
+* [x] **Teach Agenda the busy-type distinction** — `Agenda.free_busy/2` gives `:busy` or `:tentative` with each interval; `busy/2` is unchanged for planning, and `BUSY-UNAVAILABLE` stays with `Availability`. 2026-11-01, v0.3.0 (unreleased).
 
 * [x] **Rename `Allocation.role` to `Allocation.requirement`** — the field, the `:requirement` option of `claim/4` and `record/4`, and the prose. 2026-11-01, v0.3.0 (unreleased).

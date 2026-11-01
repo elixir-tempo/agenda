@@ -58,6 +58,13 @@ defmodule Agenda.Ledger do
   """
   @type change :: {:keep | :release | :allocate, Allocation.t()}
 
+  @typedoc """
+  Whether busy time is firm or only held: iCalendar's `BUSY` and
+  `BUSY-TENTATIVE` (RFC 5545 `FBTYPE`, RFC 7953 `BUSYTYPE`).
+
+  """
+  @type busy_type :: :busy | :tentative
+
   defstruct sessions: %{}
 
   @doc """
@@ -917,6 +924,85 @@ defmodule Agenda.Ledger do
   """
   @spec busy(t(), keyword()) :: %{optional(String.t()) => [Tempo.t()]}
   def busy(%__MODULE__{} = ledger, options \\ []) do
+    ledger
+    |> claims(options)
+    |> Enum.group_by(& &1.resource, & &1.interval)
+  end
+
+  @doc """
+  What each resource is already claimed for, and whether each claim is
+  firm or only held.
+
+  `busy/2` gives the intervals alone, as planning wants them. This
+  keeps the distinction iCalendar's free/busy draws: a booking is
+  `:busy`, a hold that has not been confirmed is `:tentative`. A
+  caller planning around somebody else's hold can see that it is one.
+
+  Time outside a resource's open hours, iCalendar's
+  `BUSY-UNAVAILABLE`, is not the ledger's to know: it is the resource's
+  own, and `Agenda.Availability.free/2` subtracts it.
+
+  ### Arguments
+
+  * `ledger` is a `t:t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:except` is a session name, or a list of them, whose allocations
+    are ignored, as for `busy/2`.
+
+  ### Returns
+
+  * a map of resource name to `{busy_type, interval}` pairs, each
+    resource's ordered by when they begin. See `t:busy_type/0`.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> boardroom = Agenda.resource("Boardroom")
+      iex> review = %Agenda.Arrangement{
+      ...>   session: "Review",
+      ...>   interval: ~o"2026-06-16T10:00:00/2026-06-16T11:00:00",
+      ...>   allocations: %{room: [boardroom]}
+      ...> }
+      iex> retro = %Agenda.Arrangement{
+      ...>   session: "Retro",
+      ...>   interval: ~o"2026-06-16T14:00:00/2026-06-16T15:00:00",
+      ...>   allocations: %{room: [boardroom]}
+      ...> }
+      iex> {:ok, ledger} = Agenda.Ledger.allocate(Agenda.Ledger.new(), review)
+      iex> {:ok, ledger} = Agenda.Ledger.hold(ledger, retro, until: "2026-06-15T17:00:00")
+      iex> ledger
+      ...> |> Agenda.Ledger.free_busy()
+      ...> |> Map.fetch!("Boardroom")
+      ...> |> Enum.map(fn {type, _interval} -> type end)
+      [:busy, :tentative]
+
+  > *"The boardroom is booked for the review and held for the retro."*
+
+  """
+  @spec free_busy(t(), keyword()) :: %{optional(String.t()) => [{busy_type(), Tempo.t()}]}
+  def free_busy(%__MODULE__{} = ledger, options \\ []) do
+    ledger
+    |> claims(options)
+    |> Enum.group_by(& &1.resource, &{busy_type(&1), &1.interval})
+    |> Map.new(fn {resource, typed} ->
+      {resource, Enum.sort_by(typed, &elem(&1, 1), Tempo)}
+    end)
+  end
+
+  defp busy_type(%Allocation{held_until: nil}) do
+    :busy
+  end
+
+  defp busy_type(%Allocation{}) do
+    :tentative
+  end
+
+  # Every allocation but those of the sessions `:except` names.
+  defp claims(ledger, options) do
     except =
       options
       |> Keyword.get(:except, [])
@@ -926,7 +1012,6 @@ defmodule Agenda.Ledger do
     ledger
     |> to_list()
     |> Enum.reject(&MapSet.member?(except, &1.session))
-    |> Enum.group_by(& &1.resource, & &1.interval)
   end
 
   @doc """

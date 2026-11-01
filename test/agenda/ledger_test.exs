@@ -33,6 +33,12 @@ defmodule Agenda.LedgerTest do
     }
   end
 
+  defp types(free_busy, resource) do
+    free_busy
+    |> Map.get(resource, [])
+    |> Enum.map(&elem(&1, 0))
+  end
+
   defp labels(changes) do
     changes
     |> Enum.map(&elem(&1, 0))
@@ -131,6 +137,57 @@ defmodule Agenda.LedgerTest do
 
       assert Ledger.busy(ledger, except: "Review")
              |> Map.keys() == ["Annexe"]
+    end
+  end
+
+  describe "free_busy/2 — firm or only held" do
+    test "a booking is busy and a hold is tentative, in the order they begin", context do
+      {:ok, ledger} =
+        Ledger.hold(Ledger.new(), review(context, session: "Retro", interval: context.thursday),
+          until: "2026-06-15T17:00:00"
+        )
+
+      {:ok, ledger} = Ledger.allocate(ledger, review(context))
+      free_busy = Ledger.free_busy(ledger)
+
+      assert types(free_busy, "Boardroom") == [:busy, :tentative]
+
+      assert free_busy
+             |> Map.fetch!("Boardroom")
+             |> Enum.map(&elem(&1, 1)) == [context.tuesday, context.thursday]
+    end
+
+    test "a confirmed hold is busy", context do
+      {:ok, ledger} = Ledger.hold(Ledger.new(), review(context), until: "2026-06-15T17:00:00")
+      {:ok, ledger} = Ledger.confirm(ledger, "Review")
+
+      assert types(Ledger.free_busy(ledger), "Alice") == [:busy]
+    end
+
+    test "has the resources and intervals busy/2 has", context do
+      {:ok, ledger} = Ledger.allocate(Ledger.new(), review(context))
+
+      {:ok, ledger} =
+        Ledger.hold(
+          ledger,
+          review(context, session: "Standup", allocations: %{room: [context.annexe]}),
+          until: "2026-06-15T17:00:00"
+        )
+
+      untyped =
+        ledger
+        |> Ledger.free_busy()
+        |> Map.new(fn {resource, typed} -> {resource, Enum.map(typed, &elem(&1, 1))} end)
+
+      assert untyped == Ledger.busy(ledger)
+    end
+
+    test ":except hides a session, and an empty ledger is nothing busy", context do
+      {:ok, ledger} = Ledger.hold(Ledger.new(), review(context), until: "2026-06-15T17:00:00")
+
+      assert Ledger.free_busy(ledger, except: "Review") == %{}
+      assert Ledger.free_busy(Ledger.new()) == %{}
+      assert Agenda.free_busy(ledger) == Ledger.free_busy(ledger)
     end
   end
 

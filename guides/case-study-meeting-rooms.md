@@ -173,6 +173,15 @@ Agenda.holds(ledger)
 
 Priya and Tom are held too, which is what stops a second meeting being offered a slot they cannot attend. A hold is per-allocation, exactly as a booking is.
 
+A calendar showing the boardroom's day draws a hold differently from a booking, as iCalendar's free/busy does with `BUSY-TENTATIVE`. `free_busy/2` keeps that distinction where `busy/2`, which only planning reads, drops it:
+
+```elixir
+Agenda.free_busy(ledger)
+|> Map.fetch!("Boardroom")
+|> Enum.map(fn {type, _interval} -> type end)
+#=> [:tentative]
+```
+
 When the colleague is found, confirm it:
 
 ```elixir

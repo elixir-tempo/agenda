@@ -1244,6 +1244,38 @@ defmodule Agenda do
   defdelegate busy(ledger, options \\ []), to: Ledger
 
   @doc """
+  What each resource is already claimed for, and whether each claim is
+  firm (`:busy`) or only held (`:tentative`). Delegates to
+  `Agenda.Ledger.free_busy/2`.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `options` is a keyword list of options.
+
+  ### Options
+
+  * `:except` is a session name, or a list of them, whose allocations
+    are ignored, as for `busy/2`.
+
+  ### Returns
+
+  * a map of resource name to `{busy_type, interval}` pairs, each
+    resource's ordered by when they begin. See
+    `t:Agenda.Ledger.busy_type/0`.
+
+  ### Examples
+
+      iex> Agenda.free_busy(Agenda.ledger())
+      %{}
+
+  """
+  @spec free_busy(Ledger.t(), keyword()) ::
+          %{optional(String.t()) => [{Ledger.busy_type(), Tempo.t()}]}
+  defdelegate free_busy(ledger, options \\ []), to: Ledger
+
+  @doc """
   How many allocations a ledger holds. Delegates to
   `Agenda.Ledger.count/1`.
 
