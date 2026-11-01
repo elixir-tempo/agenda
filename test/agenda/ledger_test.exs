@@ -186,7 +186,7 @@ defmodule Agenda.LedgerTest do
       assert labels(changes) == %{allocate: 3}
     end
 
-    test "the same resource in a different role is not the same binding", context do
+    test "the same resource in a different requirement is not the same binding", context do
       {:ok, ledger} =
         Ledger.allocate(Ledger.new(), review(context, allocations: %{room: [context.boardroom]}))
 
@@ -212,7 +212,7 @@ defmodule Agenda.LedgerTest do
   end
 
   describe "diff/3 — order independence" do
-    test "resource order within a role does not change the changeset", context do
+    test "resource order within a requirement does not change the changeset", context do
       {:ok, ledger} = Ledger.allocate(Ledger.new(), review(context))
 
       reordered =

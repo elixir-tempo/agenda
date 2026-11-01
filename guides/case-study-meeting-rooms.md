@@ -96,7 +96,7 @@ Agenda.needs(:room, seats: at_least(10), video_conferencing: true)
 
 The attic satisfies every stated requirement. It is excluded because of who is attending, and nobody had to remember to check. That is the difference between a requirement being modelled and a requirement being a habit.
 
-## Two roles at once: a room *and* the kit
+## Two requirements at once: a room *and* the kit
 
 Portable equipment is a resource like any other. It has no seats; it has a projector:
 
@@ -121,7 +121,7 @@ Agenda.explain(hd(for_workshop))
 
 > *"The workshop needs a room for fifteen and a projector; four two-hour windows work, the first at nine in the training room with the cart."*
 
-Two independent roles, each satisfied by a different resource, both booked together and both freed together. Four options rather than eight because the session runs two hours instead of one — the cart happens to be free whenever the room is.
+Two independent requirements, each satisfied by a different resource, both booked together and both freed together. Four options rather than eight because the session runs two hours instead of one — the cart happens to be free whenever the room is.
 
 ## The ledger makes the second booking see the first
 
@@ -226,6 +226,6 @@ Re-planning to exactly where it already is yields nothing but `:keep`. The chang
 
 * **Put a person's access needs on the person.** `requires:` turns "somebody must remember" into "the room is not eligible".
 
-* **Ask for several roles in one session.** A room and a projector are two `needs`, booked and released as one unit.
+* **Ask for several requirements in one session.** A room and a projector are two `needs`, booked and released as one unit.
 
 * **Derive busy time, never store it.** That is what makes `release/2` a one-liner and stale free/busy records impossible.

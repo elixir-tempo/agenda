@@ -48,7 +48,7 @@ The `~o` sigil parses ISO 8601 at compile time. For strings that arrive at runti
 
 * **Session** — the thing being scheduled: how long it runs, the window it must fall inside, and what it requires. A meeting, a talk, a shift, a task.
 
-* **Arrangement** — one candidate way to hold a session: a time, and a resource for every role.
+* **Arrangement** — one candidate way to hold a session: a time, and a resource for every requirement.
 
 * **Allocation** — one resource bound to one session over one interval. The **ledger** is the set of them.
 

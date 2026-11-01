@@ -124,9 +124,9 @@ defmodule Agenda.Planner do
 
   def plan(%Session{} = session, pool, options) when is_list(pool) do
     named = Session.named_resources(session)
-    roles = induced_roles(session, named)
+    requirements = induced_requirements(session, named)
 
-    with {:ok, candidates} <- eligible_by_role(session, roles, pool),
+    with {:ok, candidates} <- eligible_by_requirement(session, requirements, pool),
          {:ok, window} <- Availability.normalise(session.window),
          {:ok, duration} <- Availability.normalise(session.duration),
          {:ok, roster_free} <- co_free(named, window, window, options) do
@@ -152,7 +152,7 @@ defmodule Agenda.Planner do
   Both kinds of demand are searched, which matters because the second
   is invisible at the call site:
 
-  * `{:needs, role, attribute}` — an attribute the session asked for,
+  * `{:needs, name, attribute}` — an attribute the session asked for,
     as in `Agenda.Session.needs(session, :room, seats: at_least(8))`.
 
   * `{:requires, resource, attribute}` — an attribute a rostered
@@ -252,16 +252,16 @@ defmodule Agenda.Planner do
 
   # --- stage 1: eligibility --------------------------------------
 
-  # A named resource's own `requires` tighten every open role: booking
+  # A named resource's own `requires` tighten every open requirement: booking
   # Alice, who needs step-free access, rules out inaccessible rooms.
-  defp induced_roles(%Session{} = session, named) do
+  defp induced_requirements(%Session{} = session, named) do
     session
     |> Session.open_roles()
     |> Enum.map(&Requirement.induce(&1, named))
   end
 
-  defp eligible_by_role(session, roles, pool) do
-    candidates = Enum.map(roles, &{&1, Requirement.eligible(&1, pool)})
+  defp eligible_by_requirement(session, requirements, pool) do
+    candidates = Enum.map(requirements, &{&1, Requirement.eligible(&1, pool)})
 
     case Enum.split_with(candidates, fn {_role, eligible} -> match?([_ | _], eligible) end) do
       {filled, []} -> {:ok, filled}
@@ -271,8 +271,8 @@ defmodule Agenda.Planner do
 
   defp no_candidates(session, empty, pool) do
     reasons =
-      Enum.map(empty, fn {role, _none} ->
-        "nothing satisfies #{role.name}: " <> nearest_misses(role, pool)
+      Enum.map(empty, fn {requirement, _none} ->
+        "nothing satisfies #{requirement.name}: " <> nearest_misses(requirement, pool)
       end)
 
     Infeasible.new(session.name, reasons)
@@ -282,15 +282,15 @@ defmodule Agenda.Planner do
     "the pool is empty"
   end
 
-  defp nearest_misses(role, pool) do
+  defp nearest_misses(requirement, pool) do
     pool
-    |> Enum.map(fn resource -> "#{resource.name} (#{miss(role, resource)})" end)
+    |> Enum.map(fn resource -> "#{resource.name} (#{miss(requirement, resource)})" end)
     |> Enum.take(3)
     |> Enum.join(", ")
   end
 
-  defp miss(role, resource) do
-    role
+  defp miss(requirement, resource) do
+    requirement
     |> Requirement.unmet(resource)
     |> Enum.join(", ")
   end
@@ -359,14 +359,16 @@ defmodule Agenda.Planner do
     end)
   end
 
-  # One resource per open role: the cartesian product across roles.
-  # With the usual single role this is just the candidate list.
+  # One resource per open requirement: the cartesian product across
+  # requirements. With the usual single requirement this is just the candidate list.
   defp combinations([]) do
     [%{}]
   end
 
-  defp combinations([{role, eligible} | rest]) do
-    for choice <- eligible, tail <- combinations(rest), do: Map.put(tail, role.name, [choice])
+  defp combinations([{requirement, eligible} | rest]) do
+    for choice <- eligible,
+        tail <- combinations(rest),
+        do: Map.put(tail, requirement.name, [choice])
   end
 
   defp rosters_of(%Session{} = session) do
@@ -556,8 +558,8 @@ defmodule Agenda.Planner do
   defp attendance(%Session{} = session, options) do
     case Availability.normalise(session.window) do
       {:ok, window} ->
-        Map.new(session.invitees, fn {role, resources} ->
-          {role, Enum.map(resources, &{&1, free_or_nothing(&1, window, options)})}
+        Map.new(session.invitees, fn {name, resources} ->
+          {name, Enum.map(resources, &{&1, free_or_nothing(&1, window, options)})}
         end)
 
       {:error, _unreadable} ->
@@ -578,13 +580,13 @@ defmodule Agenda.Planner do
 
   defp attended(%Arrangement{} = arrangement, invited) do
     available =
-      Map.new(invited, fn {role, pairs} ->
+      Map.new(invited, fn {name, pairs} ->
         free_now =
           for {resource, free} <- pairs,
               free_throughout?(free, arrangement.interval),
               do: resource
 
-        {role, free_now}
+        {name, free_now}
       end)
 
     count =

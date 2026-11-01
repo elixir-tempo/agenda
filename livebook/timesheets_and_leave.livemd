@@ -158,7 +158,7 @@ record_day = fn ledger, day, tag ->
   # *instants* it contains, so `Enum` here would walk 25,200 seconds
   # rather than two blocks.
   Enum.reduce(Tempo.IntervalSet.members(blocks), ledger, fn block, acc ->
-    {:ok, acc} = Agenda.record(acc, dana, block, role: :consultant, tag: tag)
+    {:ok, acc} = Agenda.record(acc, dana, block, requirement: :consultant, tag: tag)
     acc
   end)
 end
@@ -314,7 +314,7 @@ A ten-hour Monday, against a seven-hour ceiling:
 ```elixir
 {:ok, long_day} =
   Agenda.record(Agenda.ledger(), dana, ~o"2026-08-10T09:00:00/2026-08-10T19:00:00",
-    role: :consultant,
+    requirement: :consultant,
     tag: acme
   )
 

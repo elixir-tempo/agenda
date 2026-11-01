@@ -173,7 +173,7 @@ defmodule Agenda.Ledger do
 
   * `:tag` is what the claim is for, as a `t:Agenda.Allocation.tag/0`.
 
-  * `:role` is the role the resource is filling. The default is
+  * `:requirement` is the requirement the resource is filling. The default is
     `:resource`.
 
   * `:session` names the claim, and is what `release/2` takes. The
@@ -255,7 +255,7 @@ defmodule Agenda.Ledger do
 
   * `:tag` is what the time was for, as a `t:Agenda.Allocation.tag/0`.
 
-  * `:role` is the role the resource filled. The default is
+  * `:requirement` is the requirement the resource filled. The default is
     `:resource`.
 
   * `:session` names the record, and is what `release/2` takes. The
@@ -308,14 +308,14 @@ defmodule Agenda.Ledger do
     end
   end
 
-  # One resource in one role over one span. Shared so that a booking
+  # One resource in one requirement over one span. Shared so that a booking
   # and a recorded hour are the same shape in the ledger — which is
   # what lets the one block the other.
   defp holding(resource, interval, options) do
     %Arrangement{
       session: Keyword.get(options, :session, Written.span(interval)),
       interval: interval,
-      allocations: %{Keyword.get(options, :role, :resource) => [resource]}
+      allocations: %{Keyword.get(options, :requirement, :resource) => [resource]}
     }
   end
 
@@ -705,7 +705,7 @@ defmodule Agenda.Ledger do
 
   ### Returns
 
-  * the allocations, ordered by session then role then resource so the
+  * the allocations, ordered by session then requirement then resource so the
     listing is stable.
 
   ### Examples
@@ -824,9 +824,9 @@ defmodule Agenda.Ledger do
            interval: hd(allocations).interval,
            allocations:
              allocations
-             |> Enum.group_by(& &1.role)
-             |> Map.new(fn {role, held} ->
-               {role, Enum.map(held, &Map.fetch!(known, &1.resource))}
+             |> Enum.group_by(& &1.requirement)
+             |> Map.new(fn {requirement, held} ->
+               {requirement, Enum.map(held, &Map.fetch!(known, &1.resource))}
              end),
            series: hd(allocations).series
          }}

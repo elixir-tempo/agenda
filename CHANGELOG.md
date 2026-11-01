@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0] — Unreleased
+
+### Breaking changes
+
+* `Agenda.Allocation`'s `:role` field is `:requirement`, and `Agenda.claim/4` and `Agenda.record/4` take `:requirement` where they took `:role`: it names the requirement a resource fills, which iCalendar's `ROLE` does not.
+
 ## [v0.2.0] — 2026-10-28
 
 ### Breaking changes

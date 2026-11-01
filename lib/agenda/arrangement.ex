@@ -1,7 +1,7 @@
 defmodule Agenda.Arrangement do
   @moduledoc """
   One way a session could be held — a time, and a resource for every
-  role.
+  requirement.
 
   Planning returns arrangements ranked best-first rather than a single
   answer, because "best" depends on preferences the caller may want to
@@ -9,8 +9,8 @@ defmodule Agenda.Arrangement do
   allocated.
 
   `resources/1` and `resources/2` give the resources it allocates,
-  across every role or in one, and `resource/2` the single resource
-  filling a role. `explain/1` describes it in a line, and `compare/2`
+  across every requirement or in one, and `resource/2` the single
+  resource filling a requirement. `explain/1` describes it in a line, and `compare/2`
   orders arrangements by time, so
   `Enum.sort(arrangements, Agenda.Arrangement)` puts them in time order.
 
@@ -37,7 +37,7 @@ defmodule Agenda.Arrangement do
             series: nil
 
   @doc """
-  Every resource allocated, across all roles.
+  Every resource allocated, across all requirements.
 
   ### Arguments
 
@@ -45,7 +45,7 @@ defmodule Agenda.Arrangement do
 
   ### Returns
 
-  * the allocated resources, role order preserved.
+  * the allocated resources, requirement order preserved.
 
   ### Examples
 
@@ -58,8 +58,8 @@ defmodule Agenda.Arrangement do
   @spec resources(t()) :: [Resource.t()]
   def resources(%__MODULE__{allocations: allocations}) do
     allocations
-    |> Enum.sort_by(fn {role, _resources} -> role end)
-    |> Enum.flat_map(fn {_role, resources} -> resources end)
+    |> Enum.sort_by(fn {name, _resources} -> name end)
+    |> Enum.flat_map(fn {_name, resources} -> resources end)
   end
 
   @doc """
@@ -87,36 +87,36 @@ defmodule Agenda.Arrangement do
   """
   @spec explain(t()) :: String.t()
   def explain(%__MODULE__{} = arrangement) do
-    roles =
+    filled =
       arrangement.allocations
-      |> Enum.sort_by(fn {role, _resources} -> role end)
-      |> Enum.map_join(", ", fn {role, resources} ->
-        "#{role}: #{Enum.map_join(resources, ", ", & &1.name)}"
+      |> Enum.sort_by(fn {name, _resources} -> name end)
+      |> Enum.map_join(", ", fn {name, resources} ->
+        "#{name}: #{Enum.map_join(resources, ", ", & &1.name)}"
       end)
 
-    "#{Written.span(arrangement.interval)} — #{roles}"
+    "#{Written.span(arrangement.interval)} — #{filled}"
   end
 
   @doc """
-  The resources filling one role.
+  The resources filling one requirement.
 
   `resources/1` answers *"who and what is booked"*; this answers *"what
   is in the room slot"*. Without it a caller reaches into
   `arrangement.allocations` — or worse, hunts through every resource
   for one carrying a `:seats` attribute, which guesses at something a
-  role already states.
+  requirement already states.
 
   ### Arguments
 
   * `arrangement` is a `t:t/0`.
 
-  * `role` is the role to read, as given to `Agenda.needs/2` or
-    `Agenda.Session.roster/3`.
+  * `name` is the requirement's name to read, as given to
+    `Agenda.needs/2` or `Agenda.Session.roster/3`.
 
   ### Returns
 
-  * the resources filling `role`, or `[]` when the arrangement has
-    none. An absent role is not an error: a session that never asked
+  * the resources filling `name`, or `[]` when the arrangement has
+    none. An absent requirement is not an error: a session that never asked
     for a projector simply has no projector.
 
   ### Examples
@@ -133,26 +133,26 @@ defmodule Agenda.Arrangement do
 
   """
   @spec resources(t(), atom()) :: [Resource.t()]
-  def resources(%__MODULE__{allocations: allocations}, role) when is_atom(role) do
-    Map.get(allocations, role, [])
+  def resources(%__MODULE__{allocations: allocations}, name) when is_atom(name) do
+    Map.get(allocations, name, [])
   end
 
   @doc """
-  The single resource filling one role, or `nil`.
+  The single resource filling one requirement, or `nil`.
 
-  The common case, because most roles take exactly one: a session has
-  one room even when it has four speakers. Where a role holds several,
+  The common case, because most requirements take exactly one: a session has
+  one room even when it has four speakers. Where a requirement holds several,
   this is the first and `resources/2` is the question to ask.
 
   ### Arguments
 
   * `arrangement` is a `t:t/0`.
 
-  * `role` is the role to read.
+  * `name` is the requirement's name to read.
 
   ### Returns
 
-  * the resource filling `role`, or `nil` when nothing does.
+  * the resource filling `name`, or `nil` when nothing does.
 
   ### Examples
 
@@ -167,9 +167,9 @@ defmodule Agenda.Arrangement do
 
   """
   @spec resource(t(), atom()) :: Resource.t() | nil
-  def resource(%__MODULE__{} = arrangement, role) when is_atom(role) do
+  def resource(%__MODULE__{} = arrangement, name) when is_atom(name) do
     arrangement
-    |> resources(role)
+    |> resources(name)
     |> List.first()
   end
 

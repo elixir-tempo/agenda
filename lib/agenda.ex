@@ -225,7 +225,7 @@ defmodule Agenda do
 
   ### Arguments
 
-  * `name` is the role name, such as `:room`.
+  * `name` is the requirement's name, such as `:room`.
 
   * `predicates` is a keyword list of attribute predicates.
 
@@ -248,7 +248,7 @@ defmodule Agenda do
 
   ### Arguments
 
-  * `name` is the role name, such as `:attendees`.
+  * `name` is the requirement's name, such as `:attendees`.
 
   * `resources` is the list of required `t:Agenda.Resource.t/0`.
 
@@ -281,7 +281,7 @@ defmodule Agenda do
 
   * `session` is a `t:Agenda.Session.t/0`.
 
-  * `role` names what the invitees would be there as, the same way
+  * `name` names what the invitees would be there as, the same way
     `Agenda.Session.roster/3` does.
 
   * `resources` is a list of `t:Agenda.Resource.t/0`.
@@ -300,7 +300,7 @@ defmodule Agenda do
 
   """
   @spec invite(Session.t(), atom(), [Resource.t()]) :: Session.t()
-  defdelegate invite(session, role, resources), to: Session
+  defdelegate invite(session, name, resources), to: Session
 
   @doc """
   The resources satisfying `requirement`. Delegates to
@@ -855,7 +855,7 @@ defmodule Agenda do
 
   * `:tag` is what the claim is for, as a `t:Agenda.Allocation.tag/0`.
 
-  * `:role` is the role the resource is filling. The default is
+  * `:requirement` is the requirement the resource is filling. The default is
     `:resource`.
 
   * `:session` names the claim, and is what `Agenda.Ledger.release/2` takes. The
@@ -910,7 +910,7 @@ defmodule Agenda do
 
   ### Options
 
-  As `Agenda.Ledger.claim/4`: `:tag`, `:role` and `:session`.
+  As `Agenda.Ledger.claim/4`: `:tag`, `:requirement` and `:session`.
 
   ### Returns
 
@@ -1726,9 +1726,9 @@ defmodule Agenda do
     programme's own window.
 
   * `:needs` is what every meeting requires beyond its two parties, as
-    `[role: predicates]` — a table, most often.
+    `[name: predicates]` — a table, most often.
 
-  * `:as` is the role both parties are rostered under. The default is
+  * `:as` is the requirement both parties are rostered under. The default is
     `:party`, which says neither of them is substitutable.
 
   * `:name` is a two-argument function naming a meeting from the pair.

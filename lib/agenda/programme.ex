@@ -490,9 +490,9 @@ defmodule Agenda.Programme do
     programme's own window.
 
   * `:needs` is what every meeting requires beyond its two parties, as
-    `[role: predicates]` — a table, most often.
+    `[name: predicates]` — a table, most often.
 
-  * `:as` is the role both parties are rostered under. The default is
+  * `:as` is the requirement both parties are rostered under. The default is
     `:party`, which says neither of them is substitutable.
 
   * `:name` is a two-argument function naming a meeting from the pair.
@@ -546,7 +546,7 @@ defmodule Agenda.Programme do
   end
 
   defp meeting({first, second}, pool, programme, duration, options) do
-    role = Keyword.get(options, :as, :party)
+    rostered_as = Keyword.get(options, :as, :party)
     naming = Keyword.get(options, :name, &"#{&1} with #{&2}")
     window = Keyword.get(options, :window, programme.window)
 
@@ -554,7 +554,7 @@ defmodule Agenda.Programme do
       session =
         naming.(first, second)
         |> Session.new(duration: duration, window: window)
-        |> Session.roster(role, parties)
+        |> Session.roster(rostered_as, parties)
 
       {:ok,
        Enum.reduce(Keyword.get(options, :needs, []), session, fn {needed, predicates}, acc ->

@@ -3,7 +3,7 @@ defmodule Agenda.Requirement do
   A requirement — what a session demands of the resources allocated to
   it.
 
-  A requirement is named, so that an arrangement can say *which* role a
+  A requirement is named, so that an arrangement can say *which* requirement a
   resource was chosen for, and comes in two shapes:
 
   * **by attribute** — "a room seating at least eight with video
@@ -26,7 +26,7 @@ defmodule Agenda.Requirement do
   alias Agenda.Predicate
   alias Agenda.Resource
 
-  @typedoc "What a session demands, under a role name."
+  @typedoc "What a session demands, under a name."
   @type t :: %__MODULE__{
           name: atom(),
           attributes: %{optional(atom()) => Predicate.t()},
@@ -44,7 +44,7 @@ defmodule Agenda.Requirement do
 
   ### Arguments
 
-  * `name` is the role name, such as `:room`.
+  * `name` is the requirement's name, such as `:room`.
 
   * `predicates` is a keyword list of attribute predicates.
 
@@ -71,7 +71,7 @@ defmodule Agenda.Requirement do
 
   ### Arguments
 
-  * `name` is the role name, such as `:attendees`.
+  * `name` is the requirement's name, such as `:attendees`.
 
   * `resources` is the list of required `t:Agenda.Resource.t/0`.
 
@@ -131,13 +131,13 @@ defmodule Agenda.Requirement do
   end
 
   @doc """
-  Combine two requirements on the same role into one.
+  Combine two requirements of the same name into one.
 
-  Naming a role twice is one demand stated in two calls, not two
+  Naming a requirement twice is one demand stated in two calls, not two
   demands: `roster(:speaker, [alice])` followed by
   `roster(:speaker, [bob])` wants both people on stage. The
   alternative — keeping both requirements — cannot be honoured,
-  because an arrangement fills each role once, so the second would
+  because an arrangement fills each requirement once, so the second would
   quietly displace the first.
 
   Attributes combine the way `induce/2` combines them, with the later

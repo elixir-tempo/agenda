@@ -90,7 +90,7 @@ Agenda.explain(hd(options))
 
 > *"The three-hour audit can run two ways; the first is Dana at Acme, starting at nine."*
 
-Two roles, expressed two ways. `needs/3` describes a resource and lets the planner choose; `roster/3` names one. The site is named because the customer is not negotiable; the consultant is described because any qualified person will do.
+Two requirements, expressed two ways. `needs/3` describes a resource and lets the planner choose; `roster/3` names one. The site is named because the customer is not negotiable; the consultant is described because any qualified person will do.
 
 Every arrangement also records which resources' free time produced it:
 

@@ -18,7 +18,7 @@ defmodule Agenda.SessionTest do
       assert Session.rosters(session) == []
     end
 
-    test "a role that neither names nor describes never reaches planning" do
+    test "a requirement that neither names nor describes never reaches planning" do
       {:ok, room} =
         Agenda.resource("Hall", seats: 250)
         |> Agenda.open(~o"2026-06-15T09:00/T17:00")

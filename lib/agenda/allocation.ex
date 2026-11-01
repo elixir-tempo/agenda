@@ -36,7 +36,7 @@ defmodule Agenda.Allocation do
 
   `from_arrangement/2` gives the allocations an arrangement implies, one
   per resource, and `same?/2` says whether two allocations bind the same
-  resource in the same role over the same span.
+  resource in the same requirement over the same span.
 
   """
 
@@ -57,7 +57,7 @@ defmodule Agenda.Allocation do
   """
   @type t :: %__MODULE__{
           session: String.t(),
-          role: atom(),
+          requirement: atom(),
           resource: String.t(),
           interval: Tempo.t(),
           series: String.t() | nil,
@@ -76,11 +76,11 @@ defmodule Agenda.Allocation do
   """
   @type tag :: {atom(), term()}
 
-  defstruct [:session, :role, :resource, :interval, :series, :held_until, :tag]
+  defstruct [:session, :requirement, :resource, :interval, :series, :held_until, :tag]
 
   @doc """
   The allocations an arrangement implies — one per resource, across
-  every role.
+  every requirement.
 
   ### Arguments
 
@@ -97,7 +97,7 @@ defmodule Agenda.Allocation do
 
   ### Returns
 
-  * the allocations, ordered by role then resource name so that two
+  * the allocations, ordered by requirement then resource name so that two
     equal arrangements always yield an equal list.
 
   ### Examples
@@ -110,7 +110,7 @@ defmodule Agenda.Allocation do
       ...>   allocations: %{room: [boardroom]}
       ...> }
       iex> [allocation] = Agenda.Allocation.from_arrangement(arrangement)
-      iex> {allocation.session, allocation.role, allocation.resource}
+      iex> {allocation.session, allocation.requirement, allocation.resource}
       {"Review", :room, "Boardroom"}
 
   Tagging what the claim was for:
@@ -132,11 +132,11 @@ defmodule Agenda.Allocation do
     tag = Keyword.get(options, :tag)
 
     arrangement.allocations
-    |> Enum.flat_map(fn {role, resources} ->
+    |> Enum.flat_map(fn {requirement, resources} ->
       Enum.map(resources, fn resource ->
         %__MODULE__{
           session: arrangement.session,
-          role: role,
+          requirement: requirement,
           resource: resource.name,
           interval: arrangement.interval,
           series: arrangement.series,
@@ -144,12 +144,12 @@ defmodule Agenda.Allocation do
         }
       end)
     end)
-    |> Enum.sort_by(&{&1.role, &1.resource})
+    |> Enum.sort_by(&{&1.requirement, &1.resource})
   end
 
   @doc """
   `true` when two allocations bind the same resource, in the same
-  role, over the same span.
+  requirement, over the same span.
 
   This is the identity a changeset compares on — it deliberately
   ignores which session holds it, because `rearrange/3` asks "is this
@@ -167,15 +167,15 @@ defmodule Agenda.Allocation do
 
       iex> import Tempo.Sigils
       iex> hour = ~o"2026-06-16T10:00:00/2026-06-16T11:00:00"
-      iex> a = %Agenda.Allocation{role: :room, resource: "Boardroom", interval: hour}
-      iex> b = %Agenda.Allocation{role: :room, resource: "Boardroom", interval: hour}
+      iex> a = %Agenda.Allocation{requirement: :room, resource: "Boardroom", interval: hour}
+      iex> b = %Agenda.Allocation{requirement: :room, resource: "Boardroom", interval: hour}
       iex> Agenda.Allocation.same?(a, b)
       true
 
   """
   @spec same?(t(), t()) :: boolean()
   def same?(%__MODULE__{} = a, %__MODULE__{} = b) do
-    a.role == b.role and a.resource == b.resource and
+    a.requirement == b.requirement and a.resource == b.resource and
       Tempo.equal?(a.interval, b.interval)
   end
 end

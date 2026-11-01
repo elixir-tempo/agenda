@@ -32,15 +32,17 @@ defmodule Agenda.ClaimTest do
       assert [%{tag: {:project, "ACME"}}] = Ledger.to_list(ledger)
     end
 
-    test "the role defaults to :resource and can be overridden" do
+    test "the requirement defaults to :resource and can be overridden" do
       resource = dana()
       span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
 
       assert {:ok, default} = Agenda.claim(Agenda.ledger(), resource, span)
-      assert [%{role: :resource}] = Ledger.to_list(default)
+      assert [%{requirement: :resource}] = Ledger.to_list(default)
 
-      assert {:ok, named} = Agenda.claim(Agenda.ledger(), resource, span, role: :consultant)
-      assert [%{role: :consultant}] = Ledger.to_list(named)
+      assert {:ok, named} =
+               Agenda.claim(Agenda.ledger(), resource, span, requirement: :consultant)
+
+      assert [%{requirement: :consultant}] = Ledger.to_list(named)
     end
 
     test "the session defaults to the interval and is what release takes" do
@@ -187,7 +189,7 @@ defmodule Agenda.ClaimTest do
     test "same options, same shape in the ledger" do
       resource = dana()
       span = ~o"2026-08-10T09:00:00/2026-08-10T12:00:00"
-      options = [role: :consultant, tag: {:project, "ACME"}, session: "monday"]
+      options = [requirement: :consultant, tag: {:project, "ACME"}, session: "monday"]
 
       assert {:ok, booked} = Agenda.claim(Agenda.ledger(), resource, span, options)
       assert {:ok, recorded} = Agenda.record(Agenda.ledger(), resource, span, options)

@@ -68,7 +68,7 @@ defmodule Agenda.PlannerTest do
       assert length(arrangements) == 8
     end
 
-    test "every arrangement allocates a resource to each role", context do
+    test "every arrangement allocates a resource to each requirement", context do
       {:ok, [first | _]} = Planner.plan(review(context), [context.boardroom])
 
       assert %{room: [room]} = first.allocations

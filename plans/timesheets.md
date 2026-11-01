@@ -42,7 +42,7 @@ There is a second consequence that is easy to miss. A public holiday is a *third
 
 This is worth exploiting rather than rebuilding. The interesting queries a consulting business asks are all comparisons between the two readings: planned versus actual utilisation, the engagement that took 40% longer than sold, the consultant whose booked week and submitted week disagree. If the two live in separate schemas with separate vocabularies, every one of those questions becomes a join and a reconciliation of its own.
 
-`Agenda.Allocation` is close to the right grain today — `session`, `role`, `resource`, `interval` — and short by exactly one field: the tag above. That is a small, real change to propose.
+`Agenda.Allocation` is close to the right grain today — `session`, `requirement`, `resource`, `interval` — and short by exactly one field: the tag above. That is a small, real change to propose.
 
 ## Reconciliation is set algebra, not a sum
 

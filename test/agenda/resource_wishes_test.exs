@@ -151,7 +151,7 @@ defmodule Agenda.ResourceWishesTest do
       assert length(arrangements) == 1
     end
 
-    test "a wish applies to whichever role the resource fills" do
+    test "a wish applies to whichever requirement the resource fills" do
       # Rooms have wishes too — a hall that would rather not be used
       # before noon is the same mechanism.
       {:ok, hall} =

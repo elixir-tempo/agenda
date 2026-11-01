@@ -95,7 +95,7 @@ Agenda.session("Building Careers, Balancing Life",
 
 `needs/3` describes — any room seating 250 will do, and the planner chooses. `roster/3` names — these four people, no substitutes. Both kinds of requirement bind the same way once the search starts.
 
-> **One roster call per role.** `roster(:speaker, [a, b, c])` binds all three. Calling `roster(:speaker, [a])` three times does *not* accumulate — the last call wins and the earlier speakers are silently dropped, which is a mistake that costs you exactly the constraint this case study is about.
+> **One roster call per requirement.** `roster(:speaker, [a, b, c])` binds all three. Calling `roster(:speaker, [a])` three times does *not* accumulate — the last call wins and the earlier speakers are silently dropped, which is a mistake that costs you exactly the constraint this case study is about.
 
 ## The keynotes are already announced
 

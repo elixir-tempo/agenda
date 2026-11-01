@@ -81,13 +81,13 @@ defmodule Agenda.Session do
   end
 
   @doc """
-  Add an attribute requirement under `role`.
+  Add an attribute requirement under `name`.
 
   ### Arguments
 
   * `session` is a `t:t/0`.
 
-  * `role` is the role name, such as `:room`.
+  * `name` is the requirement's name, such as `:room`.
 
   * `predicates` is a keyword list of attribute predicates.
 
@@ -105,24 +105,24 @@ defmodule Agenda.Session do
 
   """
   @spec needs(t(), atom(), keyword()) :: t()
-  def needs(%__MODULE__{} = session, role, predicates) when is_atom(role) do
-    add(session, Requirement.new(role, predicates))
+  def needs(%__MODULE__{} = session, name, predicates) when is_atom(name) do
+    add(session, Requirement.new(name, predicates))
   end
 
   @doc """
-  Add a requirement naming specific resources under `role`.
+  Add a requirement naming specific resources under `name`.
 
   ### Arguments
 
   * `session` is a `t:t/0`.
 
-  * `role` is the role name, such as `:attendees`.
+  * `name` is the requirement's name, such as `:attendees`.
 
   * `resources` is the list of required
     `t:Agenda.Resource.t/0`. Naming nobody adds no requirement — a
-    role filled by no one constrains nothing, and a requirement that
+    requirement filled by no one constrains nothing, and a requirement that
     neither names nor describes would otherwise let planning bind any
-    resource at all to the role.
+    resource at all to the requirement.
 
   ### Returns
 
@@ -143,21 +143,21 @@ defmodule Agenda.Session do
 
   """
   @spec roster(t(), atom(), [Resource.t()]) :: t()
-  def roster(%__MODULE__{} = session, role, []) when is_atom(role) do
+  def roster(%__MODULE__{} = session, name, []) when is_atom(name) do
     session
   end
 
-  def roster(%__MODULE__{} = session, role, resources) when is_atom(role) do
-    add(session, Requirement.roster(role, resources))
+  def roster(%__MODULE__{} = session, name, resources) when is_atom(name) do
+    add(session, Requirement.roster(name, resources))
   end
 
-  # Naming a role twice states one demand in two calls. An arrangement
-  # fills each role once, so keeping both requirements would let the
+  # Naming a requirement twice states one demand in two calls. An
+  # arrangement fills each requirement once, so keeping both requirements would let the
   # second displace the first and lose whatever the first asked for —
   # silently, and only at planning time. They are combined here
   # instead, where the caller can still see the result.
   #
-  # A named role and a described one are not combined: "these four
+  # A named requirement and a described one are not combined: "these four
   # people" and "any room seating 250" under one name is a
   # contradiction rather than a pair of demands, and merging them
   # would answer it by ignoring one.
@@ -292,7 +292,7 @@ defmodule Agenda.Session do
   @doc """
   The requirements described by attribute rather than named.
 
-  Each of these is a role that planning must *choose* a resource for.
+  Each of these is a requirement that planning must *choose* a resource for.
 
   ### Arguments
 
@@ -319,7 +319,7 @@ defmodule Agenda.Session do
   @doc """
   Every resource named by a roster requirement.
 
-  These are the resources whose own `requires` tighten the open roles —
+  These are the resources whose own `requires` tighten the open requirements —
   see `Agenda.Requirement.induce/2`.
 
   ### Arguments
@@ -368,7 +368,7 @@ defmodule Agenda.Session do
 
   * `session` is a `t:t/0`.
 
-  * `role` names what the invitees would be there as, the same way
+  * `name` names what the invitees would be there as, the same way
     `roster/3` does.
 
   * `resources` is a list of `t:Agenda.Resource.t/0`.
@@ -386,12 +386,12 @@ defmodule Agenda.Session do
 
   """
   @spec invite(t(), atom(), [Resource.t()]) :: t()
-  def invite(%__MODULE__{} = session, _role, []) do
+  def invite(%__MODULE__{} = session, _name, []) do
     session
   end
 
-  def invite(%__MODULE__{} = session, role, resources)
-      when is_atom(role) and is_list(resources) do
-    %{session | invitees: Keyword.update(session.invitees, role, resources, &(&1 ++ resources))}
+  def invite(%__MODULE__{} = session, name, resources)
+      when is_atom(name) and is_list(resources) do
+    %{session | invitees: Keyword.update(session.invitees, name, resources, &(&1 ++ resources))}
   end
 end
