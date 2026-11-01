@@ -16,6 +16,8 @@ Resource-constrained scheduling for [Tempo](https://hexdocs.pm/ex_tempo). Tempo 
 
 * **Open hours from a calendar** — RFC 7953 `VAVAILABILITY` read with the optional `ical` dependency.
 
+* **iCalendar's vocabulary** — busy time as `BUSY` or `BUSY-TENTATIVE`, hold, confirm and cancel as `STATUS`, calendar user and location types, and recurrence identity, each mapping recorded with what an export loses.
+
 Meeting and conference scheduling is the focus. Task and shift scheduling are expressible — precedence makes a task graph, limits make a contract, wishes make a roster people will accept — and exact at small scale, or handed to a solver at large.
 
 ## Supported Elixir and OTP versions
@@ -30,7 +32,7 @@ Add `agenda` to the dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:agenda, "~> 0.2"}
+    {:agenda, "~> 0.3"}
   ]
 end
 ```
@@ -301,7 +303,7 @@ Requires the optional `ical` dependency.
 
 ## Documentation
 
-* [Getting started](https://hexdocs.pm/agenda/getting-started.html) — the one Tempo idea you need, the five nouns, and the whole describe-plan-allocate-release loop in five minutes.
+* [Getting started](https://hexdocs.pm/agenda/getting-started.html) — the one Tempo idea you need, the five nouns, and the whole describe-plan-allocate-cancel loop in five minutes.
 
 * [Sequencing, tracks and affinity](https://hexdocs.pm/agenda/sequencing-and-affinity.html) — *this after that*, *these may not collide*, and *keep them together if you can*: three kinds of constraint, and why the differences matter more than the syntax.
 
@@ -323,4 +325,4 @@ Full API documentation is available on [HexDocs](https://hexdocs.pm/agenda).
 
 ## License
 
-The code is licensed under the Apache License 2.0; [LICENSE.md](https://github.com/elixir-tempo/agenda/blob/v0.2.0/LICENSE.md) gives it.
+The code is licensed under the Apache License 2.0; [LICENSE.md](https://github.com/elixir-tempo/agenda/blob/v0.3.0/LICENSE.md) gives it.

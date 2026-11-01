@@ -1,6 +1,6 @@
 # Vocabulary alignment with iCalendar and CalDAV
 
-**Status:** in progress, 2026-11-01
+**Status:** implemented (v0.3.0), 2026-11-01
 
 Agenda's lexicon was chosen in [agenda.md](agenda.md) to dodge collisions with
 Elixir's stdlib, Tempo and the Ash scheduling library. That constraint still

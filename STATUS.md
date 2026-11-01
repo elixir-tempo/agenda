@@ -1,5 +1,5 @@
 # Status
 
-**Status:** active, 2026-10-28
+**Status:** active, 2026-11-01
 
-Agenda 0.2.0 is on hex, its first release on Tempo 2 (`ex_tempo ~> 2.1`). Functional work is tracked in `TODO.md` and designed in `plans/`.
+Agenda 0.3.0 is the current release, on Tempo 2.3 (`ex_tempo ~> 2.3`), with Agenda's vocabulary aligned with iCalendar. Functional work is tracked in `TODO.md` and designed in `plans/`.

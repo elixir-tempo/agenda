@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [v0.3.0] — Unreleased
+## [v0.3.0] — 2026-11-01
 
 ### Breaking changes
 
@@ -21,6 +21,12 @@ All notable changes to this project are documented here. The format follows [Kee
 * `Agenda.Place.new/2` takes `:location_type`, RFC 9073's `LOCATION-TYPE`; the `Agenda.Place` moduledoc maps a place onto `VLOCATION` and says what an export loses.
 
 * An occurrence of `Agenda.Series.expand/3` carries a `recurrence_id`, the start of its repetition (iCalendar's `RECURRENCE-ID`), into its arrangements and allocations, beside the `series` name.
+
+### Changed
+
+* Agenda runs on Tempo 2.3 (`ex_tempo ~> 2.3`).
+
+* The `Agenda.Precedence`, `Agenda.Availability`, `Agenda.Session`, `Agenda.Ledger` and `Agenda.Track` moduledocs record how each maps onto iCalendar, and what an export loses.
 
 ## [v0.2.0] — 2026-10-28
 
