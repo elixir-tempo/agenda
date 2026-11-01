@@ -107,13 +107,13 @@ length(remaining)
 Cancelling puts it back, with no bookkeeping:
 
 ```elixir
-{:ok, ledger} = Agenda.release(ledger, "Sprint review")
+{:ok, ledger} = Agenda.cancel(ledger, "Sprint review")
 {:ok, restored} = Agenda.plan(review, [room], busy: Agenda.busy(ledger))
 length(restored)
 #=> 3
 ```
 
-That is the whole loop: **describe, plan, allocate, release.** Free time is derived on every call rather than stored, so there is no free/busy record to go stale and no release step that can be forgotten.
+That is the whole loop: **describe, plan, allocate, cancel.** `cancel/2` is `release/2` named from the session's side; either frees what the session held. Free time is derived on every call rather than stored, so there is no free/busy record to go stale and no release step that can be forgotten.
 
 ## Failures are sentences
 

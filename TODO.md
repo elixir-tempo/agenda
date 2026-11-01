@@ -7,8 +7,6 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 
 ## Open
 
-* [ ] **Add `Agenda.cancel/2`** — the session-facing name for `release/2`, completing the hold/confirm/cancel trio; keep `release/2` and delegate.
-
 * [ ] **Give `Agenda.Resource` a `cutype:` attribute** — `INDIVIDUAL|GROUP|RESOURCE|ROOM` for invitable resources and RFC 9073 `RESOURCE-TYPE` for equipment; document that an Agenda resource is never RFC 5545's free-text `RESOURCES`.
 
 * [ ] **Map `Agenda.Place` onto `VLOCATION` and record what is lost** — `LOCATION-TYPE` as the conventional attribute; `within` and `travel_time/3` do not survive a round trip because `VLOCATION` does not nest.
@@ -17,9 +15,11 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 
 * [ ] **Adopt `CONCEPT` as the export of `Agenda.Track`** — keep the word `Track`; `CONCEPT` names the grouping, not the no-overlap rule, which export loses.
 
-* [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/release are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
+* [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/cancel are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
 
 ## Done
+
+* [x] **Add `Agenda.cancel/2`** — the session-facing name for `release/2`, in `Agenda` and `Agenda.Ledger`; the guides cancel sessions with it. 2026-11-01, v0.3.0 (unreleased).
 
 * [x] **Teach Agenda the busy-type distinction** — `Agenda.free_busy/2` gives `:busy` or `:tentative` with each interval; `busy/2` is unchanged for planning, and `BUSY-UNAVAILABLE` stays with `Availability`. 2026-11-01, v0.3.0 (unreleased).
 

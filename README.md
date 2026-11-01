@@ -256,7 +256,7 @@ A booking page needs to take a room *tentatively*. A hold occupies the resource 
 
 That is deliberate. `busy/2` is called inside `plan/3` and `arrange/3`; if it consulted the system clock, arranging the same programme twice would give different answers as holds lapsed underneath it. Refusing to guess the time is the same discipline as refusing to guess an unmeasured journey.
 
-The rest of the claim lifecycle — completed, cancelled, no-show — is deliberately *not* here. A hold changes what is available; a no-show does not. That line is what separates the engine's business from the adapter's.
+A session is held, confirmed or cancelled: `cancel/2` frees what it held, because that changes what is available. The rest of the claim lifecycle — completed, no-show — is deliberately *not* here: a no-show changes nothing that is available. That line is what separates the engine's business from the adapter's.
 
 ## Preferring one workable layout over another
 

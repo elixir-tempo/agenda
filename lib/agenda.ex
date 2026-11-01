@@ -1031,6 +1031,35 @@ defmodule Agenda do
   defdelegate confirm(ledger, session), to: Ledger
 
   @doc """
+  Cancel a session, freeing everything it holds, whether held or
+  booked. Delegates to `Agenda.Ledger.cancel/2`.
+
+  `hold/3`, `confirm/2` and `cancel/2` are a session's lifecycle as a
+  calendar names it; `release/2` is the same freeing, named from the
+  resources' side.
+
+  ### Arguments
+
+  * `ledger` is a `t:Agenda.Ledger.t/0`.
+
+  * `session` is the session's name.
+
+  ### Returns
+
+  * `{:ok, ledger}`. Cancelling a session that holds nothing is a
+    no-op, so this is safe to call twice.
+
+  ### Examples
+
+      iex> {:ok, ledger} = Agenda.cancel(Agenda.ledger(), "Review")
+      iex> Agenda.count(ledger)
+      0
+
+  """
+  @spec cancel(Ledger.t(), String.t()) :: {:ok, Ledger.t()}
+  defdelegate cancel(ledger, session), to: Ledger
+
+  @doc """
   Drop every hold that has lapsed by a moment. Delegates to
   `Agenda.Ledger.expire/2`.
 

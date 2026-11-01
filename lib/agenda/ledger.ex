@@ -604,6 +604,48 @@ defmodule Agenda.Ledger do
   end
 
   @doc """
+  Cancel a session, freeing everything it holds, whether held or
+  booked.
+
+  The session-facing name for `release/2`, completing hold, confirm
+  and cancel: `release` says what happens to the resources, `cancel`
+  what happens to the session, as iCalendar's `STATUS:CANCELLED` does.
+
+  ### Arguments
+
+  * `ledger` is a `t:t/0`.
+
+  * `session` is the session's name.
+
+  ### Returns
+
+  * `{:ok, ledger}`. Cancelling a session that holds nothing is a
+    no-op, so this is safe to call twice.
+
+  ### Examples
+
+      iex> import Tempo.Sigils
+      iex> boardroom = Agenda.resource("Boardroom")
+      iex> arrangement = %Agenda.Arrangement{
+      ...>   session: "Review",
+      ...>   interval: ~o"2026-06-16T10:00:00/2026-06-16T11:00:00",
+      ...>   allocations: %{room: [boardroom]}
+      ...> }
+      iex> {:ok, ledger} = Agenda.Ledger.hold(Agenda.Ledger.new(), arrangement,
+      ...>                   until: "2026-06-15T10:15:00")
+      iex> {:ok, ledger} = Agenda.Ledger.cancel(ledger, "Review")
+      iex> Agenda.Ledger.count(ledger)
+      0
+
+  > *"Hold the boardroom for the review, then cancel the review."*
+
+  """
+  @spec cancel(t(), String.t()) :: {:ok, t()}
+  def cancel(%__MODULE__{} = ledger, session) when is_binary(session) do
+    release(ledger, session)
+  end
+
+  @doc """
   Free everything held by a whole series.
 
   The occurrences of a repeating session are separate sessions sharing

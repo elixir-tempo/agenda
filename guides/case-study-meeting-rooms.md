@@ -198,7 +198,7 @@ Agenda.holds(ledger)
 
 That looks like extra work and is worth the trouble. `busy/2` is called inside `plan/3` and `arrange/3`. If it read the system clock, planning the same meeting twice would give different answers as holds lapsed underneath you, and the ledger would stop being a value you can reason about or test. Passing the moment in is the same discipline as `travel_time/3` returning `{:error, :unknown}` rather than guessing an unmeasured journey.
 
-A hold good *until* five past is gone at five past, not after it. And the rest of the lifecycle — completed, cancelled, no-show — is deliberately absent: a hold changes what is available, and none of those do. Those belong to whatever persists your bookings.
+A hold good *until* five past is gone at five past, not after it. Cancelling the meeting is `Agenda.cancel(ledger, "Quarterly review")`, held or confirmed, because it frees what the meeting held. The rest of the lifecycle — completed, no-show — is deliberately absent: a hold changes what is available, and neither of those does. Those belong to whatever persists your bookings.
 
 ## Moving a meeting without losing the room
 

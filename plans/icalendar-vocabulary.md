@@ -30,7 +30,8 @@ is the cheapest this will ever be.
 * `Agenda.Session.window` is CalDAV's `time-range` and
   `Agenda.Session.duration` is `DURATION`. No change.
 
-* `Agenda.hold/3`, `confirm/2` and `release/2` line up with
+* `Agenda.hold/3`, `confirm/2` and `cancel/2` (`release/2` from the
+  ledger's side) line up with
   `STATUS:TENTATIVE`, `STATUS:CONFIRMED` and `STATUS:CANCELLED` — see the
   naming note below, but the concepts match one for one.
 
@@ -89,6 +90,8 @@ is the cheapest this will ever be.
    trio every calendar UI already uses. Keep `release/2` — it is the right
    word from the ledger's side — and delegate. Touches `lib/agenda.ex` and
    `lib/agenda/ledger.ex`.
+
+   Done 2026-11-01: `Agenda.cancel/2` and `Agenda.Ledger.cancel/2`.
 
 4. **Give `Agenda.Resource` a conventional attribute for its calendar user
    type.** An Agenda resource is `ATTENDEE;CUTYPE=INDIVIDUAL|GROUP|RESOURCE|ROOM`

@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.free_busy/2` gives each resource's claims as `{:busy | :tentative, interval}` pairs, iCalendar's `BUSY` and `BUSY-TENTATIVE`, where `busy/2` gives the intervals alone.
 
+* `Agenda.cancel/2` cancels a session, freeing what it held or booked: the session's name for `release/2`, completing hold, confirm and cancel.
+
 ## [v0.2.0] — 2026-10-28
 
 ### Breaking changes

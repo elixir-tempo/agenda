@@ -117,7 +117,7 @@ Two allocations from one booking — the consultant *and* the site. Both are now
 Cancelling is dropping the key:
 
 ```elixir
-{:ok, ledger} = Agenda.release(ledger, "Security audit")
+{:ok, ledger} = Agenda.cancel(ledger, "Security audit")
 Agenda.busy(ledger)
 #=> %{}
 ```

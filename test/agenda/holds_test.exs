@@ -164,6 +164,47 @@ defmodule Agenda.HoldsTest do
     end
   end
 
+  describe "cancelling" do
+    test "cancelling a held session frees it, and its time is free again", context do
+      ledger = held(Agenda.ledger(), context.arrangement, "2026-06-15T10:15:00")
+
+      assert {:ok, ledger} = Agenda.cancel(ledger, "Review")
+      assert Agenda.count(ledger) == 0
+      assert Agenda.busy(ledger) == %{}
+    end
+
+    test "cancelling a confirmed session frees it as well", context do
+      ledger = held(Agenda.ledger(), context.arrangement, "2026-06-15T10:15:00")
+      {:ok, ledger} = Agenda.confirm(ledger, "Review")
+
+      assert {:ok, ledger} = Agenda.cancel(ledger, "Review")
+      assert Agenda.count(ledger) == 0
+    end
+
+    test "cancelling is releasing, and cancels only the session it names", context do
+      {:ok, ledger} = Agenda.allocate(Agenda.ledger(), context.arrangement)
+
+      other = %{context.arrangement | session: "Standup"}
+      {:ok, ledger} = Agenda.allocate(ledger, other)
+
+      assert Agenda.cancel(ledger, "Review") == Agenda.release(ledger, "Review")
+
+      {:ok, ledger} = Agenda.cancel(ledger, "Review")
+      assert [%{session: "Standup"}] = Ledger.to_list(ledger)
+    end
+
+    test "cancelling a session that holds nothing, or twice, is a no-op", context do
+      assert {:ok, ledger} = Agenda.cancel(Agenda.ledger(), "Nothing")
+      assert Agenda.count(ledger) == 0
+
+      ledger = held(Agenda.ledger(), context.arrangement, "2026-06-15T10:15:00")
+      {:ok, once} = Agenda.cancel(ledger, "Review")
+      {:ok, twice} = Agenda.cancel(once, "Review")
+
+      assert once == twice
+    end
+  end
+
   describe "holds and the rest of the ledger" do
     test "a hold replaces whatever the session held before", context do
       # Same key, same wholesale replacement as allocate/2.
