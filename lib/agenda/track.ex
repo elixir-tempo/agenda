@@ -31,6 +31,25 @@ defmodule Agenda.Track do
   > be able to walk between consecutive ones inside the ten-minute
   > break."*
 
+  ### In iCalendar
+
+  iCalendar can say which sessions make up a track, but not what makes
+  them one. An export writes two RFC 9253 properties on each of the
+  track's sessions:
+
+  * **`REFID`** — the track's name, as text: the key that groups
+    associated components, as an itinerary groups its legs.
+
+  * **`CONCEPT`** — a URI for the track as a classification, such as
+    `https://example.com/tracks/elixir`, which the adapter mints from
+    the track's name.
+
+  Both name the grouping, which is why the word stays `Track`. The
+  rule is lost: iCalendar has no way to say that a track's sessions
+  must not overlap each other, nor that a delegate must be able to
+  walk between them (`reachable/2`). A track read back from iCalendar
+  is a group of sessions that may clash.
+
   """
 
   alias Agenda.Availability

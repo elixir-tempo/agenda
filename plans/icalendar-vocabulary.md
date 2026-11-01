@@ -142,6 +142,12 @@ is the cheapest this will ever be.
    all, so export loses it. Keep the word `Track`: `CONCEPT` names the
    grouping, not the rule.
 
+   Done 2026-11-01: RFC 9253's `REFID` (text, "a key for associated
+   iCalendar entities") fits a track's grouping more closely than
+   `CONCEPT` (a URI classification), so the `Agenda.Track` moduledoc names
+   both: `REFID` for the track's name and a `CONCEPT` the adapter mints for
+   it. The no-overlap rule and `reachable/2` are lost.
+
 ## Deliberate divergences to keep
 
 * **`Session`, not `Event`.** Already decided (`Tempo.Event.Easter` exists,
@@ -164,9 +170,9 @@ is the cheapest this will ever be.
   may or must be claimed over a period — a scheduling constraint, not a
   storage one.
 
-* **`Track`, `Programme`, `Arrangement`, `Ledger`, `Layout`, `Conflict`,
-  `Preference`, `Reconciliation` and `Infeasible` have no iCalendar
-  counterparts** and should not acquire invented ones. iCalendar describes
+* **`Track`'s rule, `Programme`, `Arrangement`, `Ledger`, `Layout`,
+  `Conflict`, `Preference`, `Reconciliation` and `Infeasible` have no
+  iCalendar counterparts** and should not acquire invented ones. iCalendar describes
   calendars; it has no vocabulary for laying one out, for why a layout
   failed, or for what makes one better than another. That absence is the
   reason the library exists.

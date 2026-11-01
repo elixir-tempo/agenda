@@ -7,11 +7,11 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 
 ## Open
 
-* [ ] **Adopt `CONCEPT` as the export of `Agenda.Track`** — keep the word `Track`; `CONCEPT` names the grouping, not the no-overlap rule, which export loses.
-
 * [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/cancel are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
 
 ## Done
+
+* [x] **Record `Agenda.Track`'s iCalendar export** — the moduledoc names RFC 9253's `REFID` for the grouping and a minted `CONCEPT` for the classification, and says the no-overlap rule is lost. 2026-11-01.
 
 * [x] **Carry recurrence identity through `Agenda.Series`** — `series` is the run, and a new `recurrence_id`, the repetition's start, is the occurrence, carried through `Session`, `Arrangement` and `Allocation`. 2026-11-01, v0.3.0 (unreleased).
 
