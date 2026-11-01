@@ -26,7 +26,8 @@ defmodule Agenda.Arrangement do
           allocations: %{optional(atom()) => [Resource.t()]},
           attending: %{optional(atom()) => [Resource.t()]},
           score: number(),
-          series: String.t() | nil
+          series: String.t() | nil,
+          recurrence_id: Tempo.t() | nil
         }
 
   defstruct session: nil,
@@ -34,7 +35,8 @@ defmodule Agenda.Arrangement do
             allocations: %{},
             attending: %{},
             score: 0,
-            series: nil
+            series: nil,
+            recurrence_id: nil
 
   @doc """
   Every resource allocated, across all requirements.

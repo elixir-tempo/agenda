@@ -33,7 +33,8 @@ defmodule Agenda.Session do
           requirements: [Requirement.t()],
           preferences: keyword(),
           invitees: keyword([Resource.t()]),
-          series: String.t() | nil
+          series: String.t() | nil,
+          recurrence_id: Tempo.t() | nil
         }
 
   defstruct name: nil,
@@ -42,7 +43,8 @@ defmodule Agenda.Session do
             requirements: [],
             preferences: [],
             invitees: [],
-            series: nil
+            series: nil,
+            recurrence_id: nil
 
   @doc """
   Build a session.

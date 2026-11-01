@@ -30,6 +30,26 @@ defmodule Agenda.Series do
   > *"The stand-up repeats weekly three times; the first occurrence may
   > fall anywhere in the week beginning the 2nd of March."*
 
+  ### Identity
+
+  An occurrence carries two identities, and every arrangement planned
+  for it and every allocation it holds carries them too:
+
+  * **`series`** is the original session's name: the whole run, as
+    iCalendar's master event is. `Agenda.release_series/3` frees by it.
+
+  * **`recurrence_id`** is the start of the repetition the occurrence
+    was expanded for: which occurrence it is, as iCalendar's
+    `RECURRENCE-ID` is the original start of an instance. It stays the
+    same wherever in its window the occurrence is planned, and however
+    often it is re-planned.
+
+  An occurrence's name (`"Stand-up 3"`) counts its place in one
+  expansion, so it changes when the run starts later; its
+  `recurrence_id` does not. An adapter writes the run as one iCalendar
+  event, the instances keyed by `recurrence_id`, rather than as many
+  unrelated ones.
+
   `expand/3` expands a session over a pattern, one occurrence per
   repetition.
 
@@ -37,6 +57,7 @@ defmodule Agenda.Series do
 
   alias Agenda.Availability
   alias Agenda.Session
+  alias Tempo.Interval
   alias Tempo.IntervalSet
 
   @doc """
@@ -44,6 +65,8 @@ defmodule Agenda.Series do
 
   Each occurrence is a full session whose window is that repetition's
   span, so an occurrence can be planned, moved, or refused on its own.
+  Its `series` is `session`'s name and its `recurrence_id` the
+  repetition's start.
 
   ### Arguments
 
@@ -75,6 +98,12 @@ defmodule Agenda.Series do
       iex> length(occurrences)
       2
 
+      iex> import Tempo.Sigils
+      iex> clinic = Agenda.session("Clinic", duration: "PT4H")
+      iex> {:ok, occurrences} = Agenda.Series.expand(clinic, "R2/2027-03-02/P1D")
+      iex> Enum.map(occurrences, & &1.recurrence_id)
+      [~o"2027Y3M2D", ~o"2027Y3M3D"]
+
       iex> clinic = Agenda.session("Clinic", duration: "PT4H")
       iex> Agenda.Series.expand(clinic, "not a recurrence")
       {:error, :unreadable_pattern}
@@ -102,8 +131,14 @@ defmodule Agenda.Series do
 
   # Each occurrence keeps the original's requirements and length, and
   # takes the repetition's span as its window. The series name is what
-  # they hold in common.
+  # they hold in common, and the repetition's start is which one it is.
   defp occurrence(%Session{} = session, {window, index}) do
-    %{session | name: "#{session.name} #{index}", window: window, series: session.name}
+    %{
+      session
+      | name: "#{session.name} #{index}",
+        window: window,
+        series: session.name,
+        recurrence_id: Interval.from(window)
+    }
   end
 end

@@ -18,6 +18,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 * `Agenda.Place.new/2` takes `:location_type`, RFC 9073's `LOCATION-TYPE`; the `Agenda.Place` moduledoc maps a place onto `VLOCATION` and says what an export loses.
 
+* An occurrence of `Agenda.Series.expand/3` carries a `recurrence_id`, the start of its repetition (iCalendar's `RECURRENCE-ID`), into its arrangements and allocations, beside the `series` name.
+
 ## [v0.2.0] — 2026-10-28
 
 ### Breaking changes

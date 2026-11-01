@@ -54,6 +54,10 @@ defmodule Agenda.Allocation do
   `tag` records what the claim was for. `nil` means untagged, which is
   every allocation made before a caller asks for one.
 
+  `series` and `recurrence_id` name the run and the occurrence a claim
+  belongs to when its session is an occurrence of a series, and are
+  `nil` otherwise. See `Agenda.Series`.
+
   """
   @type t :: %__MODULE__{
           session: String.t(),
@@ -61,6 +65,7 @@ defmodule Agenda.Allocation do
           resource: String.t(),
           interval: Tempo.t(),
           series: String.t() | nil,
+          recurrence_id: Tempo.t() | nil,
           held_until: Tempo.t() | nil,
           tag: tag() | nil
         }
@@ -76,7 +81,16 @@ defmodule Agenda.Allocation do
   """
   @type tag :: {atom(), term()}
 
-  defstruct [:session, :requirement, :resource, :interval, :series, :held_until, :tag]
+  defstruct [
+    :session,
+    :requirement,
+    :resource,
+    :interval,
+    :series,
+    :recurrence_id,
+    :held_until,
+    :tag
+  ]
 
   @doc """
   The allocations an arrangement implies — one per resource, across
@@ -140,6 +154,7 @@ defmodule Agenda.Allocation do
           resource: resource.name,
           interval: arrangement.interval,
           series: arrangement.series,
+          recurrence_id: arrangement.recurrence_id,
           tag: tag
         }
       end)

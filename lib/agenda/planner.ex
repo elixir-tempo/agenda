@@ -410,7 +410,8 @@ defmodule Agenda.Planner do
            interval: interval,
            allocations: allocations,
            score: 0,
-           series: session.series
+           series: session.series,
+           recurrence_id: session.recurrence_id
          }
        end)}
     end

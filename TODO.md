@@ -7,13 +7,13 @@ breaking change, recorded in the CHANGELOG for the next minor release.
 
 ## Open
 
-* [ ] **Carry recurrence identity through `Agenda.Series`** — a master identity on the series and an instance identity on each expansion, so a round trip does not turn one weekly stand-up into fifty-two unrelated events. Touches `lib/agenda/series.ex`.
-
 * [ ] **Adopt `CONCEPT` as the export of `Agenda.Track`** — keep the word `Track`; `CONCEPT` names the grouping, not the no-overlap rule, which export loses.
 
 * [ ] **Record the mappings that already line up** — in the moduledocs: `precede/4`'s `:gap` is RFC 9253's `GAP` and `RELTYPE=FINISHTOSTART`; `open/2` is `VAVAILABILITY`'s `AVAILABLE` (export direction still unwritten); `Session.window` and `duration` are CalDAV `time-range` and `DURATION`; hold/confirm/cancel are `TENTATIVE`/`CONFIRMED`/`CANCELLED`; roster and invitees are `REQ-` and `OPT-PARTICIPANT`.
 
 ## Done
+
+* [x] **Carry recurrence identity through `Agenda.Series`** — `series` is the run, and a new `recurrence_id`, the repetition's start, is the occurrence, carried through `Session`, `Arrangement` and `Allocation`. 2026-11-01, v0.3.0 (unreleased).
 
 * [x] **Map `Agenda.Place` onto `VLOCATION`** — a `:location_type` field for `LOCATION-TYPE`, and the moduledoc records that the nesting, `separation/2` and `travel_time/3` do not survive export. 2026-11-01, v0.3.0 (unreleased).
 

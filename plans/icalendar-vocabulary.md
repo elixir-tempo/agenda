@@ -129,6 +129,12 @@ is the cheapest this will ever be.
    evidence that the identity exists and is simply not written down. Touches
    `lib/agenda/series.ex`.
 
+   Done 2026-11-01: `series` was already the master identity, carried to
+   every allocation. The instance identity is a new `recurrence_id`, the
+   repetition's start, on `Session`, `Arrangement` and `Allocation`. The rule
+   is not carried: an adapter writes the master from `series` and its
+   instances' `recurrence_id`s, or from the pattern given to `every/3`.
+
 7. **Adopt `CONCEPT` as the export of `Agenda.Track`.** RFC 9253's `CONCEPT`
    (or RFC 7986's `CATEGORIES`, which is weaker) is the closest iCalendar has
    to a named grouping of sessions. The *constraint* a track carries — that

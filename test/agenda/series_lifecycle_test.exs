@@ -20,7 +20,7 @@ defmodule Agenda.SeriesLifecycleTest do
 
     {:ok, occurrences} = Agenda.every(standup, "R4/2027-03-01T09:00:00/P1W")
 
-    %{room: room, occurrences: occurrences}
+    %{room: room, standup: standup, occurrences: occurrences}
   end
 
   defp book_all(occurrences, room) do
@@ -87,6 +87,53 @@ defmodule Agenda.SeriesLifecycleTest do
         |> Enum.map(&Interval.from(&1.interval))
 
       assert length(Enum.uniq(starts)) == 4
+    end
+  end
+
+  describe "recurrence identity" do
+    test "an occurrence's recurrence_id is the start of its repetition", context do
+      assert Enum.map(context.occurrences, & &1.recurrence_id) == [
+               ~o"2027Y3M1DT9H0M0S",
+               ~o"2027Y3M8DT9H0M0S",
+               ~o"2027Y3M15DT9H0M0S",
+               ~o"2027Y3M22DT9H0M0S"
+             ]
+    end
+
+    test "a session that does not repeat has none" do
+      assert Agenda.session("Review", duration: ~o"PT1H").recurrence_id == nil
+    end
+
+    test "names count the run, the recurrence_id names the occurrence", context do
+      {:ok, later} = Agenda.every(context.standup, "R3/2027-03-08T09:00:00/P1W")
+
+      second = Enum.at(context.occurrences, 1)
+      first_of_later = hd(later)
+
+      assert first_of_later.name != second.name
+      assert first_of_later.recurrence_id == second.recurrence_id
+    end
+
+    test "is carried into every arrangement and allocation, wherever it is planned", context do
+      occurrence = Enum.at(context.occurrences, 1)
+      {:ok, arrangements} = Agenda.plan(occurrence, [context.room])
+
+      assert Enum.all?(arrangements, &(&1.recurrence_id == occurrence.recurrence_id))
+      assert length(Enum.uniq_by(arrangements, & &1.interval)) > 1
+
+      {:ok, ledger} = Agenda.allocate(Agenda.ledger(), List.last(arrangements))
+
+      assert [%{recurrence_id: recurrence_id}] = Ledger.to_list(ledger)
+      assert recurrence_id == occurrence.recurrence_id
+    end
+
+    test "survives rebuilding arrangements from the ledger", context do
+      ledger = book_all(context.occurrences, context.room)
+      {:ok, rebuilt} = Ledger.arrangements(ledger, [context.room])
+
+      assert rebuilt
+             |> Enum.map(& &1.recurrence_id)
+             |> Enum.sort(Tempo) == Enum.map(context.occurrences, & &1.recurrence_id)
     end
   end
 

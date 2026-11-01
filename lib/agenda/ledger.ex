@@ -877,7 +877,8 @@ defmodule Agenda.Ledger do
              |> Map.new(fn {requirement, held} ->
                {requirement, Enum.map(held, &Map.fetch!(known, &1.resource))}
              end),
-           series: hd(allocations).series
+           series: hd(allocations).series,
+           recurrence_id: hd(allocations).recurrence_id
          }}
 
       strangers ->
